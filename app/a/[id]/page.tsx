@@ -3,7 +3,7 @@ import TrackView from "./TrackView";
 
 export const dynamic = "force-dynamic";
 
-type Lead={id:string;company:string;contact:string;city:string;industry:string;roofArea:number;energyScore:number;notes:string};
+type Lead={id:string;company:string;contact:string;city:string;industry:string;roofArea:number;energyScore:number;notes:string;videoUrl?:string};
 type Store={leads:Lead[];settings?:{companyName?:string;senderName?:string;calendarUrl?:string}};
 
 export default async function AnalysisPage({params}:{params:Promise<{id:string}>}){
@@ -19,6 +19,7 @@ export default async function AnalysisPage({params}:{params:Promise<{id:string}>
       <div style={{fontSize:12,letterSpacing:".18em",color:"#63eaaa",fontWeight:800}}>{company.toUpperCase()} · VORANALYSE</div>
       <h1 style={{fontSize:"clamp(36px,7vw,72px)",lineHeight:.98,letterSpacing:"-.05em",maxWidth:850,margin:"22px 0"}}>Energie-Potenzial für {lead.company}</h1>
       <p style={{maxWidth:720,color:"#95a2b7",fontSize:18,lineHeight:1.65}}>Wir haben öffentlich verfügbare Unternehmens- und Gebäudedaten für eine erste Vertriebs-Vorabschätzung zusammengeführt. Diese Analyse ersetzt keine technische Planung.</p>
+      {lead.videoUrl&&<section style={{margin:"30px 0",border:"1px solid #223244",borderRadius:22,padding:10,background:"#05080d",overflow:"hidden"}}><video controls preload="metadata" src={lead.videoUrl} style={{width:"100%",display:"block",borderRadius:15,aspectRatio:"16/9",background:"#000"}}/></section>}
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(210px,1fr))",gap:14,margin:"36px 0"}}>
         {[["Energy Score",`${lead.energyScore}/100`],["Standort",lead.city||"—"],["Branche",lead.industry||"—"],["Dachfläche",lead.roofArea?`ca. ${lead.roofArea.toLocaleString("de-DE")} m²`:"noch offen"]].map(([k,v])=><div key={k} style={{border:"1px solid #1f2b3b",borderRadius:18,padding:22,background:"#0d141f"}}><small style={{color:"#738097",textTransform:"uppercase",letterSpacing:".1em"}}>{k}</small><strong style={{display:"block",fontSize:26,marginTop:8}}>{v}</strong></div>)}
       </div>
