@@ -11,7 +11,8 @@ const schema = z.object({
 
 export async function POST(request: Request) {
   const secret = process.env.WEBHOOK_SECRET;
-  if (secret && request.headers.get("x-energy-radar-secret") !== secret) return Response.json({ error:"Unauthorized" }, { status:401 });
+  if (!secret) return Response.json({ error:"WEBHOOK_SECRET fehlt." }, { status:503 });
+  if (request.headers.get("x-energy-radar-secret") !== secret) return Response.json({ error:"Unauthorized" }, { status:401 });
   try {
     const input = schema.parse(await request.json());
     await query("insert into er_events(workspace,lead_id,type,meta) values('default',$1,$2,$3::jsonb)", [input.leadId || null,input.type,JSON.stringify({ ...input.meta, email:input.email })]);
