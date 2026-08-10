@@ -52,6 +52,13 @@ export async function ensureSchema() {
       meta jsonb not null default '{}'::jsonb,
       created_at timestamptz not null default now()
     );
+    create table if not exists er_secrets (
+      workspace text not null,
+      key text not null,
+      encrypted_value text not null,
+      updated_at timestamptz not null default now(),
+      primary key(workspace,key)
+    );
   `);
   initialized = true;
 }
