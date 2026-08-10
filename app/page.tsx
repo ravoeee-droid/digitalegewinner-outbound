@@ -1,5 +1,5 @@
-import EnergyRadarPro from "./ui/EnergyRadarPro";
+import EnergyRadarLive from "./ui/EnergyRadarLive";
 
 export default function Page() {
-  return <EnergyRadarPro />;
+  return <EnergyRadarLive />;
 }
