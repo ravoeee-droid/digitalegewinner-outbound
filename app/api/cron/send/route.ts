@@ -10,15 +10,14 @@ type Credential = { id:string; provider:"gmail"|"microsoft"|"smtp"; email:string
 function authorized(request: Request) {
   const expected = process.env.CRON_SECRET;
   if (!expected) return false;
-  const auth = request.headers.get("authorization") || "";
-  return auth === `Bearer ${expected}`;
+  return (request.headers.get("authorization") || "") === `Bearer ${expected}`;
 }
 
-export async function POST(request: Request) {
+async function run(request: Request) {
   if (!authorized(request)) return Response.json({ error:"Unauthorized" }, { status:401 });
-  const raw = process.env.MAILBOX_CREDENTIALS_JSON || "[]";
   let credentials: Credential[] = [];
-  try { credentials = JSON.parse(raw) as Credential[]; } catch { return Response.json({ error:"MAILBOX_CREDENTIALS_JSON ist ungültig." }, { status:503 }); }
+  try { credentials = JSON.parse(process.env.MAILBOX_CREDENTIALS_JSON || "[]") as Credential[]; }
+  catch { return Response.json({ error:"MAILBOX_CREDENTIALS_JSON ist ungültig." }, { status:503 }); }
   const credMap = new Map(credentials.map((c) => [c.id,c]));
   const due = await query<OutboxRow>(
     `select o.id,o.lead_id,o.mailbox_id,o.recipient,o.subject,o.body,o.attempts
@@ -47,3 +46,6 @@ export async function POST(request: Request) {
   }
   return Response.json({ ok:true, processed:due.length, sent, failed, skipped });
 }
+
+export async function GET(request: Request) { return run(request); }
+export async function POST(request: Request) { return run(request); }
