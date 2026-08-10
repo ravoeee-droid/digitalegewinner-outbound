@@ -28,6 +28,7 @@ export async function ensureSchema() {
       recipient text not null,
       subject text not null,
       body text not null,
+      variant text not null default 'A',
       status text not null default 'queued',
       attempts integer not null default 0,
       scheduled_at timestamptz not null default now(),
@@ -36,7 +37,9 @@ export async function ensureSchema() {
       error text,
       created_at timestamptz not null default now()
     );
+    alter table er_outbox add column if not exists variant text not null default 'A';
     create index if not exists er_outbox_due_idx on er_outbox(status, scheduled_at);
+    create index if not exists er_outbox_campaign_idx on er_outbox(campaign_id, variant, status);
     create table if not exists er_suppressions (
       workspace text not null,
       email text not null,
