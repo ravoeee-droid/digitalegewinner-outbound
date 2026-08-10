@@ -1,6 +1,6 @@
 {
   "name": "energy-radar-ai",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "private": true,
   "engines": { "node": ">=22.17.0" },
   "scripts": {
@@ -12,19 +12,18 @@
     "test": "npm run typecheck && npm run lint"
   },
   "dependencies": {
-    "imapflow": "1.0.195",
     "next": "16.2.6",
-    "nodemailer": "7.0.6",
-    "openai": "5.12.2",
-    "pg": "8.16.3",
+    "nodemailer": "9.0.3",
+    "openai": "6.48.0",
+    "pg": "8.22.0",
     "react": "19.2.6",
     "react-dom": "19.2.6",
     "zod": "4.3.6"
   },
   "devDependencies": {
     "@types/node": "22.19.19",
-    "@types/nodemailer": "7.0.1",
-    "@types/pg": "8.15.5",
+    "@types/nodemailer": "8.0.1",
+    "@types/pg": "8.20.0",
     "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",
     "eslint": "9.39.4",
