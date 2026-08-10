@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { deleteSecret, secretStatus, setSecret } from "@/lib/secrets";
 
-const allowed=["openai_api_key","google_maps_api_key","email_verifier_api_key","google_client_id","google_client_secret","microsoft_client_id","microsoft_client_secret","mailbox_credentials_json"] as const;
+const allowed=["openai_api_key","google_maps_api_key","email_verifier_api_key","google_client_id","google_client_secret","microsoft_client_id","microsoft_client_secret","mailbox_credentials_json","video_renderer_url","video_renderer_secret"] as const;
 const keySchema=z.enum(allowed);
 const input=z.object({key:keySchema,value:z.string().max(50000)});
 
