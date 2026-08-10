@@ -10,6 +10,8 @@ const fields=[
  ["google_client_secret","Google OAuth Client Secret","password"],
  ["microsoft_client_id","Microsoft OAuth Client ID","text"],
  ["microsoft_client_secret","Microsoft OAuth Client Secret","password"],
+ ["video_renderer_url","Loom / Video Renderer API URL","text"],
+ ["video_renderer_secret","Loom / Video Renderer Secret","password"],
  ["mailbox_credentials_json","Mailbox Credentials JSON (optional fallback)","password"],
 ] as const;
 
