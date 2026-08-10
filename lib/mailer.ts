@@ -1,4 +1,5 @@
 import nodemailer from "nodemailer";
+import { getSecret } from "@/lib/secrets";
 
 type MailboxConfig = {
   provider: "gmail" | "microsoft" | "smtp";
@@ -18,8 +19,10 @@ function mimeHeader(value: string) { return value.replace(/[\r\n]+/g, " ").trim(
 
 async function googleToken(input: MailboxConfig) {
   if (input.accessToken) return input.accessToken;
-  if (!input.refreshToken || !process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) throw new Error("Google OAuth Credentials fehlen.");
-  const body = new URLSearchParams({ client_id: process.env.GOOGLE_CLIENT_ID, client_secret: process.env.GOOGLE_CLIENT_SECRET, refresh_token: input.refreshToken, grant_type: "refresh_token" });
+  const clientId = process.env.GOOGLE_CLIENT_ID || await getSecret("google_client_id");
+  const clientSecret = process.env.GOOGLE_CLIENT_SECRET || await getSecret("google_client_secret");
+  if (!input.refreshToken || !clientId || !clientSecret) throw new Error("Google OAuth Credentials fehlen.");
+  const body = new URLSearchParams({ client_id: clientId, client_secret: clientSecret, refresh_token: input.refreshToken, grant_type: "refresh_token" });
   const r = await fetch("https://oauth2.googleapis.com/token", { method:"POST", headers:{"content-type":"application/x-www-form-urlencoded"}, body });
   if (!r.ok) throw new Error(`Google Token Refresh fehlgeschlagen (${r.status}).`);
   const j = await r.json() as { access_token?: string };
@@ -29,8 +32,10 @@ async function googleToken(input: MailboxConfig) {
 
 async function microsoftToken(input: MailboxConfig) {
   if (input.accessToken) return input.accessToken;
-  if (!input.refreshToken || !process.env.MICROSOFT_CLIENT_ID || !process.env.MICROSOFT_CLIENT_SECRET) throw new Error("Microsoft OAuth Credentials fehlen.");
-  const body = new URLSearchParams({ client_id:process.env.MICROSOFT_CLIENT_ID, client_secret:process.env.MICROSOFT_CLIENT_SECRET, refresh_token:input.refreshToken, grant_type:"refresh_token", scope:"offline_access Mail.Send Mail.Read" });
+  const clientId = process.env.MICROSOFT_CLIENT_ID || await getSecret("microsoft_client_id");
+  const clientSecret = process.env.MICROSOFT_CLIENT_SECRET || await getSecret("microsoft_client_secret");
+  if (!input.refreshToken || !clientId || !clientSecret) throw new Error("Microsoft OAuth Credentials fehlen.");
+  const body = new URLSearchParams({ client_id:clientId, client_secret:clientSecret, refresh_token:input.refreshToken, grant_type:"refresh_token", scope:"offline_access Mail.Send Mail.Read" });
   const r = await fetch("https://login.microsoftonline.com/common/oauth2/v2.0/token", { method:"POST", headers:{"content-type":"application/x-www-form-urlencoded"}, body });
   if (!r.ok) throw new Error(`Microsoft Token Refresh fehlgeschlagen (${r.status}).`);
   const j = await r.json() as { access_token?: string };
