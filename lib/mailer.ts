@@ -1,7 +1,8 @@
 import nodemailer from "nodemailer";
 import { getSecret } from "@/lib/secrets";
 
-type MailboxConfig = {
+export type MailboxConfig = {
+  id?: string;
   provider: "gmail" | "microsoft" | "smtp";
   email: string;
   name?: string;
@@ -41,6 +42,12 @@ async function microsoftToken(input: MailboxConfig) {
   const j = await r.json() as { access_token?: string };
   if (!j.access_token) throw new Error("Microsoft Access Token fehlt.");
   return j.access_token;
+}
+
+export async function getMailboxAccessToken(input: MailboxConfig) {
+  if (input.provider === "gmail") return googleToken(input);
+  if (input.provider === "microsoft") return microsoftToken(input);
+  throw new Error("SMTP verwendet keinen OAuth Access Token.");
 }
 
 async function sendGmail(input: SendInput) {
