@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { validSession, adminCookieName } from "@/lib/admin-auth";
 
-const publicPrefixes=["/login","/api/auth/login","/a/","/api/track","/api/events/inbound","/api/cron/","/api/oauth/google/callback","/api/oauth/microsoft/callback"];
+const publicPrefixes=["/login","/api/auth/login","/a/","/api/track","/api/events/inbound","/api/cron/","/api/oauth/google/callback","/api/oauth/microsoft/callback","/api/video/callback"];
 
 export function proxy(request:NextRequest){
  const {pathname}=request.nextUrl;
