@@ -1,0 +1,15 @@
+import { decodeOAuthState } from "@/lib/oauth-state";
+import { getSecret, setSecret } from "@/lib/secrets";
+
+export async function GET(request:Request){
+ const url=new URL(request.url);const code=url.searchParams.get("code");const stateRaw=url.searchParams.get("state");
+ try{
+  if(!code||!stateRaw)throw new Error("OAuth Code/State fehlt.");const state=decodeOAuthState(stateRaw);if(state.provider!=="microsoft")throw new Error("Falscher OAuth Provider.");
+  const clientId=process.env.MICROSOFT_CLIENT_ID||await getSecret("microsoft_client_id");const clientSecret=process.env.MICROSOFT_CLIENT_SECRET||await getSecret("microsoft_client_secret");if(!clientId||!clientSecret)throw new Error("Microsoft OAuth Credentials fehlen.");
+  const base=process.env.NEXT_PUBLIC_APP_URL||url.origin;const body=new URLSearchParams({client_id:clientId,client_secret:clientSecret,code,redirect_uri:`${base}/api/oauth/microsoft/callback`,grant_type:"authorization_code",scope:"openid profile email offline_access User.Read Mail.Send Mail.Read"});
+  const tokenResponse=await fetch("https://login.microsoftonline.com/common/oauth2/v2.0/token",{method:"POST",headers:{"content-type":"application/x-www-form-urlencoded"},body});if(!tokenResponse.ok)throw new Error(`Microsoft Token Exchange fehlgeschlagen (${tokenResponse.status}).`);const token=await tokenResponse.json() as {access_token?:string;refresh_token?:string};if(!token.access_token)throw new Error("Microsoft Access Token fehlt.");
+  const profileResponse=await fetch("https://graph.microsoft.com/v1.0/me?$select=displayName,mail,userPrincipalName",{headers:{Authorization:`Bearer ${token.access_token}`}});if(!profileResponse.ok)throw new Error("Microsoft Profil konnte nicht gelesen werden.");const profile=await profileResponse.json() as {displayName?:string;mail?:string;userPrincipalName?:string};const email=profile.mail||profile.userPrincipalName;if(!email)throw new Error("Microsoft Mailbox E-Mail fehlt.");
+  const raw=await getSecret("mailbox_credentials_json").catch(()=>"");let list:Array<Record<string,unknown>>=[];try{list=raw?JSON.parse(raw):[]}catch{}const existing=list.find(x=>x.id===state.mailboxId) as Record<string,unknown>|undefined;const credential={...(existing||{}),id:state.mailboxId,provider:"microsoft",email,name:state.name||profile.displayName||existing?.name||email,refreshToken:token.refresh_token||existing?.refreshToken,accessToken:token.refresh_token?undefined:token.access_token};const next=[...list.filter(x=>x.id!==state.mailboxId),credential];await setSecret("mailbox_credentials_json",JSON.stringify(next));
+  return Response.redirect(`${base}/?oauth=microsoft-connected`);
+ }catch(error){return Response.json({error:error instanceof Error?error.message:"Microsoft OAuth fehlgeschlagen."},{status:400})}
+}
