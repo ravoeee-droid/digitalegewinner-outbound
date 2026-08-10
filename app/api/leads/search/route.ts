@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { getSecret } from "@/lib/secrets";
 
 export const runtime="nodejs";
 const schema=z.object({query:z.string().min(3).max(300),pageSize:z.number().int().min(1).max(20).default(20)});
@@ -7,8 +8,8 @@ type Place={id?:string;displayName?:{text?:string};formattedAddress?:string;webs
 export async function POST(request:Request){
  try{
   const input=schema.parse(await request.json());
-  const key=process.env.GOOGLE_MAPS_API_KEY;
-  if(!key)return Response.json({error:"GOOGLE_MAPS_API_KEY fehlt."},{status:503});
+  const key=process.env.GOOGLE_MAPS_API_KEY||await getSecret("google_maps_api_key");
+  if(!key)return Response.json({error:"Google Maps / Solar API ist noch nicht verbunden."},{status:503});
   const r=await fetch("https://places.googleapis.com/v1/places:searchText",{method:"POST",headers:{"content-type":"application/json","X-Goog-Api-Key":key,"X-Goog-FieldMask":"places.id,places.displayName,places.formattedAddress,places.websiteUri,places.nationalPhoneNumber,places.primaryTypeDisplayName,places.location"},body:JSON.stringify({textQuery:input.query,pageSize:input.pageSize,languageCode:"de"})});
   if(!r.ok)return Response.json({error:`Google Places Fehler (${r.status}).`},{status:502});
   const data=await r.json() as {places?:Place[]};
