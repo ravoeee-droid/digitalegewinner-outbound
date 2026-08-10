@@ -5,6 +5,7 @@ type MailboxConfig = {
   email: string;
   name?: string;
   accessToken?: string;
+  refreshToken?: string;
   smtpHost?: string;
   smtpPort?: number;
   smtpUser?: string;
@@ -15,8 +16,30 @@ type SendInput = MailboxConfig & { to: string; subject: string; text: string; ht
 
 function mimeHeader(value: string) { return value.replace(/[\r\n]+/g, " ").trim(); }
 
+async function googleToken(input: MailboxConfig) {
+  if (input.accessToken) return input.accessToken;
+  if (!input.refreshToken || !process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) throw new Error("Google OAuth Credentials fehlen.");
+  const body = new URLSearchParams({ client_id: process.env.GOOGLE_CLIENT_ID, client_secret: process.env.GOOGLE_CLIENT_SECRET, refresh_token: input.refreshToken, grant_type: "refresh_token" });
+  const r = await fetch("https://oauth2.googleapis.com/token", { method:"POST", headers:{"content-type":"application/x-www-form-urlencoded"}, body });
+  if (!r.ok) throw new Error(`Google Token Refresh fehlgeschlagen (${r.status}).`);
+  const j = await r.json() as { access_token?: string };
+  if (!j.access_token) throw new Error("Google Access Token fehlt.");
+  return j.access_token;
+}
+
+async function microsoftToken(input: MailboxConfig) {
+  if (input.accessToken) return input.accessToken;
+  if (!input.refreshToken || !process.env.MICROSOFT_CLIENT_ID || !process.env.MICROSOFT_CLIENT_SECRET) throw new Error("Microsoft OAuth Credentials fehlen.");
+  const body = new URLSearchParams({ client_id:process.env.MICROSOFT_CLIENT_ID, client_secret:process.env.MICROSOFT_CLIENT_SECRET, refresh_token:input.refreshToken, grant_type:"refresh_token", scope:"offline_access Mail.Send Mail.Read" });
+  const r = await fetch("https://login.microsoftonline.com/common/oauth2/v2.0/token", { method:"POST", headers:{"content-type":"application/x-www-form-urlencoded"}, body });
+  if (!r.ok) throw new Error(`Microsoft Token Refresh fehlgeschlagen (${r.status}).`);
+  const j = await r.json() as { access_token?: string };
+  if (!j.access_token) throw new Error("Microsoft Access Token fehlt.");
+  return j.access_token;
+}
+
 async function sendGmail(input: SendInput) {
-  if (!input.accessToken) throw new Error("Gmail access token fehlt.");
+  const accessToken = await googleToken(input);
   const raw = [
     `From: ${mimeHeader(input.name || input.email)} <${input.email}>`,
     `To: ${mimeHeader(input.to)}`,
@@ -29,7 +52,7 @@ async function sendGmail(input: SendInput) {
   const encoded = Buffer.from(raw).toString("base64url");
   const response = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages/send", {
     method: "POST",
-    headers: { Authorization: `Bearer ${input.accessToken}`, "Content-Type": "application/json" },
+    headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
     body: JSON.stringify({ raw: encoded }),
   });
   if (!response.ok) throw new Error(`Gmail Versand fehlgeschlagen (${response.status}).`);
@@ -38,10 +61,10 @@ async function sendGmail(input: SendInput) {
 }
 
 async function sendMicrosoft(input: SendInput) {
-  if (!input.accessToken) throw new Error("Microsoft access token fehlt.");
+  const accessToken = await microsoftToken(input);
   const response = await fetch("https://graph.microsoft.com/v1.0/me/sendMail", {
     method: "POST",
-    headers: { Authorization: `Bearer ${input.accessToken}`, "Content-Type": "application/json" },
+    headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
     body: JSON.stringify({
       message: {
         subject: input.subject,
