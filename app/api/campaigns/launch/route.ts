@@ -4,15 +4,16 @@ import { z } from "zod";
 export const runtime = "nodejs";
 const variantSchema=z.object({label:z.string().min(1).max(20),subject:z.string().min(1),body:z.string().min(1)});
 const stepSchema=z.object({waitDays:z.number().int().min(0).max(60),subject:z.string().min(1),body:z.string().min(1),variants:z.array(variantSchema).min(2).max(3).optional()});
+const filterSchema=z.object({industry:z.string().optional(),city:z.string().optional(),minEnergyScore:z.number().min(0).max(100).optional(),minWebsiteScore:z.number().min(0).max(100).optional(),minIntentScore:z.number().min(0).max(100).optional()});
 const schema = z.object({
-  campaign: z.object({id:z.string(),steps:z.array(stepSchema).min(1),filters:z.object({industry:z.string().optional(),city:z.string().optional(),minEnergyScore:z.number().min(0).max(100).optional()}).optional()}),
-  leads:z.array(z.object({id:z.string(),email:z.string().email(),company:z.string(),contact:z.string().optional().default(""),city:z.string().optional().default(""),industry:z.string().optional().default(""),energyScore:z.number().optional().default(0)})).min(1).max(5000),
+  campaign: z.object({id:z.string(),steps:z.array(stepSchema).min(1),filters:filterSchema.optional()}),
+  leads:z.array(z.object({id:z.string(),email:z.string().email(),company:z.string(),contact:z.string().optional().default(""),city:z.string().optional().default(""),industry:z.string().optional().default(""),energyScore:z.number().optional().default(0),websiteScore:z.number().optional().default(0),intentScore:z.number().optional().default(0)})).min(1).max(5000),
   mailboxes:z.array(z.object({id:z.string(),enabled:z.boolean(),dailyLimit:z.number().int().min(1).max(100)})).min(1),
-  senderName:z.string().default("Walkenhorst Energie"),appUrl:z.string().url().optional(),
+  senderName:z.string().default("Digitale Gewinner"),appUrl:z.string().url().optional(),
 });
 function render(template:string,lead:{id:string;company:string;contact:string;city:string},senderName:string,appUrl:string){const first=lead.contact.trim().split(/\s+/)[0]||"Guten Tag";return template.replaceAll("{{first_name}}",first).replaceAll("{{company}}",lead.company).replaceAll("{{city}}",lead.city).replaceAll("{{sender_name}}",senderName).replaceAll("{{analysis_link}}",`${appUrl}/a/${encodeURIComponent(lead.id)}`)}
 function hash(value:string){let h=2166136261;for(let i=0;i<value.length;i++){h^=value.charCodeAt(i);h=Math.imul(h,16777619)}return h>>>0}
-function matches(lead:{industry:string;city:string;energyScore:number},filters?:{industry?:string;city?:string;minEnergyScore?:number}){if(!filters)return true;if(filters.industry&&!lead.industry.toLowerCase().includes(filters.industry.toLowerCase()))return false;if(filters.city&&!lead.city.toLowerCase().includes(filters.city.toLowerCase()))return false;if(typeof filters.minEnergyScore==="number"&&lead.energyScore<filters.minEnergyScore)return false;return true}
+function matches(lead:{industry:string;city:string;energyScore:number;websiteScore:number;intentScore:number},filters?:z.infer<typeof filterSchema>){if(!filters)return true;if(filters.industry&&!lead.industry.toLowerCase().includes(filters.industry.toLowerCase()))return false;if(filters.city&&!lead.city.toLowerCase().includes(filters.city.toLowerCase()))return false;if(typeof filters.minEnergyScore==="number"&&lead.energyScore<filters.minEnergyScore)return false;if(typeof filters.minWebsiteScore==="number"&&lead.websiteScore<filters.minWebsiteScore)return false;if(typeof filters.minIntentScore==="number"&&lead.intentScore<filters.minIntentScore)return false;return true}
 export async function POST(request:Request){
  try{
   const input=schema.parse(await request.json());const active=input.mailboxes.filter(m=>m.enabled&&m.dailyLimit>0);if(!active.length)return Response.json({error:"Keine aktive Mailbox."},{status:409});
