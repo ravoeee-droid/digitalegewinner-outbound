@@ -4,6 +4,7 @@ import IntegrationVaultWidget from "./ui/IntegrationVaultWidget";
 import LeadFinderWidget from "./ui/LeadFinderWidget";
 import CampaignLabWidget from "./ui/CampaignLabWidget";
 import WebsiteAuditWidget from "./ui/WebsiteAuditWidget";
+import NoShowRescueWidget from "./ui/NoShowRescueWidget";
 
 export default function Page() {
   return (
@@ -13,6 +14,7 @@ export default function Page() {
       <LeadFinderWidget />
       <CampaignLabWidget />
       <WebsiteAuditWidget />
+      <NoShowRescueWidget />
       <IntegrationVaultWidget />
     </>
   );
