@@ -32,7 +32,15 @@ async function run(request: Request) {
      from er_outbox o
      where o.status='queued' and o.scheduled_at<=now()
        and not exists(select 1 from er_suppressions s where s.workspace=o.workspace and lower(s.email)=lower(o.recipient))
-       and not exists(select 1 from er_events e where e.workspace=o.workspace and e.lead_id=o.lead_id and e.type in ('reply','positive_reply','appointment'))
+       and not exists(
+         select 1 from er_events e
+         where e.workspace=o.workspace and e.lead_id=o.lead_id
+           and (
+             e.type in ('reply','positive_reply')
+             or (e.type='appointment' and coalesce(o.campaign_id,'') not like 'noshow:%')
+             or (e.type='appointment_attended' and coalesce(o.campaign_id,'') like 'noshow:%')
+           )
+       )
      order by o.scheduled_at asc limit 100`
   );
   let sent=0, failed=0, skipped=0, limited=0;
