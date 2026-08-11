@@ -23,7 +23,7 @@ async function run(request: Request) {
   const credMap = new Map(credentials.map((c) => [c.id,c]));
   const state = (await readState().catch(() => null))?.payload as State | undefined;
   const mailboxLimits = new Map((state?.mailboxes || []).filter((m) => m.enabled).map((m) => [m.id, Math.max(1, Math.min(100, Number(m.dailyLimit || 30)))]));
-  const campaignLimits = new Map((state?.campaigns || []).filter((c) => c.status === "Aktiv").map((c) => [c.id, Math.max(1, Math.min(500, Number(c.dailyLimit || 150)))]));
+  const campaignLimits = new Map((state?.campaigns || []).map((c) => [c.id, Math.max(1, Math.min(500, Number(c.dailyLimit || 150)))]));
 
   await query("update er_outbox set status='queued',scheduled_at=now()+interval '5 minutes',error='Stale send claim recovered' where workspace='default' and status='sending' and scheduled_at<now()-interval '15 minutes'");
 
@@ -71,7 +71,7 @@ async function run(request: Request) {
     }
     const mailboxLimit = mailboxLimits.get(row.mailbox_id) ?? 30;
     const mailboxCurrent = sentToday.get(row.mailbox_id) ?? 0;
-    const campaignLimit = row.campaign_id && !row.campaign_id.startsWith("noshow:") ? campaignLimits.get(row.campaign_id) : undefined;
+    const campaignLimit = row.campaign_id && !row.campaign_id.startsWith("noshow:") ? (campaignLimits.get(row.campaign_id) ?? 150) : undefined;
     const campaignCurrent = row.campaign_id ? campaignToday.get(row.campaign_id) ?? 0 : 0;
     if (mailboxCurrent >= mailboxLimit || (campaignLimit !== undefined && campaignCurrent >= campaignLimit)) {
       await query("update er_outbox set status='queued',attempts=greatest(attempts-1,0),scheduled_at=now()+interval '60 minutes',error=null where id=$1 and status='sending'", [row.id]);
