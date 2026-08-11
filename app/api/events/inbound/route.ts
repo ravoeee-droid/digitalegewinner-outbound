@@ -5,7 +5,7 @@ export const runtime = "nodejs";
 const schema = z.object({
   leadId: z.string().optional(),
   email: z.string().email().optional(),
-  type: z.enum(["reply","positive_reply","bounce","unsubscribe","appointment","microsite_view","video_view"]),
+  type: z.enum(["reply","positive_reply","bounce","unsubscribe","appointment","appointment_attended","appointment_no_show","microsite_view","video_view"]),
   meta: z.record(z.string(), z.unknown()).optional().default({}),
 });
 
@@ -26,6 +26,9 @@ export async function POST(request: Request) {
     }
     if (input.leadId && ["reply","positive_reply","appointment"].includes(input.type)) {
       await query("update er_outbox set status='stopped' where workspace='default' and lead_id=$1 and status='queued'", [input.leadId]);
+    }
+    if (input.leadId && input.type === "appointment_attended") {
+      await query("update er_outbox set status='stopped' where workspace='default' and lead_id=$1 and status='queued' and coalesce(campaign_id,'') like 'noshow:%'", [input.leadId]);
     }
     return Response.json({ ok:true });
   } catch (error) {
