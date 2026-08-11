@@ -1,12 +1,12 @@
 import { query, readState } from "@/lib/db";
 import { sendMail } from "@/lib/mailer";
-import { getSecret } from "@/lib/secrets";
+import { loadMailboxCredentials, type StoredMailboxCredential } from "@/lib/mailbox-credentials";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
 type OutboxRow = { id:string; lead_id:string; campaign_id:string|null; mailbox_id:string; recipient:string; subject:string; body:string; attempts:number };
-type Credential = { id:string; provider:"gmail"|"microsoft"|"smtp"; email:string; name?:string; accessToken?:string; refreshToken?:string; smtpHost?:string; smtpPort?:number; smtpUser?:string; smtpPass?:string };
+type Credential = StoredMailboxCredential;
 type State = { mailboxes?: Array<{id:string;enabled:boolean;dailyLimit:number}>; campaigns?: Array<{id:string;status?:string;dailyLimit?:number}> };
 
 function authorized(request: Request) {
@@ -16,9 +16,8 @@ function authorized(request: Request) {
 
 async function run(request: Request) {
   if (!authorized(request)) return Response.json({ error:"Unauthorized" }, { status:401 });
-  const storedCredentials = await getSecret("mailbox_credentials_json").catch(() => "");
   let credentials: Credential[] = [];
-  try { credentials = JSON.parse(process.env.MAILBOX_CREDENTIALS_JSON || storedCredentials || "[]") as Credential[]; }
+  try { credentials = await loadMailboxCredentials(); }
   catch { return Response.json({ error:"Mailbox Credentials JSON ist ungültig." }, { status:503 }); }
   const credMap = new Map(credentials.map((c) => [c.id,c]));
   const state = (await readState().catch(() => null))?.payload as State | undefined;
