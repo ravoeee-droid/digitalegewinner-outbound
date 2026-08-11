@@ -32,7 +32,7 @@ export async function GET() {
     const videoReady=checks.videoRenderer;
     const fullReady=outboundReady&&leadFinderReady&&aiReady&&videoReady;
     const configured = Object.values(checks).filter(Boolean).length;
-    return Response.json({checks,configured,total:Object.keys(checks).length,activeMailboxes,coreReady,outboundReady,leadFinderReady,aiReady,videoReady,ready:fullReady});
+    return Response.json({checks:{...checks,google:checks.mapsPlaces},configured,total:Object.keys(checks).length,activeMailboxes,coreReady,outboundReady,leadFinderReady,aiReady,videoReady,ready:fullReady});
   } catch (error) {
     return Response.json({ error: error instanceof Error ? error.message : "Health Check fehlgeschlagen." }, { status: 503 });
   }
