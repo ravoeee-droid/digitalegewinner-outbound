@@ -6,6 +6,7 @@ import CampaignLabWidget from "./ui/CampaignLabWidget";
 import WebsiteAuditWidget from "./ui/WebsiteAuditWidget";
 import NoShowRescueWidget from "./ui/NoShowRescueWidget";
 import VideoStudioWidget from "./ui/VideoStudioWidget";
+import SalesOSWidget from "./ui/SalesOSWidget";
 
 export default function Page() {
   return (
@@ -18,6 +19,7 @@ export default function Page() {
       <NoShowRescueWidget />
       <VideoStudioWidget />
       <IntegrationVaultWidget />
+      <SalesOSWidget />
     </>
   );
 }
