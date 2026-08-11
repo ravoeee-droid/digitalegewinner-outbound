@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { readState } from "@/lib/db";
+import { readState, writeState } from "@/lib/db";
 import { getSecret } from "@/lib/secrets";
 
 const schema=z.object({leadId:z.string().min(1).max(200)});
@@ -12,6 +12,7 @@ export async function POST(request:Request){
   const payload={jobId:crypto.randomUUID(),leadId,company:String(lead.company||""),contact:String(lead.contact||""),website:String(lead.website||""),city:String(lead.city||""),industry:String(lead.industry||""),websiteScore:Number(lead.websiteScore||audit?.scores?.overall||0),intentScore:Number(lead.intentScore||0),opener:String(audit?.sales?.opener||""),talkingPoints,analysisUrl:`${base}/a/${encodeURIComponent(leadId)}`,callbackUrl,brand:{name:"Digitale Gewinner",sender:String(state?.settings?.senderName||"Raphael Hermann")}};
   const r=await fetch(renderer,{method:"POST",headers:{"content-type":"application/json",...(secret?{"authorization":`Bearer ${secret}`}:{})},body:JSON.stringify(payload)});
   if(!r.ok)return Response.json({error:`Video Renderer Fehler (${r.status}).`},{status:502});const result=await r.json().catch(()=>({})) as {jobId?:string;videoUrl?:string};
+  if(result.videoUrl&&state?.leads){const leads=state.leads.map(item=>String(item.id)===leadId?{...item,videoUrl:result.videoUrl,videoStatus:"ready",videoUpdatedAt:new Date().toISOString()}:item);await writeState({...state,leads})}
   return Response.json({ok:true,status:result.videoUrl?"ready":"queued",jobId:result.jobId||payload.jobId,videoUrl:result.videoUrl||null});
  }catch(error){return Response.json({error:error instanceof Error?error.message:"Video konnte nicht gestartet werden."},{status:400})}
 }
