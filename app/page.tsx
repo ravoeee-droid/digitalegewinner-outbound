@@ -2,6 +2,8 @@ import EnergyRadarLive from "./ui/EnergyRadarLive";
 import InboxWidget from "./ui/InboxWidget";
 import IntegrationVaultWidget from "./ui/IntegrationVaultWidget";
 import LeadFinderWidget from "./ui/LeadFinderWidget";
+import CampaignLabWidget from "./ui/CampaignLabWidget";
+import WebsiteAuditWidget from "./ui/WebsiteAuditWidget";
 
 export default function Page() {
   return (
@@ -9,6 +11,8 @@ export default function Page() {
       <EnergyRadarLive />
       <InboxWidget />
       <LeadFinderWidget />
+      <CampaignLabWidget />
+      <WebsiteAuditWidget />
       <IntegrationVaultWidget />
     </>
   );
