@@ -11,7 +11,7 @@
     },
     {
       "path": "/api/cron/triggers",
-      "schedule": "17 * * * *"
+      "schedule": "7,22,37,52 * * * *"
     }
   ]
 }
