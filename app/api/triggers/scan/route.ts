@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { scanCompanyTriggers, scanDueCompanies } from "@/lib/sales-triggers";
+import { restoreTriggerScores } from "@/lib/trigger-score-sync";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -16,7 +17,8 @@ export async function POST(request: Request) {
     const result = input.companyId
       ? await scanCompanyTriggers(input.companyId, input.workspace)
       : await scanDueCompanies(input.workspace, input.limit);
-    return Response.json({ ok: true, result });
+    const scoreSync = await restoreTriggerScores(input.workspace);
+    return Response.json({ ok: true, result, scoreSync });
   } catch (error) {
     return Response.json({ error: error instanceof Error ? error.message : "Trigger-Scan fehlgeschlagen." }, { status: 400 });
   }
