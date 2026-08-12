@@ -2,6 +2,8 @@
 
 Ein integriertes B2B-Outbound-System für Lead Discovery, öffentliche Kontaktanreicherung, Website-Analyse, personalisierte Microsites, Fake-Loom-Videojobs, Multi-Mailbox-Sequenzen, Reply-Sync, Intent Scoring, CRM/Pipeline und No-Show-Recovery.
 
+**Production release:** 2.0.0 · Vercel deployment trigger 2026-08-12
+
 ## Kernflow
 
 1. **Lead Finder** sucht Unternehmen über Google Places.
