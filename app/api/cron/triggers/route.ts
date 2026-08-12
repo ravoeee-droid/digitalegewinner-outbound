@@ -12,7 +12,7 @@ function authorized(request: Request) {
 async function run(request: Request) {
   if (!authorized(request)) return Response.json({ error: "Unauthorized" }, { status: 401 });
   try {
-    const result = await scanDueCompanies("default", 4);
+    const result = await scanDueCompanies("default", 1);
     const scoreSync = await restoreTriggerScores("default");
     return Response.json({ ok: true, ...result, scoreSync });
   } catch (error) {
