@@ -14,6 +14,12 @@ jobs:
         with:
           node-version: 22
       - run: npm install
+      - name: Capture resolved lockfile
+        uses: actions/upload-artifact@v4
+        with:
+          name: resolved-package-lock
+          path: package-lock.json
+          retention-days: 1
       - run: npm run typecheck
       - run: npm run lint
       - run: npm run build
