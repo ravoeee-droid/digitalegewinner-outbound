@@ -1,4 +1,4 @@
-name: EnergyRadar CI
+name: Digitale Gewinner Outbound CI
 
 on:
   push:
