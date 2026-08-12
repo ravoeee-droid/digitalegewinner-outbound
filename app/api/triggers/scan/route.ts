@@ -8,7 +8,7 @@ export const maxDuration = 60;
 const schema = z.object({
   workspace: z.string().min(1).max(100).optional().default("default"),
   companyId: z.string().min(1).max(200).optional(),
-  limit: z.number().int().min(1).max(10).optional().default(4),
+  limit: z.number().int().min(1).max(4).optional().default(1),
 });
 
 export async function POST(request: Request) {
