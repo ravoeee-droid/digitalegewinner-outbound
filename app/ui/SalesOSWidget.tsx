@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 type Lead = {
   id: string;
@@ -114,12 +114,8 @@ export default function SalesOSWidget() {
     }
   }
 
-  useEffect(() => {
-    if (open) void load();
-  }, [open]);
-
   return <>
-    <button onClick={() => setOpen(true)} style={{ position: "fixed", right: 24, bottom: 78, zIndex: 80, border: "1px solid #335f4e", background: "#10241d", color: "#7cf0b8", padding: "12px 15px", borderRadius: 13, fontWeight: 900, cursor: "pointer", boxShadow: "0 18px 45px rgba(0,0,0,.35)" }}>⚡ Sales OS</button>
+    <button onClick={() => { setOpen(true); void load(); }} style={{ position: "fixed", right: 24, bottom: 78, zIndex: 80, border: "1px solid #335f4e", background: "#10241d", color: "#7cf0b8", padding: "12px 15px", borderRadius: 13, fontWeight: 900, cursor: "pointer", boxShadow: "0 18px 45px rgba(0,0,0,.35)" }}>⚡ Sales OS</button>
     {open && <div onClick={() => setOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 120, background: "rgba(3,6,10,.82)", backdropFilter: "blur(9px)", display: "grid", placeItems: "center", padding: 20 }}>
       <div onClick={e => e.stopPropagation()} style={{ width: "min(1180px,100%)", maxHeight: "90vh", overflow: "auto", background: "#09111a", border: "1px solid #26384b", borderRadius: 24, padding: 24, color: "#eef6ff", fontFamily: "Inter,system-ui" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start", gap: 18 }}>

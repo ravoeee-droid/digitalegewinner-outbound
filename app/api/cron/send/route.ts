@@ -61,7 +61,7 @@ async function run(request: Request) {
      returning o.id,o.lead_id,o.campaign_id,o.mailbox_id,o.recipient,o.subject,o.body,o.attempts`
   );
 
-  let sent=0, failed=0, skipped=0, limited=0;
+  let sent=0, failed=0, limited=0; const skipped=0;
   for (const row of due) {
     const credential = credMap.get(row.mailbox_id);
     if (!credential) {

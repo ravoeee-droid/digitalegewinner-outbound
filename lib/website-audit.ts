@@ -333,7 +333,6 @@ function scoreAudit(input: {
 export async function runWebsiteAudit(rawUrl: string, companyInput = ""): Promise<WebsiteAuditResult> {
   const fetched = await fetchWebsite(rawUrl);
   const { html, finalUrl, statusCode, responseMs, bytes } = fetched;
-  const htmlLower = html.toLowerCase();
   const title = firstMatch(html, /<title[^>]*>([\s\S]*?)<\/title>/i);
   const description = metaContent(html, "description");
   const canonicalTag = (html.match(/<link\b[^>]*rel\s*=\s*["'][^"']*canonical[^"']*["'][^>]*>/i) || [""])[0];

@@ -205,7 +205,7 @@ export async function persistRadarLead(candidate: RadarCandidate, contact: Parti
   const domain = domainFromWebsite(website);
   const { scores, signals } = scoreResearch(candidate, contact, audit);
 
-  let company = await query<{ id: string }>(
+  const company = await query<{ id: string }>(
     `select id from sales_companies
      where workspace=$1 and ((source_id<>'' and source_id=$2) or (domain<>'' and domain=$3))
      order by updated_at desc limit 1`,
