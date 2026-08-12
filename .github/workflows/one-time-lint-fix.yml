@@ -1,0 +1,82 @@
+name: One-time lint cleanup
+
+on:
+  push:
+    branches:
+      - feature/sales-trigger-engine
+    paths:
+      - .github/workflows/one-time-lint-fix.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.event.head_commit.message == 'Add one-time lint cleanup workflow'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/sales-trigger-engine
+          fetch-depth: 0
+
+      - name: Apply exact lint fixes
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          replacements = {
+            'app/ui/InboxWidget.tsx': [
+              ('import { useEffect, useState } from "react";', 'import { useState } from "react";'),
+              (' useEffect(()=>{if(open)void load()},[open]);\n', ''),
+              ('<button onClick={()=>setOpen(true)}', '<button onClick={()=>{setOpen(true);void load()}}'),
+            ],
+            'app/ui/IntegrationVaultWidget.tsx': [
+              ('import { FormEvent, useEffect, useState } from "react";', 'import { FormEvent, useState } from "react";'),
+              (' useEffect(()=>{if(open)void load()},[open]);\n', ''),
+              ('<button onClick={()=>setOpen(true)}', '<button onClick={()=>{setOpen(true);void load()}}'),
+            ],
+            'app/ui/NoShowRescueWidget.tsx': [
+              ('import { useEffect, useState } from "react";', 'import { useState } from "react";'),
+              ('  useEffect(()=>{if(open)void load()},[open]);\n\n', ''),
+              ('<button onClick={()=>setOpen(true)}', '<button onClick={()=>{setOpen(true);void load()}}'),
+            ],
+            'app/ui/VideoStudioWidget.tsx': [
+              ('import { useEffect,useState } from "react";', 'import { useState } from "react";'),
+              (' useEffect(()=>{if(open)void load()},[open]);\n', ''),
+              ('<button onClick={()=>setOpen(true)}', '<button onClick={()=>{setOpen(true);void load()}}'),
+            ],
+            'app/ui/SalesOSWidget.tsx': [
+              ('import { useEffect, useState } from "react";', 'import { useState } from "react";'),
+              ('  useEffect(() => {\n    if (open) void load();\n  }, [open]);\n\n', ''),
+              ('<button onClick={() => setOpen(true)}', '<button onClick={() => { setOpen(true); void load(); }}'),
+            ],
+            'app/api/cron/send/route.ts': [
+              ('  let sent=0, failed=0, skipped=0, limited=0;', '  let sent=0, failed=0, limited=0; const skipped=0;'),
+            ],
+            'lib/sales-os.ts': [
+              ('  let company = await query<{ id: string }>(', '  const company = await query<{ id: string }>('),
+            ],
+            'lib/website-audit.ts': [
+              ('  const htmlLower = html.toLowerCase();\n', ''),
+            ],
+          }
+
+          for filename, pairs in replacements.items():
+              path = Path(filename)
+              text = path.read_text()
+              for old, new in pairs:
+                  count = text.count(old)
+                  if count != 1:
+                      raise SystemExit(f'{filename}: expected exactly one match for {old!r}, found {count}')
+                  text = text.replace(old, new, 1)
+              path.write_text(text)
+          PY
+
+      - name: Commit targeted lint cleanup
+        run: |
+          git config user.name "ravoeee-droid"
+          git config user.email "ravoeee@gmail.com"
+          git add -- app/ui/InboxWidget.tsx app/ui/IntegrationVaultWidget.tsx app/ui/NoShowRescueWidget.tsx app/ui/VideoStudioWidget.tsx app/ui/SalesOSWidget.tsx app/api/cron/send/route.ts lib/sales-os.ts lib/website-audit.ts
+          git commit -m "Fix lint blockers across outbound cockpit"
+          git push origin HEAD:feature/sales-trigger-engine
