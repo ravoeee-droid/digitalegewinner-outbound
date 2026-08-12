@@ -75,7 +75,7 @@ export async function POST(request: Request) {
     const green = rgb(0.13, 0.67, 0.43);
     const pale = rgb(0.94, 0.97, 0.95);
     const line = rgb(0.87, 0.89, 0.91);
-    let page: PDFPage;
+    let page!: PDFPage;
     let y = 0;
 
     const newPage = (title?: string) => {

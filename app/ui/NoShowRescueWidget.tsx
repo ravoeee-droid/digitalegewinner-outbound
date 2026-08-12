@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 type Lead = { id:string; company:string; contact?:string; email?:string; stage?:string; notes?:string };
 type Store = { leads?:Lead[]; campaigns?:unknown[]; mailboxes?:unknown[]; settings?:Record<string,unknown> };
@@ -22,8 +22,6 @@ export default function NoShowRescueWidget() {
       setMessage(error instanceof Error?error.message:"Fehler beim Laden.");
     }
   }
-
-  useEffect(()=>{if(open)void load()},[open]);
 
   async function rescue(lead:Lead) {
     setBusy(lead.id);
@@ -57,7 +55,7 @@ export default function NoShowRescueWidget() {
   }
 
   return <>
-    <button onClick={()=>setOpen(true)} style={{position:"fixed",right:680,bottom:24,zIndex:80,border:"1px solid #603845",background:"#251118",color:"#ff9eaf",padding:"12px 15px",borderRadius:13,fontWeight:900,cursor:"pointer",boxShadow:"0 18px 45px rgba(0,0,0,.35)"}}>↻ No-Show Rescue</button>
+    <button onClick={()=>{setOpen(true);void load()}} style={{position:"fixed",right:680,bottom:24,zIndex:80,border:"1px solid #603845",background:"#251118",color:"#ff9eaf",padding:"12px 15px",borderRadius:13,fontWeight:900,cursor:"pointer",boxShadow:"0 18px 45px rgba(0,0,0,.35)"}}>↻ No-Show Rescue</button>
     {open&&<div onClick={()=>setOpen(false)} style={{position:"fixed",inset:0,zIndex:125,background:"rgba(3,6,10,.82)",backdropFilter:"blur(9px)",display:"grid",placeItems:"center",padding:18}}>
       <div onClick={(event)=>event.stopPropagation()} style={{width:"min(820px,100%)",maxHeight:"88vh",overflow:"auto",background:"#0a1119",border:"1px solid #2d3545",borderRadius:22,padding:24,color:"#eef4ff",fontFamily:"Inter,system-ui"}}>
         <div style={{display:"flex",justifyContent:"space-between",gap:16,alignItems:"start"}}>
