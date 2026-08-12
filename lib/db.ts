@@ -85,6 +85,7 @@ export async function writeState(payload: unknown, workspace = "default") {
 
 export async function query<T = Record<string, unknown>>(text: string, values: unknown[] = []) {
   await ensureSchema();
-  const result = await getPool().query(text, values);
+  const result = values.length ? await getPool().query(text, values) : await getPool().query(text);
+  if (Array.isArray(result)) return ((result.at(-1)?.rows ?? []) as T[]);
   return result.rows as T[];
 }
