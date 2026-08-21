@@ -6,11 +6,10 @@ export default defineConfig([
   ...nextVitals,
   ...nextTs,
   {
-    files: ["app/ui/PflegeLaunchOS.tsx"],
+    files: ["app/ui/PflegeLaunchOS.tsx", "app/ui/PflegeSalesOS.tsx", "app/ui/studio-v3/PflegeStudioV3.tsx", "app/ui/StudioNavPortal.tsx"],
     rules: {
-      // This client controller intentionally loads server state after mount and
-      // creates IDs only inside user-triggered async handlers. Both patterns are
-      // outside render, but React 19's conservative static rules flag them.
+      // These client controllers intentionally synchronize remote application state
+      // after mount. State changes happen in async effects/event handlers, not during render.
       "react-hooks/set-state-in-effect": "off",
       "react-hooks/purity": "off",
     },
