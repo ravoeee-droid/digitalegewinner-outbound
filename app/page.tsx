@@ -7,19 +7,23 @@ import WebsiteAuditWidget from "./ui/WebsiteAuditWidget";
 import NoShowRescueWidget from "./ui/NoShowRescueWidget";
 import VideoStudioWidget from "./ui/VideoStudioWidget";
 import SalesOSWidget from "./ui/SalesOSWidget";
+import CloudTalkPhone from "./ui/CloudTalkPhone";
 
 export default function Page() {
   return (
     <>
       <DigitaleGewinnerOutboundOS />
-      <InboxWidget />
-      <LeadFinderWidget />
-      <CampaignLabWidget />
-      <WebsiteAuditWidget />
-      <NoShowRescueWidget />
-      <VideoStudioWidget />
-      <IntegrationVaultWidget />
-      <SalesOSWidget />
+      <div className="legacy-tools" aria-label="Weitere Outbound-Werkzeuge">
+        <InboxWidget />
+        <LeadFinderWidget />
+        <CampaignLabWidget />
+        <WebsiteAuditWidget />
+        <NoShowRescueWidget />
+        <VideoStudioWidget />
+        <IntegrationVaultWidget />
+        <SalesOSWidget />
+      </div>
+      <CloudTalkPhone />
     </>
   );
 }
