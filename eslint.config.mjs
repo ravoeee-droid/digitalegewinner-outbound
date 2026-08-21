@@ -14,5 +14,13 @@ export default defineConfig([
       "react-hooks/purity": "off",
     },
   },
+  {
+    files: ["app/ui/PflegeProOS.tsx"],
+    rules: {
+      // Pure, stateless render helpers intentionally live next to the dense CRM controller
+      // so they can consume its derived data/actions without prop plumbing.
+      "react-hooks/static-components": "off",
+    },
+  },
   globalIgnores([".next/**", "out/**", "build/**", "next-env.d.ts"]),
 ]);
