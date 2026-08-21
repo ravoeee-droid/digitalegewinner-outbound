@@ -31,7 +31,15 @@ Dieses Repository enthält **keine produktiven Zugangsdaten**. Die Datei `.env.e
 
 Jede neue Installation benötigt eigene Infrastruktur und eigene Zugangsdaten. Dadurch kann diese Version als ZIP weitergegeben oder in ein separates Repository kopiert werden, ohne Datenbank, Leads, Mailboxen oder API-Zugänge der ursprünglichen Installation mitzuteilen.
 
-## Schnellstart
+## So gibst du die Version weiter
+
+1. Auf GitHub den Branch `feature/pflege-outbound-system` auswählen.
+2. **Code → Download ZIP**.
+3. ZIP an den Empfänger schicken.
+4. Der Empfänger entpackt das Projekt und legt es in ein eigenes GitHub-Repository oder deployed es per Vercel CLI.
+5. Danach eigene Datenbank, Secrets, APIs und Mailboxen verbinden.
+
+## Schnellstart lokal
 
 ```bash
 npm install
@@ -68,23 +76,69 @@ Für Fake Loom optional:
 
 ## Datenbank
 
-Die vorhandenen SQL-Migrationen unter `supabase/migrations` auf einer **neuen, leeren Postgres-/Supabase-Datenbank** ausführen. Nicht die Datenbank der ursprünglichen Installation teilen.
+Die vorhandenen SQL-Migrationen unter `supabase/migrations` auf einer **neuen, leeren Supabase-/Postgres-Datenbank** ausführen. Nicht die Datenbank der ursprünglichen Installation teilen.
+
+Die Migrationen aktivieren auch `pg_cron` und `pg_net` und legen den Scheduler für Versand und Reply-Sync an.
+
+## Scheduler aktivieren
+
+Der Scheduler ist absichtlich standardmäßig deaktiviert, damit nach einem frischen Deploy nicht versehentlich E-Mails verschickt werden.
+
+Nach erfolgreichem Test müssen in Supabase Vault zwei Secrets hinterlegt werden:
+
+- `dg_app_url` = öffentliche Produktions-URL, z. B. `https://pflege-outbound.vercel.app`
+- `dg_cron_secret` = derselbe Wert wie `CRON_SECRET` im Hosting
+
+Anschließend serverseitig aktivieren:
+
+```sql
+update dg_private.scheduler_control
+set enabled = true, updated_at = now()
+where id = true;
+```
+
+Danach laufen automatisch:
+
+- Versand-Worker alle 5 Minuten
+- Reply-Sync alle 10 Minuten
+
+Damit ist kein hochfrequenter Vercel-Cron erforderlich.
 
 ## Erste Inbetriebnahme
 
-1. Neue Postgres-/Supabase-Datenbank erstellen.
-2. Migrationen ausführen.
+1. Neue Supabase-/Postgres-Datenbank erstellen.
+2. Alle Migrationen aus `supabase/migrations` ausführen.
 3. `.env.example` als Vorlage verwenden und eigene Secrets setzen.
-4. Anwendung deployen, z. B. über Vercel.
+4. Anwendung über ein eigenes GitHub-Repository nach Vercel deployen oder Vercel CLI verwenden.
 5. Unter **Setup / API Vault** eigene Google-Places-, OpenAI- und Mailbox-Verbindungen einrichten.
 6. Im **Pflege Lead Finder** mit einer Suchanfrage wie `Pflegedienst Stuttgart` testen.
 7. Einen Lead importieren und den Recruiting Opportunity Score prüfen.
 8. Eine eigene Mailbox verbinden.
-9. Zuerst mit einem eigenen Testlead die gesamte Journey testen:
+9. Mit einem eigenen Testlead die gesamte Journey testen:
 
 `Pflege Lead Finder → Recruiting Analyse → Microsite/Fake Loom → Kampagne → Testmail → Reply → Stop-on-Reply → Termin → Pipeline`
 
-Erst danach echte Versandlimits schrittweise erhöhen.
+10. Erst danach den Supabase Scheduler aktivieren und echte Versandlimits schrittweise erhöhen.
+
+## Was nach dem Deploy sofort funktioniert
+
+Sobald Datenbank und Core-Secrets gesetzt sind:
+
+- Login und geschütztes Dashboard
+- CRM / Pipeline
+- Lead-Verwaltung
+- Website Radar
+- personalisierte Microsites
+- Recruiting Intelligence
+- Scoring und Talking Points
+
+Sobald die jeweilige externe Integration verbunden ist:
+
+- Google Places → automatischer Pflege Lead Finder
+- OpenAI → KI-Kampagnen
+- Mailbox/OAuth/SMTP → echter E-Mail-Versand und Reply-Sync
+- Video Renderer → Fake Loom Videos
+- Scheduler aktiviert → automatischer Versand und Antwort-Sync
 
 ## Scoring verstehen
 
