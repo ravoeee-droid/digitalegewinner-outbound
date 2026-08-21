@@ -80,18 +80,6 @@ export default function DomainMailCenter() {
     return json.state || {};
   }
 
-  async function load() {
-    try {
-      const state = await getState();
-      setDomains(Array.isArray(state.domains) ? state.domains : []);
-      setMailboxes(Array.isArray(state.mailboxes) ? state.mailboxes : []);
-    } catch (error) {
-      notify(error instanceof Error ? error.message : "Domain Center konnte nicht geladen werden.");
-    } finally {
-      setLoaded(true);
-    }
-  }
-
   async function persist(patch: Partial<AppState>) {
     const latest = await getState();
     const next = { ...latest, ...patch };
@@ -105,7 +93,27 @@ export default function DomainMailCenter() {
   }
 
   useEffect(() => {
-    void load();
+    let active = true;
+    fetch("/api/state", { cache: "no-store" })
+      .then(async (response) => {
+        const json = (await response.json()) as { state?: AppState; error?: string };
+        if (!response.ok) throw new Error(json.error || "State konnte nicht geladen werden.");
+        return json.state || {};
+      })
+      .then((state) => {
+        if (!active) return;
+        setDomains(Array.isArray(state.domains) ? state.domains : []);
+        setMailboxes(Array.isArray(state.mailboxes) ? state.mailboxes : []);
+        setLoaded(true);
+      })
+      .catch((error: unknown) => {
+        if (!active) return;
+        const message = error instanceof Error ? error.message : "Domain Center konnte nicht geladen werden.";
+        setToast(message);
+        setLoaded(true);
+        window.setTimeout(() => setToast(""), 3000);
+      });
+    return () => { active = false; };
   }, []);
 
   const readyDomains = useMemo(
