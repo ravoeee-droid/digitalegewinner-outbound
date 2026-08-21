@@ -1,16 +1,12 @@
-import PflegeLaunchOS from "./ui/PflegeLaunchOS";
+import PflegeSalesOS from "./ui/PflegeSalesOS";
 import CloudTalkPhone from "./ui/CloudTalkPhone";
 import DomainMailCenter from "./ui/DomainMailCenter";
-import StudioNavPortal from "./ui/StudioNavPortal";
 
 export default function Page() {
   return (
     <>
-      <a className="wcag-skip-link" href="#outbound-workspace">Zum Hauptinhalt springen</a>
-      <div id="outbound-workspace" tabIndex={-1}>
-        <PflegeLaunchOS />
-      </div>
-      <StudioNavPortal />
+      <a className="wcag-skip-link" href="#main-sales-os">Zum Hauptinhalt springen</a>
+      <PflegeSalesOS />
       <CloudTalkPhone />
       <DomainMailCenter />
     </>
