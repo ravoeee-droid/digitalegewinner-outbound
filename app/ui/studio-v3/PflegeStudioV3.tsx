@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
 import {
   defaultStudioProject,
@@ -11,7 +12,6 @@ import {
   type StudioLead,
   type StudioMode,
   type StudioProject,
-  type StudioTrack,
 } from "@/lib/studio-v3-pflege";
 import styles from "./studio-v3.module.css";
 
@@ -86,24 +86,24 @@ function StudioCanvas({ project, lead, timeMs, selectedItemId, onSelect }: {
         };
         const source = sourceFor(item);
         const selected = selectedItemId === item.id;
-        const common = { key: item.id, type: "button" as const, className: `${styles.canvasItem} ${selected ? styles.selected : ""}`, style: itemStyle, onClick: () => onSelect(item.id), "aria-label": `${item.label} auswählen` };
+        const common = { type: "button" as const, className: `${styles.canvasItem} ${selected ? styles.selected : ""}`, style: itemStyle, onClick: () => onSelect(item.id), "aria-label": `${item.label} auswählen` };
 
         if (item.type === "website") {
-          return <button {...common} className={`${common.className} ${styles.websiteItem}`}>
+          return <button key={item.id} {...common} className={`${common.className} ${styles.websiteItem}`}>
             {source ? <div className={styles.websiteMock}><div className={styles.browserBar}><i/><i/><i/><span>{source.replace(/^https?:\/\//, "")}</span></div><div className={styles.websiteBody}><strong>{lead?.company || "Unternehmenswebsite"}</strong><small>{source}</small><div/><div/><div/></div></div> : <div className={styles.emptyVisual}>Website / Capture hinterlegen</div>}
           </button>;
         }
         if (item.type === "presenter") {
-          return <button {...common} className={`${common.className} ${styles.presenterItem}`}>
+          return <button key={item.id} {...common} className={`${common.className} ${styles.presenterItem}`}>
             {source ? <video src={source} muted playsInline aria-label="Sprecher-Vorschau" /> : <div className={styles.presenterPlaceholder}><span>RH</span><small>Sprecher-Video hinterlegen</small></div>}
           </button>;
         }
         if (item.type === "logo") {
-          return <button {...common} className={`${common.className} ${styles.logoItem}`}>{source ? <img src={source} alt={`${project.brand.name} Logo`} /> : <span>{project.brand.name}</span>}</button>;
+          return <button key={item.id} {...common} className={`${common.className} ${styles.logoItem}`}>{source ? <img src={source} alt={`${project.brand.name} Logo`} /> : <span>{project.brand.name}</span>}</button>;
         }
         const text = resolveStudioText(item.text, lead, project);
         const subtext = resolveStudioText(item.subtext, lead, project);
-        return <button {...common} className={`${common.className} ${item.type === "metric" ? styles.metricItem : styles.textItem}`} style={{ ...itemStyle, color: item.color || project.brand.textColor, background: item.backgroundColor || "transparent", fontSize: `${Math.max(12, (item.fontSize || 36) / 4)}px`, fontWeight: item.fontWeight || 700, textAlign: item.textAlign || "left" }}>
+        return <button key={item.id} {...common} className={`${common.className} ${item.type === "metric" ? styles.metricItem : styles.textItem}`} style={{ ...itemStyle, color: item.color || project.brand.textColor, background: item.backgroundColor || "transparent", fontSize: `${Math.max(12, (item.fontSize || 36) / 4)}px`, fontWeight: item.fontWeight || 700, textAlign: item.textAlign || "left" }}>
           <strong>{text}</strong>{subtext && <small>{subtext}</small>}
         </button>;
       })}
@@ -275,7 +275,7 @@ export default function PflegeStudioV3() {
   return <main className={styles.studioShell}>
     <a className={styles.skipLink} href="#studio-main">Zum Studio-Arbeitsbereich springen</a>
     <header className={styles.topbar}>
-      <div className={styles.brand}><a href="/" aria-label="Zurück zum Pflege Recruiting OS"><span>DG</span></a><div><strong>Studio V3</strong><small>PERSONALIZED OUTBOUND CREATIVE ENGINE</small></div></div>
+      <div className={styles.brand}><Link href="/" aria-label="Zurück zum Pflege Recruiting OS"><span>DG</span></Link><div><strong>Studio V3</strong><small>PERSONALIZED OUTBOUND CREATIVE ENGINE</small></div></div>
       <div className={styles.scopeGroup}>
         <label>Vorlage / Lead<select value={scope} onChange={(event) => chooseScope(event.target.value)}><option value="global">Master-Vorlage</option>{leads.map((lead) => <option key={lead.id} value={lead.id}>{lead.company}</option>)}</select></label>
         <label>Preset<select value={project.presetKey} onChange={(event) => applyProject({ ...project, presetKey: event.target.value, name: STUDIO_PRESETS.find((preset) => preset.key === event.target.value)?.label || project.name })}>{STUDIO_PRESETS.map((preset) => <option key={preset.key} value={preset.key}>{preset.label}</option>)}</select></label>
