@@ -6,8 +6,12 @@ const FALLBACK_PASSWORD_SHA256="30e363d3e8c59f2c1319f8d73d48e3ad26db5e087951a4d7
 
 export function adminCookieName(){return COOKIE}
 
+function normalize(value:string){
+ return value.trim().toLowerCase();
+}
+
 function hash(value:string){
- return createHash("sha256").update(value).digest("hex");
+ return createHash("sha256").update(normalize(value)).digest("hex");
 }
 
 function sessionFor(secret:string){
@@ -15,9 +19,10 @@ function sessionFor(secret:string){
 }
 
 export function passwordIsValid(password:string){
+ const normalized=normalize(password);
  const env=process.env.ADMIN_PASSWORD;
- if(env&&password===env)return true;
- return hash(password)===FALLBACK_PASSWORD_SHA256;
+ if(env&&normalized===normalize(env))return true;
+ return hash(normalized)===FALLBACK_PASSWORD_SHA256;
 }
 
 export function sessionValue(password?:string){
