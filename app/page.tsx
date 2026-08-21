@@ -1,6 +1,7 @@
 import PflegeSalesOS from "./ui/PflegeSalesOS";
 import CloudTalkPhone from "./ui/CloudTalkPhone";
 import DomainMailCenter from "./ui/DomainMailCenter";
+import DomainMailBridge from "./ui/DomainMailBridge";
 
 export default function Page() {
   return (
@@ -9,6 +10,7 @@ export default function Page() {
       <PflegeSalesOS />
       <CloudTalkPhone />
       <DomainMailCenter />
+      <DomainMailBridge />
     </>
   );
 }
