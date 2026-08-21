@@ -70,7 +70,13 @@ async function loadLeads(workspace: string) {
     `select l.id,c.name as company,coalesce(ct.name,'') as contact,c.city,c.industry,c.website,
             coalesce(ct.email,'') as email,coalesce(ct.phone,c.phone,'') as phone,l.stage,
             l.deal_value::float8 as deal_value,l.notes,l.priority_score,l.fit_score,l.opportunity_score,l.intent_score,
-            coalesce(rr.website_score,0) as website_score,c.metadata,
+            coalesce(rr.website_score,0) as website_score,
+            case
+              when (c.metadata->>'phone_ready')='false' then c.metadata
+              when l.stage in ('Termin','Angebot','Gewonnen','Verloren') then c.metadata || '{"phone_ready":false,"queue_reason":"pipeline_stage"}'::jsonb
+              when call_activity.created_at>=date_trunc('day',now()) and coalesce(call_activity.meta->>'outcome','')<>'Rückruf' then c.metadata || '{"phone_ready":false,"today_done":true}'::jsonb
+              else c.metadata
+            end as metadata,
             call_activity.created_at as last_call_at,coalesce(call_activity.meta->>'outcome','') as last_outcome,l.updated_at
      from sales_leads l
      join sales_companies c on c.id=l.company_id
