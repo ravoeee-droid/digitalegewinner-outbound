@@ -5,9 +5,9 @@ const schema=z.object({password:z.string().min(1).max(500)});
 export async function POST(request:Request){
  try{
   const {password}=schema.parse(await request.json());
-  if(!passwordIsValid(password))return Response.json({error:"Falsches Passwort."},{status:401});
-  const response=Response.json({ok:true});
+  if(!passwordIsValid(password))return Response.json({error:"Falsches Passwort · CloudTalk Build 21.08 V3"},{status:401});
+  const response=Response.json({ok:true,build:"cloudtalk-2026-08-21-v3"});
   response.headers.append("Set-Cookie",`${adminCookieName()}=${sessionValue(password)}; Path=/; HttpOnly; SameSite=Strict; Max-Age=2592000${process.env.NODE_ENV==="production"?"; Secure":""}`);
   return response;
- }catch{return Response.json({error:"Login fehlgeschlagen."},{status:400})}
+ }catch{return Response.json({error:"Login fehlgeschlagen · CloudTalk Build 21.08 V3"},{status:400})}
 }
