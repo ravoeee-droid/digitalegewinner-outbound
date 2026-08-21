@@ -1,0 +1,15 @@
+.cloudtalk-panel{
+  width:min(720px,calc(100vw - 42px));
+  height:min(620px,calc(100vh - 105px));
+}
+.cloudtalk-frame-wrap{min-width:0;min-height:420px}
+.cloudtalk-launcher{min-width:184px}
+
+@media(max-width:760px){
+  .cloudtalk-panel{
+    width:calc(100vw - 20px);
+    height:calc(100vh - 164px);
+    right:-2px;
+  }
+  .cloudtalk-frame-wrap{min-height:0}
+}

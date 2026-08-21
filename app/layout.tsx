@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import "./launch.css";
+import "./launch-overrides.css";
 
 export const metadata: Metadata = {
-  title: "EnergyRadar AI",
-  description: "Lead Intelligence, Campaign Engine, Energy Intelligence und Sales CRM in einer Plattform.",
+  title: "Pflege Recruiting OS · Digitale Gewinner",
+  description: "Pflege Lead Intelligence, CloudTalk Call Sessions, Kampagnen, Video, Inbox und Sales Pipeline in einem System.",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
