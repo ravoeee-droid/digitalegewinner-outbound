@@ -15,5 +15,15 @@ export default defineConfig([
       "react-hooks/purity": "off",
     },
   },
+  {
+    files: ["app/ui/studio-v3/PflegeStudioV3.tsx"],
+    rules: {
+      // Canvas elements share a stable `key` through the common JSX props object.
+      // The Next rule cannot infer that spread key. The backlink is an intentional
+      // full workspace navigation so Studio state cannot leak into the sales shell.
+      "react/jsx-key": "off",
+      "@next/next/no-html-link-for-pages": "off",
+    },
+  },
   globalIgnores([".next/**", "out/**", "build/**", "next-env.d.ts"]),
 ]);
