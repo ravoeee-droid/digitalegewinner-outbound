@@ -23,7 +23,7 @@ export default function CloudTalkPhone() {
   const [target, setTarget] = useState<DialTarget | null>(null);
   const [sessionId, setSessionId] = useState("");
   const [startedAt, setStartedAt] = useState<number | null>(null);
-  const [now, setNow] = useState(Date.now());
+  const [now, setNow] = useState(0);
   const targetRef = useRef<DialTarget | null>(null);
   const sessionRef = useRef("");
 
@@ -32,6 +32,7 @@ export default function CloudTalkPhone() {
 
   useEffect(() => {
     if (!startedAt) return;
+    setNow(startedAt);
     const timer = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(timer);
   }, [startedAt]);
@@ -41,11 +42,12 @@ export default function CloudTalkPhone() {
       const detail = (event as CustomEvent<DialTarget>).detail;
       if (!detail?.phone) return;
       const nextSession = crypto.randomUUID();
+      const timestamp = Date.now();
       setTarget(detail);
       setSessionId(nextSession);
       setStatus("dialing");
-      setStartedAt(Date.now());
-      setNow(Date.now());
+      setStartedAt(timestamp);
+      setNow(timestamp);
       setOpen(true);
     }
     function onOpen() { setOpen(true); }
@@ -101,7 +103,7 @@ export default function CloudTalkPhone() {
     return () => window.removeEventListener("message", onMessage);
   }, []);
 
-  const duration = useMemo(() => startedAt ? Math.max(0, Math.floor((now - startedAt) / 1000)) : 0, [now, startedAt]);
+  const duration = useMemo(() => startedAt && now ? Math.max(0, Math.floor((now - startedAt) / 1000)) : 0, [now, startedAt]);
   const durationLabel = `${String(Math.floor(duration / 60)).padStart(2, "0")}:${String(duration % 60).padStart(2, "0")}`;
 
   return <div className={`cloudtalk-shell ${open ? "is-open" : ""}`}>
