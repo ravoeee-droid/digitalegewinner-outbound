@@ -32,6 +32,8 @@ type LaunchLead = {
   intent_score: number;
   website_score: number;
   metadata: Record<string, unknown>;
+  last_call_at: string | null;
+  last_outcome: string;
   updated_at: string;
 };
 
@@ -68,13 +70,19 @@ async function loadLeads(workspace: string) {
     `select l.id,c.name as company,coalesce(ct.name,'') as contact,c.city,c.industry,c.website,
             coalesce(ct.email,'') as email,coalesce(ct.phone,c.phone,'') as phone,l.stage,
             l.deal_value::float8 as deal_value,l.notes,l.priority_score,l.fit_score,l.opportunity_score,l.intent_score,
-            coalesce(rr.website_score,0) as website_score,c.metadata,l.updated_at
+            coalesce(rr.website_score,0) as website_score,c.metadata,
+            call_activity.created_at as last_call_at,coalesce(call_activity.meta->>'outcome','') as last_outcome,l.updated_at
      from sales_leads l
      join sales_companies c on c.id=l.company_id
      left join sales_contacts ct on ct.id=l.contact_id
      left join lateral (
        select website_score from sales_research_runs r where r.company_id=l.company_id order by r.created_at desc limit 1
      ) rr on true
+     left join lateral (
+       select created_at,meta from sales_activities a
+       where a.workspace=l.workspace and a.lead_id=l.id and a.type='call.outcome'
+       order by a.created_at desc limit 1
+     ) call_activity on true
      where l.workspace=$1 and l.status='active' and ${pflegeFilter}
      order by
        case when (c.metadata->>'phone_ready')='false' then 1 else 0 end,
@@ -95,8 +103,8 @@ async function mirrorToLegacy(leads: LaunchLead[]) {
 
   for (const lead of leads) {
     const previous = map.get(lead.id) || {};
-    const next = { ...legacyFromLead(lead), ...previous, stage: lead.stage, dealValue: Number(lead.deal_value || 0), notes: lead.notes || String(previous.notes || "") };
-    if (!map.has(lead.id) || String(previous.stage || "") !== lead.stage || String(previous.phone || "") !== lead.phone || String(previous.email || "") !== lead.email) changed = true;
+    const next = { ...previous, ...legacyFromLead(lead) };
+    if (!map.has(lead.id) || String(previous.stage || "") !== lead.stage || String(previous.phone || "") !== lead.phone || String(previous.email || "") !== lead.email || String(previous.notes || "") !== lead.notes) changed = true;
     map.set(lead.id, next);
   }
 
@@ -134,7 +142,20 @@ export async function GET(request: Request) {
        order by a.created_at desc limit 60`,
       [workspace],
     );
-    const calls = await getCallSummary(workspace);
+    const [outcomeStats] = await query<{ today: number; connected: number }>(
+      `select
+         count(*)::int today,
+         count(*) filter(where coalesce(meta->>'outcome','') not in ('Nicht erreicht','Falsche Nummer',''))::int connected
+       from sales_activities
+       where workspace=$1 and type='call.outcome' and created_at>=date_trunc('day',now())`,
+      [workspace],
+    );
+    const telephony = await getCallSummary(workspace);
+    const calls = {
+      today: Math.max(Number(outcomeStats?.today || 0), Number(telephony.today || 0)),
+      connected: Math.max(Number(outcomeStats?.connected || 0), Number(telephony.connected || 0)),
+      talk_seconds: Number(telephony.talk_seconds || 0),
+    };
     return Response.json({ stats: stats || { companies: 0, leads: 0, hot: 0, appointments: 0, won: 0, pipeline: 0 }, leads, activities, calls });
   } catch (error) {
     return Response.json({ error: error instanceof Error ? error.message : "Launch CRM konnte nicht geladen werden." }, { status: 503 });
@@ -162,6 +183,13 @@ export async function PATCH(request: Request) {
       [input.leadId, input.stage ?? null, notes, input.dealValue ?? null],
     );
     if (!rows.length) return Response.json({ error: "Lead konnte nicht aktualisiert werden." }, { status: 409 });
+
+    if (input.outcome === "Falsche Nummer") {
+      await query(
+        `update sales_companies set metadata=metadata || $2::jsonb,updated_at=now() where id=$1`,
+        [existing.company_id, JSON.stringify({ phone_ready: false, phone_verification: "manual_wrong_number" })],
+      );
+    }
 
     const summary = input.outcome
       ? `Call-Ergebnis: ${input.outcome}${input.callbackAt ? ` · Rückruf ${input.callbackAt}` : ""}`
