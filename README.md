@@ -1,26 +1,45 @@
-# Digitale Gewinner Outbound OS
+# Pflege Recruiting Outbound OS
 
-Ein integriertes B2B-Outbound-System für Lead Discovery, öffentliche Kontaktanreicherung, Website-Analyse, personalisierte Microsites, Fake-Loom-Videojobs, Multi-Mailbox-Sequenzen, Reply-Sync, Intent Scoring, CRM/Pipeline und No-Show-Recovery.
+Eine eigenständige Branchenversion des High-End-Outbound-Systems für die Akquise von **ambulanten Pflegediensten und Pflegeanbietern**.
 
-**Production release:** 2.0.0 · Vercel deployment trigger 2026-08-12
+Die Installation verbindet Lead Discovery, öffentliches Kontakt-Enrichment, Website- und Recruiting-Analyse, personalisierte Microsites/Fake-Loom-Videos, Multi-Mailbox-Sequenzen, Reply-Sync, CRM/Pipeline und No-Show-Recovery.
 
-## Kernflow
+## Pflege-spezifischer Kernflow
 
-1. **Lead Finder** sucht Unternehmen über Google Places.
+1. **Pflege Lead Finder** sucht Pflegedienste und Pflegeanbieter über Google Places.
 2. **Contact Enrichment** liest ausschließlich öffentlich sichtbare geschäftliche Kontaktdaten der Unternehmenswebsite aus.
-3. **Website Radar** bewertet SEO, Conversion, Vertrauen, Technik und Content und erzeugt priorisierte Vertriebs-Talking-Points.
-4. **Fake Loom Studio** sendet Website, Analyse, Talking Points und Microsite-URL an den konfigurierten Video Renderer.
-5. **Personalisierte Microsite** unter `/a/[id]` zeigt Analyse, Video und Kalender-CTA; Views und CTA-Klicks erhöhen den Intent Score.
-6. **Campaign Engine** erstellt Sequenzen mit A/B/C-Varianten und segmentiert nach Branche, Ort, Website Score und Intent Score.
-7. **Outbound Worker** verschickt atomar über mehrere Mailboxen, respektiert Mailbox-/Kampagnenlimits, Suppressions und Stop-on-Reply.
-8. **Reply Sync** synchronisiert Gmail und Microsoft und stoppt Folgeschritte automatisch.
-9. **Pipeline + No-Show Rescue** verfolgt Termine und kann verpasste Termine mit einer kontrollierten 2-Stufen-Sequenz zurückholen.
+3. **Website Radar** prüft SEO, Conversion, Vertrauen, Technik und Content.
+4. **Pflege Recruiting Intelligence** bewertet den sichtbaren Bewerber-Einstieg zusätzlich auf:
+   - Karriere-/Job-Einstieg
+   - Bewerbungs-CTA
+   - Arbeitgeberpositionierung und Benefits
+   - Mitarbeiter-/Arbeitgeber-Proof
+   - reibungsarme Schnellbewerbung
+   - Mobile Readiness
+   - Social-Media-Verknüpfung
+   - Vertrauenssignale
+5. Daraus entstehen **Recruiting-Reife**, **Recruiting Opportunity Score**, konkrete Recruiting-Gaps, Talking Points und ein empfohlenes Angebot.
+6. **Fake Loom Studio** kann Analyse, Website und Microsite in einen personalisierten Video-Workflow geben.
+7. **Campaign Engine** erstellt Pflege-spezifische Sequenzen und kann KI-Varianten generieren.
+8. **Outbound Worker** verschickt über mehrere eigene Mailboxen mit Tageslimits, Suppressions und Stop-on-Reply.
+9. **Reply Sync + Inbox** synchronisieren Antworten.
+10. **Pipeline + No-Show Rescue** verfolgen Termine bis zum Abschluss.
 
-## Pflicht-Konfiguration für Livebetrieb
+## Wichtig beim Teilen
 
-Die vollständige Vorlage steht in `.env.example`.
+Dieses Repository enthält **keine produktiven Zugangsdaten**. Die Datei `.env.example` enthält ausschließlich Platzhalter.
 
-Mindestens erforderlich:
+Jede neue Installation benötigt eigene Infrastruktur und eigene Zugangsdaten. Dadurch kann diese Version als ZIP weitergegeben oder in ein separates Repository kopiert werden, ohne Datenbank, Leads, Mailboxen oder API-Zugänge der ursprünglichen Installation mitzuteilen.
+
+## Schnellstart
+
+```bash
+npm install
+cp .env.example .env.local
+npm run dev
+```
+
+Danach mindestens folgende Werte setzen:
 
 - `DATABASE_URL`
 - `ADMIN_PASSWORD`
@@ -29,67 +48,78 @@ Mindestens erforderlich:
 - `CRON_SECRET`
 - `WEBHOOK_SECRET`
 
-Für den vollständigen Acquisition-Flow zusätzlich:
+Für den Pflege-Lead-Finder:
 
-- OpenAI API Key (Env oder verschlüsselter API-Tresor)
-- Google Maps / Places API Key
-- mindestens eine verbundene Mailbox
-- Google/Microsoft OAuth App Credentials oder SMTP Credentials
-- `VIDEO_RENDERER_URL` + `VIDEO_RENDERER_SECRET` für Fake Loom
+- `GOOGLE_MAPS_API_KEY`
 
-Optional:
+Für KI-Kampagnen optional:
 
-- E-Mail-Verifier API Key
+- `OPENAI_API_KEY`
 
-## Mailbox-Verbindung
+Für den echten Versand:
 
-Google und Microsoft werden über den API-Tresor per OAuth verbunden. Nach erfolgreichem OAuth-Callback wird die Mailbox automatisch im Cockpit angelegt bzw. aktualisiert. Environment- und Vault-Credentials werden zusammengeführt; Vault-Werte überschreiben gleichnamige Fallback-Credentials.
+- mindestens eine eigene Google-/Microsoft-/SMTP-Mailbox
+- passende OAuth- oder SMTP-Credentials
 
-Neue Sender starten bewusst mit niedrigem Tageslimit. Das UI-Ramp-up erhöht nur das erlaubte Versandlimit; es erzeugt keine künstlichen Warm-up-Interaktionen.
+Für Fake Loom optional:
 
-## Cron-Endpunkte
+- `VIDEO_RENDERER_URL`
+- `VIDEO_RENDERER_SECRET`
 
-Die beiden produktiven Worker sind gegen `Authorization: Bearer <CRON_SECRET>` geschützt:
+## Datenbank
 
-- `/api/cron/send` – Versandqueue
-- `/api/cron/replies` – Gmail/Microsoft Reply Sync
+Die vorhandenen SQL-Migrationen unter `supabase/migrations` auf einer **neuen, leeren Postgres-/Supabase-Datenbank** ausführen. Nicht die Datenbank der ursprünglichen Installation teilen.
 
-Empfohlene Produktionsfrequenz:
+## Erste Inbetriebnahme
 
-- Send Worker: alle 5 Minuten
-- Reply Sync: alle 10 Minuten
+1. Neue Postgres-/Supabase-Datenbank erstellen.
+2. Migrationen ausführen.
+3. `.env.example` als Vorlage verwenden und eigene Secrets setzen.
+4. Anwendung deployen, z. B. über Vercel.
+5. Unter **Setup / API Vault** eigene Google-Places-, OpenAI- und Mailbox-Verbindungen einrichten.
+6. Im **Pflege Lead Finder** mit einer Suchanfrage wie `Pflegedienst Stuttgart` testen.
+7. Einen Lead importieren und den Recruiting Opportunity Score prüfen.
+8. Eine eigene Mailbox verbinden.
+9. Zuerst mit einem eigenen Testlead die gesamte Journey testen:
 
-Die Cron-Schedules müssen im Hosting-Projekt aktiviert werden. Auf Vercel können sie über die Projekt-Cron-Konfiguration angelegt werden.
+`Pflege Lead Finder → Recruiting Analyse → Microsite/Fake Loom → Kampagne → Testmail → Reply → Stop-on-Reply → Termin → Pipeline`
 
-## Produktions-Readiness
+Erst danach echte Versandlimits schrittweise erhöhen.
 
-`/api/system/health` prüft getrennt:
+## Scoring verstehen
 
-- `coreReady` – DB, Login, Encryption, Public URL, Cron/Webhook Secrets
-- `outboundReady` – Core + aktive Mailbox + Credentials
-- `leadFinderReady` – Google Places
-- `aiReady` – OpenAI
-- `videoReady` – Fake-Loom Renderer
-- `ready` – alle Kern-Capabilities verfügbar
+- **Recruiting-Reife 0–100:** Wie gut der sichtbare digitale Bewerber-Einstieg bereits aufgebaut ist.
+- **Recruiting Opportunity 0–100:** Wie groß der aktuell erkennbare Optimierungshebel ist. Ein hoher Opportunity Score bedeutet nicht automatisch Kaufbereitschaft, sondern einen starken sichtbaren Ansatzpunkt für ein qualifiziertes Gespräch.
+- **Intent Score:** Reaktionen innerhalb des Outbound-Systems, etwa Microsite-Views oder CTA-Interaktionen.
 
-Das Cockpit zeigt diese Readiness ebenfalls im Bereich **Analytics** und **Setup**.
+## Empfohlene Angebotslogik
 
-## Sicherheit und Versandlogik
+Bei hoher Opportunity:
+
+**Karriere-Landingpage + Employer Branding + Schnellbewerbungs-Funnel + Social Recruiting**
+
+Bei mittlerer Opportunity:
+
+**Employer-Branding-Optimierung + Bewerber-Funnel + Social Recruiting**
+
+Bei bereits starker Recruiting-Basis:
+
+**Recruiting-Conversion-Audit + gezielte Social-Recruiting-Kampagne**
+
+## Sicherheit
 
 - Admin-Routen sind sessiongeschützt.
-- Secrets werden AES-256-GCM verschlüsselt in Postgres gespeichert.
-- Website-Audit und Kontakt-Enrichment blockieren private/interne Zieladressen und validieren Redirects.
-- Outbox-Jobs werden atomar mit `FOR UPDATE SKIP LOCKED` beansprucht.
-- Hängende `sending`-Jobs werden automatisch zurückgesetzt.
-- Suppression bei Bounce/Unsubscribe wird serverseitig erzwungen.
-- Replies und Termine stoppen weitere reguläre Sequenzschritte.
-- Doppelte Enrollment-Versuche für denselben Lead in derselben Kampagne werden verhindert.
-- Tageslimits werden serverseitig für Mailboxen und Kampagnen erzwungen.
+- Secrets werden serverseitig gespeichert bzw. verschlüsselt.
+- Reale Secrets gehören nie in GitHub oder in eine ZIP-Datei.
+- Website-Audit und Kontakt-Enrichment arbeiten mit öffentlich erreichbaren Unternehmensseiten.
+- Suppression bei Bounce/Unsubscribe wird serverseitig berücksichtigt.
+- Replies und Termine stoppen reguläre Folgeschritte.
+- Versandlimits werden serverseitig erzwungen.
 
-## Vor dem ersten echten Kunden-Outbound
+## Branch
 
-Einmal vollständig mit einem eigenen Testlead durchlaufen:
+Diese Pflege-Version lebt separat auf:
 
-`Lead finden → enrichen → Website Radar → Fake Loom → Microsite → Kampagne → echte Testmail → Reply → Stop-on-Reply → Termin → optional No-Show Rescue`
+`feature/pflege-outbound-system`
 
-Erst danach Tageslimits schrittweise erhöhen.
+Die ursprüngliche `main`-Version bleibt unverändert.
