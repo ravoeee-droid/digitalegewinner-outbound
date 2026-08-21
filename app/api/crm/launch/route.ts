@@ -1,6 +1,5 @@
 import { z } from "zod";
 import { query, readState, writeState } from "@/lib/db";
-import { syncLegacyLeads } from "@/lib/sales-os-migration";
 import { getCallSummary } from "@/lib/telephony";
 
 export const runtime = "nodejs";
@@ -44,6 +43,8 @@ type LegacyState = {
   [key: string]: unknown;
 };
 
+const pflegeFilter = `(lower(coalesce(c.industry,'')) like '%pflege%' or lower(c.name) like '%pflege%' or c.source like 'pflege%' or coalesce(c.metadata->>'campaign','') like 'pflege%')`;
+
 function legacyFromLead(lead: LaunchLead) {
   return {
     id: lead.id,
@@ -74,7 +75,7 @@ async function loadLeads(workspace: string) {
      left join lateral (
        select website_score from sales_research_runs r where r.company_id=l.company_id order by r.created_at desc limit 1
      ) rr on true
-     where l.workspace=$1 and l.status='active'
+     where l.workspace=$1 and l.status='active' and ${pflegeFilter}
      order by
        case when (c.metadata->>'phone_ready')='false' then 1 else 0 end,
        l.priority_score desc,
@@ -106,24 +107,31 @@ export async function GET(request: Request) {
   try {
     const url = new URL(request.url);
     const workspace = url.searchParams.get("workspace") || "default";
-    await syncLegacyLeads(workspace);
     const leads = await loadLeads(workspace);
     await mirrorToLegacy(leads);
 
     const [stats] = await query<{ companies: number; leads: number; hot: number; appointments: number; won: number; pipeline: number }>(
       `select
-        (select count(*)::int from sales_companies where workspace=$1) companies,
+        count(distinct c.id)::int companies,
         count(*)::int leads,
-        count(*) filter(where priority_score>=70)::int hot,
-        count(*) filter(where stage='Termin')::int appointments,
-        count(*) filter(where stage='Gewonnen')::int won,
-        coalesce(sum(deal_value) filter(where stage not in ('Gewonnen','Verloren')),0)::float8 pipeline
-       from sales_leads where workspace=$1 and status='active'`,
+        count(*) filter(where l.priority_score>=70)::int hot,
+        count(*) filter(where l.stage='Termin')::int appointments,
+        count(*) filter(where l.stage='Gewonnen')::int won,
+        coalesce(sum(l.deal_value) filter(where l.stage not in ('Gewonnen','Verloren')),0)::float8 pipeline
+       from sales_leads l join sales_companies c on c.id=l.company_id
+       where l.workspace=$1 and l.status='active' and ${pflegeFilter}`,
       [workspace],
     );
     const activities = await query<{ id: number; lead_id: string; type: string; summary: string; meta: Record<string, unknown>; created_at: string }>(
-      `select id,coalesce(lead_id,'') lead_id,type,summary,meta,created_at
-       from sales_activities where workspace=$1 order by created_at desc limit 60`,
+      `select a.id,coalesce(a.lead_id,'') lead_id,a.type,a.summary,a.meta,a.created_at
+       from sales_activities a
+       where a.workspace=$1 and (
+         a.lead_id is null or a.lead_id='' or a.lead_id in (
+           select l.id from sales_leads l join sales_companies c on c.id=l.company_id
+           where l.workspace=$1 and l.status='active' and ${pflegeFilter}
+         )
+       )
+       order by a.created_at desc limit 60`,
       [workspace],
     );
     const calls = await getCallSummary(workspace);
