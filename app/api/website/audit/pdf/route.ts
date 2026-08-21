@@ -1,23 +1,15 @@
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from "pdf-lib";
 import { z } from "zod";
 import type { WebsiteAuditResult } from "@/lib/website-audit";
+import { analyzePflegeRecruiting } from "@/lib/pflege-recruiting";
 
 export const runtime = "nodejs";
-
 const schema = z.object({ audit: z.unknown() });
 
 function isAudit(value: unknown): value is WebsiteAuditResult {
   if (!value || typeof value !== "object") return false;
   const audit = value as Partial<WebsiteAuditResult>;
-  return Boolean(
-    audit.version === 1 &&
-    audit.company &&
-    audit.finalUrl &&
-    audit.scores &&
-    Array.isArray(audit.findings) &&
-    Array.isArray(audit.priorities) &&
-    audit.sales,
-  );
+  return Boolean(audit.version === 1 && audit.company && audit.finalUrl && audit.scores && Array.isArray(audit.findings) && audit.sales);
 }
 
 function safe(value: unknown) {
@@ -39,18 +31,7 @@ function wrap(text: string, font: PDFFont, size: number, maxWidth: number) {
     if (font.widthOfTextAtSize(candidate, size) <= maxWidth) line = candidate;
     else {
       if (line) lines.push(line);
-      if (font.widthOfTextAtSize(word, size) <= maxWidth) line = word;
-      else {
-        let chunk = "";
-        for (const char of word) {
-          const next = chunk + char;
-          if (font.widthOfTextAtSize(next, size) > maxWidth && chunk) {
-            lines.push(chunk);
-            chunk = char;
-          } else chunk = next;
-        }
-        line = chunk;
-      }
+      line = word;
     }
   }
   if (line) lines.push(line);
@@ -62,6 +43,7 @@ export async function POST(request: Request) {
     const input = schema.parse(await request.json());
     if (!isAudit(input.audit)) return Response.json({ error: "Audit-Daten unvollständig." }, { status: 400 });
     const audit = input.audit;
+    const recruiting = analyzePflegeRecruiting(audit);
 
     const pdf = await PDFDocument.create();
     const regular = await pdf.embedFont(StandardFonts.Helvetica);
@@ -74,27 +56,26 @@ export async function POST(request: Request) {
     const muted = rgb(0.36, 0.41, 0.48);
     const green = rgb(0.13, 0.67, 0.43);
     const pale = rgb(0.94, 0.97, 0.95);
-    const line = rgb(0.87, 0.89, 0.91);
+    const rule = rgb(0.87, 0.89, 0.91);
     let page!: PDFPage;
     let y = 0;
 
     const newPage = (title?: string) => {
       page = pdf.addPage([width, height]);
       y = height - margin;
-      page.drawText("DIGITALE GEWINNER", { x: margin, y, size: 10, font: bold, color: green });
-      page.drawText("WEBSITE RADAR", { x: width - margin - 98, y, size: 9, font: bold, color: muted });
+      page.drawText("PFLEGE RECRUITING OS", { x: margin, y, size: 10, font: bold, color: green });
+      page.drawText("RECRUITING RADAR", { x: width - margin - 110, y, size: 9, font: bold, color: muted });
       y -= 20;
-      page.drawLine({ start: { x: margin, y }, end: { x: width - margin, y }, thickness: 0.7, color: line });
+      page.drawLine({ start: { x: margin, y }, end: { x: width - margin, y }, thickness: 0.7, color: rule });
       y -= 24;
       if (title) {
         page.drawText(safe(title), { x: margin, y, size: 19, font: bold, color: ink });
         y -= 28;
       }
-      return page;
     };
 
-    const ensure = (needed = 70, title?: string) => {
-      if (y - needed < margin) newPage(title);
+    const ensure = (needed = 70) => {
+      if (y - needed < margin) newPage("Fortsetzung");
     };
 
     const paragraph = (text: string, options?: { size?: number; color?: ReturnType<typeof rgb>; font?: PDFFont; gap?: number; indent?: number }) => {
@@ -102,8 +83,7 @@ export async function POST(request: Request) {
       const useFont = options?.font ?? regular;
       const color = options?.color ?? ink;
       const indent = options?.indent ?? 0;
-      const lines = wrap(text, useFont, size, contentWidth - indent);
-      for (const row of lines) {
+      for (const row of wrap(text, useFont, size, contentWidth - indent)) {
         ensure(size + 10);
         page.drawText(row, { x: margin + indent, y, size, font: useFont, color });
         y -= size + 4;
@@ -113,106 +93,89 @@ export async function POST(request: Request) {
 
     const section = (title: string) => {
       ensure(55);
-      y -= 4;
+      y -= 3;
       page.drawText(safe(title), { x: margin, y, size: 13, font: bold, color: ink });
       y -= 20;
     };
 
     const scoreBox = (label: string, value: number, x: number, boxWidth: number) => {
-      page.drawRectangle({ x, y: y - 53, width: boxWidth, height: 53, color: pale, borderColor: line, borderWidth: 0.6 });
-      page.drawText(String(value), { x: x + 12, y: y - 27, size: 20, font: bold, color: value >= 75 ? green : ink });
-      page.drawText(label, { x: x + 12, y: y - 43, size: 7.8, font: bold, color: muted });
+      page.drawRectangle({ x, y: y - 55, width: boxWidth, height: 55, color: pale, borderColor: rule, borderWidth: 0.6 });
+      page.drawText(String(value), { x: x + 12, y: y - 28, size: 21, font: bold, color: value >= 70 ? green : ink });
+      page.drawText(safe(label), { x: x + 12, y: y - 44, size: 7.4, font: bold, color: muted });
     };
 
     newPage();
-    page.drawText("High-End Website Analyse", { x: margin, y, size: 27, font: bold, color: ink });
-    y -= 34;
+    page.drawText("Pflege Recruiting Analyse", { x: margin, y, size: 27, font: bold, color: ink });
+    y -= 35;
     paragraph(audit.company, { size: 16, font: bold, gap: 2 });
     paragraph(audit.finalUrl, { size: 9, color: muted, gap: 18 });
 
     const scoreWidth = (contentWidth - 16) / 3;
-    scoreBox("GESAMT", audit.scores.overall, margin, scoreWidth);
-    scoreBox("CONVERSION", audit.scores.conversion, margin + scoreWidth + 8, scoreWidth);
-    scoreBox("TRUST", audit.scores.trust, margin + (scoreWidth + 8) * 2, scoreWidth);
-    y -= 70;
-    scoreBox("SEO", audit.scores.seo, margin, scoreWidth);
-    scoreBox("TECHNIK", audit.scores.technical, margin + scoreWidth + 8, scoreWidth);
-    scoreBox("CONTENT", audit.scores.content, margin + (scoreWidth + 8) * 2, scoreWidth);
+    scoreBox("RECRUITING OPPORTUNITY", recruiting.opportunityScore, margin, scoreWidth);
+    scoreBox("RECRUITING-REIFE", recruiting.maturityScore, margin + scoreWidth + 8, scoreWidth);
+    scoreBox("WEBSITE", audit.scores.overall, margin + (scoreWidth + 8) * 2, scoreWidth);
     y -= 75;
 
-    section("Executive Summary");
-    paragraph(audit.sales.opportunitySummary, { size: 11, gap: 12 });
-    paragraph(`Status ${audit.statusCode} | Antwort ${audit.responseMs} ms | ${audit.metrics.wordCount} Woerter | ${audit.metrics.ctaCount} CTAs | ${audit.metrics.formCount} Formulare`, { size: 8.5, color: muted, gap: 14 });
+    section("Executive Recruiting Summary");
+    paragraph(recruiting.emailHook, { size: 11, gap: 9 });
+    paragraph(`Einordnung: ${recruiting.level}. Empfohlener Ansatz: ${recruiting.recommendedOffer}`, { size: 10, color: green, gap: 15 });
 
-    section("Die 5 wichtigsten Hebel");
-    if (!audit.priorities.length) paragraph("Keine kritischen Hebel erkannt. Fokus auf datenbasierte Tests und Feintuning.", { color: muted });
-    for (const priority of audit.priorities.slice(0, 5)) {
-      ensure(90);
-      page.drawText(`${priority.rank}. ${safe(priority.title)}`, { x: margin, y, size: 11, font: bold, color: ink });
-      y -= 17;
-      paragraph(priority.why, { size: 9.2, color: muted, gap: 2, indent: 12 });
-      paragraph(`Massnahme: ${priority.action}`, { size: 9.2, gap: 3, indent: 12 });
-      paragraph(`Ziel: ${priority.expectedImpact}`, { size: 8.5, color: green, gap: 10, indent: 12 });
-    }
+    section("Sichtbare Recruiting-Hebel");
+    if (!recruiting.gaps.length) paragraph("Die digitale Recruiting-Basis wirkt solide. Der nächste Hebel liegt in Conversion, Reichweite und datenbasierten Tests.", { color: muted });
+    recruiting.gaps.slice(0, 6).forEach((gap, index) => {
+      ensure(48);
+      page.drawText(`${index + 1}.`, { x: margin, y, size: 10, font: bold, color: green });
+      paragraph(gap, { size: 10, indent: 22, gap: 8 });
+    });
+
+    section("Empfohlenes Angebot");
+    paragraph(recruiting.recommendedOffer, { size: 12, font: bold, gap: 15 });
+
+    section("Website Basis");
+    paragraph(`Gesamt ${audit.scores.overall}/100 | Conversion ${audit.scores.conversion}/100 | Vertrauen ${audit.scores.trust}/100 | SEO ${audit.scores.seo}/100 | Technik ${audit.scores.technical}/100`, { size: 9.5, color: muted, gap: 12 });
+    paragraph(audit.sales.opportunitySummary, { size: 10, gap: 14 });
 
     newPage("Detailanalyse");
-    const categoryLabels: Record<string, string> = { SEO:"SEO",Conversion:"Conversion",Trust:"Vertrauen",Technical:"Technik",Content:"Content" };
-    for (const finding of audit.findings) {
-      ensure(95, "Detailanalyse");
-      const severity = finding.severity === "critical" ? "KRITISCH" : finding.severity === "warning" ? "WICHTIG" : finding.severity === "strength" ? "STAERKE" : "CHANCE";
-      page.drawText(`${severity} - ${categoryLabels[finding.category] || finding.category}`, { x: margin, y, size: 7.5, font: bold, color: finding.severity === "strength" ? green : muted });
+    const relevantFindings = audit.findings.filter((finding) => finding.severity !== "strength").slice(0, 10);
+    for (const finding of relevantFindings) {
+      ensure(92);
+      const severity = finding.severity === "critical" ? "KRITISCH" : finding.severity === "warning" ? "WICHTIG" : "CHANCE";
+      page.drawText(`${severity} - ${safe(finding.category)}`, { x: margin, y, size: 7.5, font: bold, color: muted });
       y -= 15;
       paragraph(finding.title, { size: 11, font: bold, gap: 2 });
       paragraph(finding.detail, { size: 9.2, color: muted, gap: 2 });
-      paragraph(`Warum relevant: ${finding.impact}`, { size: 9.2, gap: 2 });
-      paragraph(`Empfehlung: ${finding.recommendation}`, { size: 9.2, gap: 12 });
-      page.drawLine({ start: { x: margin, y: y + 4 }, end: { x: width - margin, y: y + 4 }, thickness: 0.5, color: line });
+      paragraph(`Empfehlung: ${finding.recommendation}`, { size: 9.2, gap: 11 });
+      page.drawLine({ start: { x: margin, y: y + 4 }, end: { x: width - margin, y: y + 4 }, thickness: 0.5, color: rule });
     }
 
-    newPage("Vertriebs-Nutzung");
-    section("Cold-Call / Loom Opener");
-    paragraph(audit.sales.opener, { size: 11, gap: 16 });
+    newPage("Outbound-Nutzung");
+    section("Gesprächsaufhänger");
+    recruiting.talkingPoints.slice(0, 5).forEach((point, index) => paragraph(`${index + 1}. ${point}`, { size: 10, gap: 8 }));
+    if (!recruiting.talkingPoints.length) paragraph(audit.sales.opener, { size: 10, gap: 14 });
+
     section("E-Mail Hook");
-    paragraph(audit.sales.emailHook, { size: 11, gap: 16 });
-    section("Fake-Loom Talking Points");
-    if (!audit.sales.loomTalkingPoints.length) paragraph("Website wirkt bereits solide. Nutze den Report fuer konkrete A/B-Test-Hypothesen.", { color: muted });
-    audit.sales.loomTalkingPoints.forEach((point, index) => paragraph(`${index + 1}. ${point}`, { size: 10, gap: 8 }));
+    paragraph(recruiting.emailHook, { size: 11, gap: 15 });
 
-    section("Messwerte");
-    const metricRows = [
-      ["HTML", `${audit.metrics.htmlKb} KB`],
-      ["Woerter", audit.metrics.wordCount],
-      ["H1 / H2", `${audit.metrics.h1Count} / ${audit.metrics.h2Count}`],
-      ["Bilder ohne Alt", `${audit.metrics.imagesMissingAlt}/${audit.metrics.imageCount}`],
-      ["Interne / externe Links", `${audit.metrics.internalLinks} / ${audit.metrics.externalLinks}`],
-      ["Kontaktwege", audit.metrics.contactMethods],
-      ["Schema Bloecke", audit.metrics.schemaCount],
-      ["robots.txt / sitemap", `${audit.metrics.hasRobotsTxt ? "ja" : "nein"} / ${audit.metrics.hasSitemap ? "ja" : "nein"}`],
-    ];
-    for (const [label, value] of metricRows) {
-      ensure(26);
-      page.drawText(safe(label), { x: margin, y, size: 9, font: bold, color: ink });
-      page.drawText(safe(value), { x: margin + 180, y, size: 9, font: regular, color: muted });
-      y -= 18;
-    }
+    section("Hinweis zur Einordnung");
+    paragraph("Die Analyse basiert ausschließlich auf öffentlich sichtbaren Informationen der analysierten Website. Ein hoher Opportunity Score beschreibt sichtbares Optimierungspotenzial und ist keine Garantie für Bewerberzahlen, Einstellungen oder wirtschaftliche Ergebnisse.", { size: 9.5, color: muted });
 
     const pages = pdf.getPages();
     pages.forEach((current, index) => {
-      current.drawLine({ start:{x:margin,y:27}, end:{x:width-margin,y:27}, thickness:0.5, color:line });
-      current.drawText(`Website Radar | ${safe(audit.company)}`, { x:margin, y:14, size:7, font:regular, color:muted });
+      current.drawLine({ start:{x:margin,y:27}, end:{x:width-margin,y:27}, thickness:0.5, color:rule });
+      current.drawText(`Pflege Recruiting Radar | ${safe(audit.company)}`, { x:margin, y:14, size:7, font:regular, color:muted });
       current.drawText(`Seite ${index + 1}/${pages.length}`, { x:width-margin-52, y:14, size:7, font:regular, color:muted });
     });
 
-    pdf.setTitle(`Website Radar - ${safe(audit.company)}`);
-    pdf.setAuthor("Digitale Gewinner");
-    pdf.setSubject("Website Analyse fuer Outbound und Conversion");
+    pdf.setTitle(`Pflege Recruiting Radar - ${safe(audit.company)}`);
+    pdf.setAuthor("Pflege Recruiting OS");
+    pdf.setSubject("Recruiting- und Website-Analyse fuer Pflegeanbieter");
     const bytes = await pdf.save();
-    const fileName = safe(audit.company).replace(/[^a-zA-Z0-9äöüÄÖÜß_-]+/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "") || "website-audit";
+    const fileName = safe(audit.company).replace(/[^a-zA-Z0-9äöüÄÖÜß_-]+/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "") || "pflege-recruiting";
     return new Response(Buffer.from(bytes), {
       status: 200,
       headers: {
         "content-type": "application/pdf",
-        "content-disposition": `attachment; filename="${fileName}-website-radar.pdf"`,
+        "content-disposition": `attachment; filename="${fileName}-pflege-recruiting-radar.pdf"`,
         "cache-control": "no-store",
       },
     });
