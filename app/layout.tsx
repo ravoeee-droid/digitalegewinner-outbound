@@ -3,6 +3,7 @@ import "./globals.css";
 import "./launch.css";
 import "./launch-overrides.css";
 import "./wcag.css";
+import "./wcag-login.css";
 
 export const metadata: Metadata = {
   title: "Pflege Recruiting OS · Digitale Gewinner",
