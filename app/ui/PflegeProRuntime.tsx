@@ -1,81 +1,79 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect } from "react";
 import PflegeProOS from "./PflegeProOS";
 
-type LeadSnapshot = {
-  id: string;
-  stage: string;
-  metadata?: Record<string, unknown> | null;
-};
-
-type CrmSnapshot = { leads?: LeadSnapshot[] };
-
-type EnrichmentMeta = { enrichedAt?: string };
-
-const SESSION_KEY = "dg.pflege.auto-research.v2";
+const SESSION_KEY = "dg.pflege.auto-research.v4";
 const SESSION_BUDGET = 20;
-const BATCH_SIZE = 2;
+const PAUSE_MS = 1400;
 
-function hasResearch(lead: LeadSnapshot) {
-  const value = lead.metadata?.enrichment;
-  return Boolean(value && typeof value === "object" && !Array.isArray(value) && (value as EnrichmentMeta).enrichedAt);
+function idleDelay(ms = 900) {
+  return new Promise<void>((resolve) => {
+    window.setTimeout(() => {
+      const idle = (window as Window & { requestIdleCallback?: (callback: () => void, options?: { timeout: number }) => number }).requestIdleCallback;
+      if (idle) idle(() => resolve(), { timeout: 1600 });
+      else resolve();
+    }, ms);
+  });
 }
 
-function AutoResearchBridge({ onBatch }: { onBatch: () => void }) {
+function AutoResearchBridge() {
   useEffect(() => {
     let cancelled = false;
 
     async function run() {
+      await idleDelay(2400);
+      if (cancelled) return;
+
       const used = Number(window.sessionStorage.getItem(SESSION_KEY) || "0");
       if (used >= SESSION_BUDGET) return;
-      let processed = used;
 
-      while (!cancelled && processed < SESSION_BUDGET) {
-        try {
-          const snapshotResponse = await fetch("/api/crm/launch", { cache: "no-store" });
-          if (!snapshotResponse.ok) return;
-          const snapshot = await snapshotResponse.json() as CrmSnapshot;
-          const missing = (snapshot.leads || []).filter((lead) => !hasResearch(lead) && !["Gewonnen", "Verloren"].includes(lead.stage));
-          if (!missing.length) {
-            window.sessionStorage.setItem(SESSION_KEY, String(SESSION_BUDGET));
-            return;
-          }
+      try {
+        const queueResponse = await fetch(`/api/crm/research-queue?limit=${SESSION_BUDGET - used}`, { cache: "no-store" });
+        if (!queueResponse.ok) return;
+        const queue = await queueResponse.json() as { ids?: string[] };
+        const ids = Array.isArray(queue.ids) ? queue.ids.slice(0, SESSION_BUDGET - used) : [];
+        if (!ids.length) {
+          window.sessionStorage.setItem(SESSION_KEY, String(SESSION_BUDGET));
+          return;
+        }
 
-          const remaining = SESSION_BUDGET - processed;
-          const batch = missing.slice(0, Math.min(BATCH_SIZE, remaining));
+        let processed = used;
+        for (const leadId of ids) {
+          if (cancelled || processed >= SESSION_BUDGET) return;
+          await idleDelay(PAUSE_MS);
+          if (cancelled) return;
+
           const response = await fetch("/api/crm/enrichment", {
             method: "POST",
             headers: { "content-type": "application/json" },
-            body: JSON.stringify({ leadIds: batch.map((lead) => lead.id), ai: true }),
+            body: JSON.stringify({ leadIds: [leadId], ai: false }),
           });
-          if (!response.ok) return;
+          if (!response.ok) continue;
 
-          processed += batch.length;
+          processed += 1;
           window.sessionStorage.setItem(SESSION_KEY, String(processed));
-          if (!cancelled) onBatch();
-          await new Promise((resolve) => window.setTimeout(resolve, 700));
-        } catch {
-          return;
+          window.dispatchEvent(new CustomEvent("dg:research-progress", { detail: { processed, budget: SESSION_BUDGET } }));
         }
+
+        window.dispatchEvent(new CustomEvent("dg:research-complete"));
+      } catch {
+        return;
       }
     }
 
     void run();
     return () => { cancelled = true; };
-  }, [onBatch]);
+  }, []);
 
   return null;
 }
 
 export default function PflegeProRuntime() {
-  const [revision, setRevision] = useState(0);
-  const refreshWorkspace = useCallback(() => setRevision((value) => value + 1), []);
-
   return (
     <>
-      <PflegeProOS key={revision} />
-      <AutoResearchBridge onBatch={refreshWorkspace} />
+      <PflegeProOS />
+      <AutoResearchBridge />
     </>
   );
 }
