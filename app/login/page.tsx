@@ -1,8 +1,10 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import { useRouter } from "next/navigation";
 
 export default function LoginPage() {
+  const router = useRouter();
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -17,7 +19,7 @@ export default function LoginPage() {
       body: JSON.stringify({ password: String(form.get("password") || "") }),
     });
     const json = await response.json() as { error?: string };
-    if (response.ok) location.href = "/";
+    if (response.ok) router.push("/");
     else setError(json.error || "Login fehlgeschlagen");
     setLoading(false);
   }
