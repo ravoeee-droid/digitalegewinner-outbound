@@ -1,7 +1,7 @@
-import DigitaleGewinnerOutboundOS from "./ui/DigitaleGewinnerOutboundOS";
+import PflegeOutboundOS from "./ui/PflegeOutboundOS";
 import InboxWidget from "./ui/InboxWidget";
 import IntegrationVaultWidget from "./ui/IntegrationVaultWidget";
-import LeadFinderWidget from "./ui/LeadFinderWidget";
+import PflegeLeadFinderWidget from "./ui/PflegeLeadFinderWidget";
 import CampaignLabWidget from "./ui/CampaignLabWidget";
 import WebsiteAuditWidget from "./ui/WebsiteAuditWidget";
 import NoShowRescueWidget from "./ui/NoShowRescueWidget";
@@ -11,9 +11,9 @@ import SalesOSWidget from "./ui/SalesOSWidget";
 export default function Page() {
   return (
     <>
-      <DigitaleGewinnerOutboundOS />
+      <PflegeOutboundOS />
       <InboxWidget />
-      <LeadFinderWidget />
+      <PflegeLeadFinderWidget />
       <CampaignLabWidget />
       <WebsiteAuditWidget />
       <NoShowRescueWidget />
