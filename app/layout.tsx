@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import "./launch.css";
+import "./launch-overrides.css";
 
 export const metadata: Metadata = {
   title: "Pflege Recruiting OS · Digitale Gewinner",
