@@ -32,7 +32,6 @@ export default function CloudTalkPhone() {
 
   useEffect(() => {
     if (!startedAt) return;
-    setNow(startedAt);
     const timer = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(timer);
   }, [startedAt]);
@@ -93,7 +92,9 @@ export default function CloudTalkPhone() {
       if (!event) return;
       setStatus(event);
       if (["dialing", "ringing", "calling", "answered", "connected"].includes(event)) {
-        setStartedAt(current => current || Date.now());
+        const timestamp = Date.now();
+        setStartedAt(current => current || timestamp);
+        setNow(timestamp);
       }
       if (["hangup", "ended", "completed"].includes(event)) setStartedAt(null);
       void persist(event, data);
