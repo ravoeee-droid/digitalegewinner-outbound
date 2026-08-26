@@ -1,0 +1,19 @@
+{
+  "instanceId": "DG-MAIN",
+  "company": "Digitale Gewinner",
+  "environment": "production",
+  "github": "ravoeee-droid/digitalegewinner-outbound",
+  "vercel": {
+    "project": "digitalegewinner-outbound",
+    "projectId": "prj_4dgtSJI6FeoUezuUW13PNCFACvyL"
+  },
+  "supabase": {
+    "project": "digitalegewinner-outbound",
+    "projectRef": "dessavbytgxyygeohjrn"
+  },
+  "forbiddenCrossInstanceRefs": [
+    "ravoeee-droid/walkenhorst",
+    "prj_x3nLVnqgVpKxJowHUjaN3iMswr9a",
+    "jiahshldcusphxtbqxpv"
+  ]
+}
