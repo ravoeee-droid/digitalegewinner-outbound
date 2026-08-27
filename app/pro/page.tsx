@@ -1,15 +1,5 @@
-import PflegeProRuntime from "../ui/PflegeProRuntime";
-import CloudTalkPhone from "../ui/CloudTalkPhone";
-import DomainMailCenter from "../ui/DomainMailCenter";
-import DomainMailBridge from "../ui/DomainMailBridge";
+import { redirect } from "next/navigation";
 
 export default function ProPage() {
-  return (
-    <>
-      <PflegeProRuntime />
-      <CloudTalkPhone />
-      <DomainMailCenter />
-      <DomainMailBridge />
-    </>
-  );
+  redirect("/");
 }
