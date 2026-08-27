@@ -7,8 +7,13 @@ import { query } from "@/lib/db";
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-export async function GET() {
-  if (process.env.VERCEL_ENV !== "preview") return Response.json({ error: "Not found" }, { status: 404 });
+const TEMP_SMOKE_KEY = "pf-smoke-7f3d5e9a6c41";
+
+export async function GET(request: Request) {
+  const url = new URL(request.url);
+  const productionSmoke = process.env.VERCEL_ENV === "production" && url.searchParams.get("key") === TEMP_SMOKE_KEY;
+  if (process.env.VERCEL_ENV !== "preview" && !productionSmoke) return Response.json({ error: "Not found" }, { status: 404 });
+  const mode = url.searchParams.get("mode") === "discovery" ? "discovery" : "full";
   const started = Date.now();
   try {
     const discoveryStart = Date.now();
@@ -21,7 +26,7 @@ export async function GET() {
     const candidate = discovery.leads.find((lead) => Boolean(lead.website)) || discovery.leads[0] || null;
 
     let enrichment: Record<string, unknown> | null = null;
-    if (candidate?.website) {
+    if (mode === "full" && candidate?.website) {
       const enrichStart = Date.now();
       const [contact, audit] = await Promise.all([
         enrichPublicContact(candidate.website),
@@ -67,6 +72,7 @@ export async function GET() {
 
     return Response.json({
       ok: discovery.leads.length > 0,
+      mode,
       totalMs: Date.now() - started,
       discovery: {
         source: discovery.source,
@@ -85,6 +91,6 @@ export async function GET() {
       database: { ok: true, ms: dbMs, counts: db[0] || null },
     });
   } catch (error) {
-    return Response.json({ ok: false, totalMs: Date.now() - started, error: error instanceof Error ? error.message : "Smoke test failed" }, { status: 500 });
+    return Response.json({ ok: false, mode, totalMs: Date.now() - started, error: error instanceof Error ? error.message : "Smoke test failed" }, { status: 500 });
   }
 }
