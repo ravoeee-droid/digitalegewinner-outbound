@@ -56,10 +56,10 @@ type OsmGeo = { lat: string; lon: string; display_name: string; boundingbox?: st
 
 const NOMINATIM = "https://nominatim.openstreetmap.org/search";
 const OVERPASS_ENDPOINTS = [
-  "https://overpass.kumi.systems/api/interpreter",
   "https://overpass-api.de/api/interpreter",
+  "https://overpass.kumi.systems/api/interpreter",
 ] as const;
-const OSM_USER_AGENT = "DigitaleGewinner-PflegeRadar/1.1 (business research; digitalegewinner.de)";
+const OSM_USER_AGENT = "DigitaleGewinner-PflegeRadar/1.2 (business research; digitalegewinner.de)";
 const osmCache = new Map<string, { expiresAt: number; value: DiscoveryResult }>();
 const osmInFlight = new Map<string, Promise<DiscoveryResult>>();
 
@@ -138,7 +138,7 @@ function osmScope(place: OsmGeo) {
     const lonSpan = Math.abs(east - west);
     if (latSpan > 0.01 && lonSpan > 0.01 && latSpan < 0.8 && lonSpan < 0.8) return `(${south},${west},${north},${east})`;
   }
-  return `(around:18000,${Number(place.lat)},${Number(place.lon)})`;
+  return `(around:16000,${Number(place.lat)},${Number(place.lon)})`;
 }
 
 async function requestOverpass(body: URLSearchParams) {
@@ -151,7 +151,7 @@ async function requestOverpass(body: URLSearchParams) {
         headers: { "content-type": "application/x-www-form-urlencoded;charset=UTF-8", "User-Agent": OSM_USER_AGENT },
         body,
         cache: "no-store",
-        signal: AbortSignal.timeout(index === 0 ? 10_000 : 8_000),
+        signal: AbortSignal.timeout(index === 0 ? 8_000 : 7_000),
       });
       if (!response.ok) { lastError = `OpenStreetMap Lead-Suche ist ausgelastet (${response.status}).`; continue; }
       return await response.json() as { elements?: OsmElement[] };
@@ -170,7 +170,7 @@ async function osmSearch(query: string, pageSize: number, locationHint?: string)
   geoUrl.searchParams.set("limit", "1");
   geoUrl.searchParams.set("countrycodes", "de");
   geoUrl.searchParams.set("addressdetails", "1");
-  const geo = await fetch(geoUrl, { headers: { "User-Agent": OSM_USER_AGENT, "Accept-Language": "de" }, cache: "no-store", signal: AbortSignal.timeout(7_000) });
+  const geo = await fetch(geoUrl, { headers: { "User-Agent": OSM_USER_AGENT, "Accept-Language": "de" }, cache: "no-store", signal: AbortSignal.timeout(6_000) });
   if (!geo.ok) throw new Error(`OpenStreetMap Geocoding fehlgeschlagen (${geo.status}).`);
   const places = await geo.json() as OsmGeo[];
   if (!places[0]) throw new Error(`Region „${location}“ wurde nicht gefunden.`);
@@ -180,9 +180,8 @@ async function osmSearch(query: string, pageSize: number, locationHint?: string)
     `nwr["name"~"Pflege|Pflegedienst|Sozialstation|Ambulante Pflege|Intensivpflege",i]${scope};`,
     `nwr["social_facility"~"ambulatory_care|outreach",i]${scope};`,
     `nwr["healthcare"="home_care"]${scope};`,
-    `nwr["office"="healthcare"]["name"]${scope};`,
   ].join("\n");
-  const overpassQuery = `[out:json][timeout:12];(${blocks});out center tags ${Math.min(160, Math.max(60, pageSize * 6))};`;
+  const overpassQuery = `[out:json][timeout:9];(${blocks});out center tags ${Math.min(120, Math.max(50, pageSize * 5))};`;
   const payload = await requestOverpass(new URLSearchParams({ data: overpassQuery }));
   const seen = new Set<string>();
   const leads: DiscoveredBusiness[] = [];
@@ -238,7 +237,7 @@ async function cachedOsmSearch(query: string, pageSize: number, locationHint?: s
   osmInFlight.set(key, promise);
   try {
     const value = await promise;
-    osmCache.set(key, { expiresAt: Date.now() + 5 * 60_000, value });
+    osmCache.set(key, { expiresAt: Date.now() + 10 * 60_000, value });
     return value;
   } finally {
     osmInFlight.delete(key);
