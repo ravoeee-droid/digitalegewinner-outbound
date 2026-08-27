@@ -3,6 +3,7 @@
 import { MouseEvent, useEffect, useState } from "react";
 import PflegeProRuntime from "./PflegeProRuntime";
 import GermanyCoverageRadar from "./GermanyCoverageRadar";
+import SeoRadarWorkspace from "./SeoRadarWorkspace";
 import styles from "./pflege-unified-runtime.module.css";
 
 function isLeadFinderTrigger(target: EventTarget | null) {
@@ -14,12 +15,18 @@ function isLeadFinderTrigger(target: EventTarget | null) {
 
 export default function PflegeUnifiedRuntime() {
   const [radarOpen, setRadarOpen] = useState(false);
+  const [seoOpen, setSeoOpen] = useState(false);
   const [workspaceKey, setWorkspaceKey] = useState(0);
 
   useEffect(() => {
-    const open = () => setRadarOpen(true);
-    window.addEventListener("dg:open-germany-radar", open);
-    return () => window.removeEventListener("dg:open-germany-radar", open);
+    const openRadar = () => setRadarOpen(true);
+    const openSeo = () => setSeoOpen(true);
+    window.addEventListener("dg:open-germany-radar", openRadar);
+    window.addEventListener("dg:open-seo-radar", openSeo);
+    return () => {
+      window.removeEventListener("dg:open-germany-radar", openRadar);
+      window.removeEventListener("dg:open-seo-radar", openSeo);
+    };
   }, []);
 
   function captureNavigation(event: MouseEvent<HTMLDivElement>) {
@@ -37,6 +44,12 @@ export default function PflegeUnifiedRuntime() {
     <div className={styles.root} onClickCapture={captureNavigation}>
       <PflegeProRuntime key={workspaceKey} />
 
+      <button className={styles.seoLauncher} type="button" onClick={() => setSeoOpen(true)} aria-label="SEO Radar öffnen">
+        <span>⌕</span>
+        <div><b>SEO Radar</b><small>Keywords · Reports</small></div>
+        <i>NEW</i>
+      </button>
+
       {radarOpen && (
         <div className={styles.radarLayer} role="dialog" aria-modal="true" aria-label="Deutschland Lead Finder">
           <div className={styles.radarTopbar}>
@@ -51,6 +64,24 @@ export default function PflegeUnifiedRuntime() {
           </div>
           <div className={styles.radarBody}>
             <GermanyCoverageRadar onCrmChanged={crmChanged} />
+          </div>
+        </div>
+      )}
+
+      {seoOpen && (
+        <div className={styles.seoLayer} role="dialog" aria-modal="true" aria-label="SEO Radar">
+          <div className={styles.radarTopbar}>
+            <div>
+              <span>DIGITALE GEWINNER · GROWTH INTELLIGENCE</span>
+              <strong>SEO Radar</strong>
+            </div>
+            <div className={styles.radarActions}>
+              <span>Keywords → Website → Social Search → Kundenreport</span>
+              <button type="button" onClick={() => setSeoOpen(false)}>Zurück zum Sales OS</button>
+            </div>
+          </div>
+          <div className={styles.seoBody}>
+            <SeoRadarWorkspace embedded />
           </div>
         </div>
       )}
