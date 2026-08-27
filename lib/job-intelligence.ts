@@ -27,6 +27,11 @@ export type HiringEmployerSignal = {
   employer: string;
   city: string;
   seedKey: string;
+  website: string;
+  address: string;
+  region: string;
+  companySize: string;
+  openPositions: number;
   jobGrowth: JobGrowthSignal;
 };
 
@@ -51,8 +56,17 @@ type BaJob = {
 };
 
 type BaResponse = { stellenangebote?: BaJob[] };
+type BaAddress = { land?: string; region?: string; plz?: string; ort?: string; strasse?: string; strasseHausnummer?: string };
+type BaJobDetail = {
+  arbeitgeber?: string;
+  arbeitgeberdarstellungUrl?: string;
+  arbeitgeberAdresse?: BaAddress;
+  betriebsgroesse?: string;
+  anzahlOffeneStellen?: number;
+};
 
 const JOBS_URL = "https://rest.arbeitsagentur.de/jobboerse/jobsuche-service/pc/v6/jobs";
+const JOB_DETAIL_BASE = "https://rest.arbeitsagentur.de/jobboerse/jobsuche-service/pc/v4/jobdetails";
 const CARE_ROLE = /(pflegefach|pflegekraft|altenpfleg|krankenpfleg|gesundheits-.*pfleg|pflegehelfer|pflegeassist|pdl|pflegedienstleit|wundmanager|intensivpfleg|gerontopsychiatr|pflegefachmann|pflegefachfrau)/i;
 const LEGAL_FORM = /\b(gmbh|ggmbh|mbh|ug|haftungsbeschränkt|ag|eg|kg|ohg|e\.v\.?|ev)\b/gi;
 const STAFFING_EMPLOYER = /(zeitarbeit|personaldienst|personalservice|arbeitnehmerüberlass|arbeitnehmerueberlass|personalvermittlung|arbeitsvermittlung|leasing|staffing|recruiting agency|avanti|akut medizin|pluss personal|all\.medi)/i;
@@ -94,6 +108,21 @@ function portalFromUrl(raw: string) {
     if (host.includes("arbeitsagentur.de")) return "Bundesagentur für Arbeit";
     return host;
   } catch { return ""; }
+}
+
+function normalizeWebsite(value = "") {
+  const raw = value.trim();
+  if (!raw) return "";
+  try {
+    const url = new URL(/^https?:\/\//i.test(raw) ? raw : `https://${raw}`);
+    return ["http:", "https:"].includes(url.protocol) ? url.toString() : "";
+  } catch { return ""; }
+}
+
+function formatAddress(value?: BaAddress) {
+  if (!value) return "";
+  const street = value.strasseHausnummer || value.strasse || "";
+  return [street, [value.plz, value.ort].filter(Boolean).join(" ")].filter(Boolean).join(", ");
 }
 
 function emptySignal(warning = ""): JobGrowthSignal {
@@ -153,19 +182,31 @@ function signalFromRoles(roles: JobSignalItem[], checkedAt: string, warning = ""
   };
 }
 
-async function fetchJobs(url: URL, timeoutMs = 10_000) {
+async function apiGet<T>(url: URL, timeoutMs = 10_000): Promise<T> {
   const response = await fetch(url, {
     cache: "no-store",
     headers: {
       "X-API-Key": "jobboerse-jobsuche",
       "accept": "application/json",
-      "user-agent": "DigitaleGewinner-PflegeLeadFactory/2.0",
+      "user-agent": "DigitaleGewinner-PflegeLeadFactory/2.1",
     },
     signal: AbortSignal.timeout(timeoutMs),
   });
   if (!response.ok) throw new Error(`Jobsuche HTTP ${response.status}`);
-  const json = await response.json() as BaResponse;
+  return response.json() as Promise<T>;
+}
+
+async function fetchJobs(url: URL, timeoutMs = 10_000) {
+  const json = await apiGet<BaResponse>(url, timeoutMs);
   return Array.isArray(json.stellenangebote) ? json.stellenangebote : [];
+}
+
+async function fetchJobDetail(reference: string): Promise<BaJobDetail | null> {
+  if (!reference) return null;
+  try {
+    const encoded = Buffer.from(reference, "utf8").toString("base64");
+    return await apiGet<BaJobDetail>(new URL(`${JOB_DETAIL_BASE}/${encodeURIComponent(encoded)}`), 8_000);
+  } catch { return null; }
 }
 
 export async function discoverHiringEmployers(location = "", options?: { days?: number; size?: number; radiusKm?: number }): Promise<HiringEmployerDiscovery> {
@@ -201,16 +242,33 @@ export async function discoverHiringEmployers(location = "", options?: { days?: 
       groups.set(key, existing);
     }
 
-    const employers = [...groups.entries()]
+    const preliminary = [...groups.entries()]
       .map(([seedKey, roles]) => ({
         employer: roles[0]?.employer || "",
         city: roles[0]?.city || location,
         seedKey,
+        roles,
         jobGrowth: signalFromRoles(roles, checkedAt),
       }))
       .filter((item) => item.employer)
       .sort((a, b) => b.jobGrowth.growthScore - a.jobGrowth.growthScore || b.jobGrowth.relevantOpenJobs - a.jobGrowth.relevantOpenJobs)
-      .slice(0, 30);
+      .slice(0, 12);
+
+    const employers = await Promise.all(preliminary.map(async (item): Promise<HiringEmployerSignal> => {
+      const detail = await fetchJobDetail(item.roles.find((role) => role.reference)?.reference || "");
+      const detailCity = detail?.arbeitgeberAdresse?.ort || item.city;
+      return {
+        employer: detail?.arbeitgeber || item.employer,
+        city: detailCity,
+        seedKey: item.seedKey,
+        website: normalizeWebsite(detail?.arbeitgeberdarstellungUrl || ""),
+        address: formatAddress(detail?.arbeitgeberAdresse),
+        region: detail?.arbeitgeberAdresse?.region || "",
+        companySize: detail?.betriebsgroesse || "",
+        openPositions: Math.max(item.jobGrowth.relevantOpenJobs, Number(detail?.anzahlOffeneStellen || 0)),
+        jobGrowth: item.jobGrowth,
+      };
+    }));
 
     return {
       source: "arbeitsagentur-jobsuche",
