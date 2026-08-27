@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { query } from "@/lib/db";
-import { getSecret } from "@/lib/secrets";
 import { ensureSalesOsSchema } from "@/lib/sales-os";
+import { discoverBusinesses, type DiscoveredBusiness } from "@/lib/business-discovery";
 import { coverageTasksForState, GERMANY_COVERAGE_STATES, normalizeGermanState } from "@/lib/germany-pflege-coverage";
 
 export const runtime = "nodejs";
@@ -12,38 +12,8 @@ const postSchema = z.object({
   state: z.string().min(2).max(80),
 });
 
-type AddressComponent = { longText?: string; types?: string[] };
-type Place = {
-  id?: string;
-  displayName?: { text?: string };
-  formattedAddress?: string;
-  websiteUri?: string;
-  nationalPhoneNumber?: string;
-  internationalPhoneNumber?: string;
-  primaryTypeDisplayName?: { text?: string };
-  location?: { latitude?: number; longitude?: number };
-  addressComponents?: AddressComponent[];
-  businessStatus?: string;
-  rating?: number;
-  userRatingCount?: number;
-};
-
-type Candidate = {
-  id: string;
-  company: string;
-  phone: string;
-  website: string;
-  city: string;
-  address: string;
-  state: string;
+type Candidate = DiscoveredBusiness & {
   stateCode: string;
-  postalCode: string;
-  industry: string;
-  lat: number | null;
-  lng: number | null;
-  rating: number;
-  reviewCount: number;
-  businessStatus: string;
   sector: string;
   query: string;
 };
@@ -75,65 +45,41 @@ async function ensureCoverageSchema() {
   `);
 }
 
-function component(place: Place, type: string) {
-  return place.addressComponents?.find((item) => item.types?.includes(type))?.longText || "";
-}
-
-function isPflegeCandidate(place: Place) {
-  const value = `${place.displayName?.text || ""} ${place.primaryTypeDisplayName?.text || ""}`.toLowerCase();
+function isPflegeCandidate(item: DiscoveredBusiness) {
+  const value = `${item.company} ${item.industry}`.toLowerCase();
   const include = /(pflege|sozialstation|ambulant|intensiv|häuslich|haeuslich|home care|home health)/i.test(value);
   const exclude = /(pflegeheim|seniorenheim|seniorenresidenz|wohnpark|krankenhaus|klinik|apotheke|physio|arztpraxis|sanitätshaus|sanitaetshaus)/i.test(value);
   return include && !exclude;
 }
 
-async function searchPages(apiKey: string, task: { state: string; code: string; sector: string; term: string; queryKey: string; query: string }) {
+async function searchTask(task: { state: string; code: string; sector: string; term: string; queryKey: string; query: string }) {
   const candidates: Candidate[] = [];
   let pageToken = "";
   let pages = 0;
+  let source = "";
+  let warning = "";
   for (let page = 0; page < 3; page += 1) {
-    const body: Record<string, unknown> = { textQuery: task.query, pageSize: 20, languageCode: "de", regionCode: "DE" };
-    if (pageToken) body.pageToken = pageToken;
-    const response = await fetch("https://places.googleapis.com/v1/places:searchText", {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        "X-Goog-Api-Key": apiKey,
-        "X-Goog-FieldMask": "places.id,places.displayName,places.formattedAddress,places.websiteUri,places.nationalPhoneNumber,places.internationalPhoneNumber,places.primaryTypeDisplayName,places.location,places.addressComponents,places.businessStatus,places.rating,places.userRatingCount,nextPageToken",
-      },
-      body: JSON.stringify(body),
-      signal: AbortSignal.timeout(15_000),
-    });
-    if (!response.ok) throw new Error(`Google Places Fehler ${response.status} bei ${task.sector}.`);
-    const json = await response.json() as { places?: Place[]; nextPageToken?: string };
+    const result = await discoverBusinesses({ query: task.query, pageSize: 20, pageToken, locationHint: `${task.sector}, ${task.state}` });
+    source = result.source;
+    warning = result.warning || warning;
     pages += 1;
-    for (const place of json.places || []) {
-      if (!place.id || !isPflegeCandidate(place)) continue;
-      const stateFromPlace = normalizeGermanState(component(place, "administrative_area_level_1"));
-      if (stateFromPlace && stateFromPlace !== task.state) continue;
+    for (const item of result.leads) {
+      if (!isPflegeCandidate(item)) continue;
+      const itemState = normalizeGermanState(item.state || "");
+      if (itemState && itemState !== task.state) continue;
       candidates.push({
-        id: place.id,
-        company: place.displayName?.text || "Unbekannt",
-        phone: place.nationalPhoneNumber || place.internationalPhoneNumber || "",
-        website: place.websiteUri || "",
-        city: component(place, "locality") || component(place, "postal_town") || task.sector,
-        address: place.formattedAddress || "",
+        ...item,
         state: task.state,
         stateCode: task.code,
-        postalCode: component(place, "postal_code"),
-        industry: place.primaryTypeDisplayName?.text || "Pflege",
-        lat: place.location?.latitude ?? null,
-        lng: place.location?.longitude ?? null,
-        rating: Number(place.rating || 0),
-        reviewCount: Number(place.userRatingCount || 0),
-        businessStatus: place.businessStatus || "",
+        city: item.city || task.sector,
         sector: task.sector,
         query: task.query,
       });
     }
-    pageToken = json.nextPageToken || "";
-    if (!pageToken) break;
+    pageToken = result.nextPageToken || "";
+    if (!pageToken || result.source !== "google-places") break;
   }
-  return { candidates, pages, pageToken };
+  return { candidates, pages, pageToken, source, warning };
 }
 
 async function persistDiscovered(candidates: Candidate[]) {
@@ -143,10 +89,19 @@ async function persistDiscovered(candidates: Candidate[]) {
   const rows = await query<{ id: string }>(
     `with input as (
        select * from jsonb_to_recordset($1::jsonb) as x(
-         id text, company text, phone text, website text, city text, address text, state text, "stateCode" text,
+         id text, company text, contact text, email text, phone text, website text, city text, address text, state text, "stateCode" text,
          "postalCode" text, industry text, lat double precision, lng double precision, rating double precision,
-         "reviewCount" integer, "businessStatus" text, sector text, query text
+         "reviewCount" integer, "businessStatus" text, source text, sector text, query text
        )
+     ), existing as (
+       select distinct on (i.id) i.id source_input_id,c.id company_id
+       from input i
+       join sales_companies c on c.workspace='default' and (
+         c.source_id=i.id or
+         (i.website<>'' and c.website<>'' and lower(c.website)=lower(i.website)) or
+         (lower(c.name)=lower(i.company) and lower(c.city)=lower(i.city))
+       )
+       order by i.id,c.updated_at desc
      ), updated as (
        update sales_companies c set
          name=i.company,
@@ -155,30 +110,34 @@ async function persistDiscovered(candidates: Candidate[]) {
          industry=case when i.industry<>'' then i.industry else c.industry end,
          phone=case when i.phone<>'' then i.phone else c.phone end,
          lat=coalesce(i.lat,c.lat),lng=coalesce(i.lng,c.lng),
-         source=case when c.source='' then 'pflege-google-places' else c.source end,
+         source=case when c.source='' then concat('pflege-',i.source) else c.source end,
+         source_id=case when c.source_id='' then i.id else c.source_id end,
          metadata=coalesce(c.metadata,'{}'::jsonb) || jsonb_build_object(
            'state',i.state,'state_code',i."stateCode",'postal_code',i."postalCode",'address',i.address,
            'google_rating',i.rating,'google_reviews',i."reviewCount",'business_status',i."businessStatus",
-           'discovery_sector',i.sector,'discovery_query',i.query,'discovered_at',now()
+           'discovery_source',i.source,'discovery_sector',i.sector,'discovery_query',i.query,'discovered_at',now()
          ),updated_at=now()
-       from input i where c.workspace='default' and c.source_id=i.id
+       from input i join existing e on e.source_input_id=i.id
+       where c.id=e.company_id
        returning c.id
      ), inserted as (
        insert into sales_companies(id,workspace,name,domain,website,city,industry,phone,source,source_id,lat,lng,research_status,latest_score,metadata)
-       select md5('company:default:'||i.id),'default',i.company,'',i.website,i.city,i.industry,i.phone,'pflege-google-places',i.id,i.lat,i.lng,'pending',20,
+       select md5('company:default:'||i.id),'default',i.company,'',i.website,i.city,i.industry,i.phone,concat('pflege-',i.source),i.id,i.lat,i.lng,'pending',20,
          jsonb_build_object(
            'state',i.state,'state_code',i."stateCode",'postal_code',i."postalCode",'address',i.address,
            'google_rating',i.rating,'google_reviews',i."reviewCount",'business_status',i."businessStatus",
-           'discovery_sector',i.sector,'discovery_query',i.query,'discovered_at',now()
+           'discovery_source',i.source,'discovery_sector',i.sector,'discovery_query',i.query,'discovered_at',now()
          )
        from input i
-       where not exists(select 1 from sales_companies c where c.workspace='default' and c.source_id=i.id)
+       where not exists(select 1 from existing e where e.source_input_id=i.id)
        on conflict do nothing
        returning id
+     ), touched as (
+       select id from updated union select id from inserted
      )
      insert into sales_leads(id,workspace,company_id,stage,status,deal_value,intent_score,fit_score,opportunity_score,priority_score,owner,notes)
      select md5('lead:default:'||c.id),'default',c.id,'Research','active',0,0,55,55,25,'','Deutschland Radar · Discovery abgeschlossen · Enrichment ausstehend'
-     from sales_companies c join input i on i.id=c.source_id
+     from sales_companies c join touched t on t.id=c.id
      where c.workspace='default'
      on conflict(workspace,company_id) where status='active'
      do update set updated_at=now()
@@ -293,8 +252,6 @@ export async function POST(request: Request) {
     const stateName = normalizeGermanState(input.state);
     const state = GERMANY_COVERAGE_STATES.find((item) => item.name === stateName);
     if (!state) return Response.json({ error: "Bundesland nicht erkannt." }, { status: 400 });
-    const key = process.env.GOOGLE_MAPS_API_KEY || await getSecret("google_maps_api_key");
-    if (!key) return Response.json({ error: "Google Maps / Places API ist noch nicht verbunden." }, { status: 503 });
 
     const tasks = coverageTasksForState(state.name);
     const doneRows = await query<{ query_key: string }>(
@@ -306,7 +263,7 @@ export async function POST(request: Request) {
     if (!nextSector) return Response.json({ ok: true, complete: true, message: `${state.name} ist im Discovery-Pass vollständig gescannt.`, coverage: await loadCoverage() });
     const sectorTasks = tasks.filter((task) => task.sector === nextSector && !done.has(task.queryKey));
 
-    const results = await Promise.all(sectorTasks.map((task) => searchPages(key, task)));
+    const results = await Promise.all(sectorTasks.map((task) => searchTask(task)));
     const allCandidates = results.flatMap((result) => result.candidates);
     const imported = await persistDiscovered(allCandidates);
 
@@ -317,10 +274,12 @@ export async function POST(request: Request) {
         `insert into sales_territory_scans(workspace,state,state_code,sector,term,query_key,status,pages_scanned,found_count,last_page_token,metadata,last_run_at)
          values('default',$1,$2,$3,$4,$5,'complete',$6,$7,$8,$9::jsonb,now())
          on conflict(workspace,query_key) do update set status='complete',pages_scanned=excluded.pages_scanned,found_count=excluded.found_count,last_page_token=excluded.last_page_token,metadata=excluded.metadata,last_run_at=now(),updated_at=now()`,
-        [state.name, state.code, task.sector, task.term, task.queryKey, result.pages, result.candidates.length, result.pageToken, JSON.stringify({ query: task.query })],
+        [state.name, state.code, task.sector, task.term, task.queryKey, result.pages, result.candidates.length, result.pageToken, JSON.stringify({ query: task.query, source: result.source, warning: result.warning })],
       );
     }
 
+    const sources = [...new Set(results.map((result) => result.source).filter(Boolean))];
+    const warnings = [...new Set(results.map((result) => result.warning).filter(Boolean))];
     return Response.json({
       ok: true,
       state: state.name,
@@ -329,6 +288,8 @@ export async function POST(request: Request) {
       rawHits: allCandidates.length,
       uniqueFound: new Set(allCandidates.map((item) => item.id)).size,
       crmTouched: imported,
+      sources,
+      warnings,
       coverage: await loadCoverage(),
     });
   } catch (error) {
