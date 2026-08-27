@@ -28,6 +28,7 @@ export type HiringEmployerSignal = {
   city: string;
   seedKey: string;
   website: string;
+  phone: string;
   address: string;
   region: string;
   companySize: string;
@@ -85,13 +86,40 @@ type BaJobDetail = {
   betriebsgroesse?: string;
   anzahlOffeneStellen?: number;
 };
+type NominatimPlace = {
+  place_id?: number;
+  osm_type?: string;
+  osm_id?: number;
+  lat?: string;
+  lon?: string;
+  name?: string;
+  display_name?: string;
+  category?: string;
+  type?: string;
+  address?: {
+    city?: string;
+    town?: string;
+    village?: string;
+    municipality?: string;
+    state?: string;
+    postcode?: string;
+    road?: string;
+    house_number?: string;
+  };
+  extratags?: Record<string, string>;
+  namedetails?: Record<string, string>;
+};
+type PublicEmployerDirectory = { phone: string; website: string; address: string; city: string; region: string };
 
 const JOBS_URL = "https://rest.arbeitsagentur.de/jobboerse/jobsuche-service/pc/v6/jobs";
 const JOB_DETAIL_BASE = "https://rest.arbeitsagentur.de/jobboerse/jobsuche-service/pc/v4/jobdetails";
+const NOMINATIM_URL = "https://nominatim.openstreetmap.org/search";
 const CARE_ROLE = /(pflegefach|pflegekraft|altenpfleg|krankenpfleg|gesundheits-.{0,20}pfleg|pflegehelfer|pflegeassist|assistent.{0,24}pflege|pflege.{0,24}assistent|pflegedienstleit|\bpdl\b|wundmanager|intensivpfleg|gerontopsychiatr|pflegefachmann|pflegefachfrau|ambulante.{0,20}pflege|pflege.{0,20}ambulant)/i;
 const AMBULATORY_TEXT = /(ambulant|häuslich|haeuslich|pflegedienst|sozialstation|diakoniestation|home care|home health|intensivpflege|hausbesuch)/i;
 const LEGAL_FORM = /\b(gmbh|ggmbh|mbh|ug|haftungsbeschränkt|ag|eg|kg|ohg|e\.v\.?|ev)\b/gi;
 const STAFFING_EMPLOYER = /(zeitarbeit|personaldienst|personalservice|arbeitnehmerüberlass|arbeitnehmerueberlass|personalvermittlung|arbeitsvermittlung|leasing|staffing|recruiting agency|avanti|akut medizin|pluss personal|all\.medi|tempton)/i;
+const NOMINATIM_USER_AGENT = "DigitaleGewinner-PflegeLeadFactory/2.3 (business research; digitalegewinner.de)";
+let nextNominatimAt = 0;
 
 function normalizeName(value: string) {
   return value
@@ -151,6 +179,19 @@ function formatAddress(value?: BaAddress) {
   if (!value) return "";
   const street = value.strasseHausnummer || [value.strasse, value.hausnummer].filter(Boolean).join(" ");
   return [street, [value.plz, value.ort].filter(Boolean).join(" ")].filter(Boolean).join(", ");
+}
+function placeAddress(place: NominatimPlace) {
+  const a = place.address || {};
+  const street = [a.road, a.house_number].filter(Boolean).join(" ");
+  const city = a.city || a.town || a.village || a.municipality || "";
+  return [street, [a.postcode, city].filter(Boolean).join(" ")].filter(Boolean).join(", ");
+}
+function firstExtra(tags: Record<string, string> | undefined, keys: string[]) {
+  for (const key of keys) {
+    const value = String(tags?.[key] || "").trim();
+    if (value) return value;
+  }
+  return "";
 }
 
 function emptySignal(warning = ""): JobGrowthSignal {
@@ -226,7 +267,7 @@ async function apiGet<T>(url: URL, timeoutMs = 10_000): Promise<T> {
     headers: {
       "X-API-Key": "jobboerse-jobsuche",
       "accept": "application/json",
-      "user-agent": "DigitaleGewinner-PflegeLeadFactory/2.2",
+      "user-agent": "DigitaleGewinner-PflegeLeadFactory/2.3",
     },
     signal: AbortSignal.timeout(timeoutMs),
   });
@@ -247,6 +288,63 @@ async function fetchJobDetail(reference: string): Promise<BaJobDetail | null> {
     const encoded = Buffer.from(reference, "utf8").toString("base64");
     return await apiGet<BaJobDetail>(new URL(`${JOB_DETAIL_BASE}/${encodeURIComponent(encoded)}`), 8_000);
   } catch { return null; }
+}
+
+function directorySearchQuery(employer: string, city: string) {
+  const clean = employer.replace(LEGAL_FORM, " ").replace(/\s+/g, " ").trim();
+  if (/diakoniestation/i.test(clean)) return `Diakoniestation ${city}`;
+  if (/sozialstation/i.test(clean)) return `${clean}, ${city}`;
+  if (/pflegedienst/i.test(clean)) return `${clean}, ${city}`;
+  if (/intensivpflege/i.test(clean)) return `${clean}, ${city}`;
+  return `${clean}, ${city}, Deutschland`;
+}
+
+async function waitForNominatimSlot() {
+  const wait = Math.max(0, nextNominatimAt - Date.now());
+  if (wait) await new Promise((resolve) => setTimeout(resolve, wait));
+  nextNominatimAt = Date.now() + 1100;
+}
+
+async function lookupPublicEmployer(employer: string, city: string): Promise<PublicEmployerDirectory> {
+  if (!employer || !city) return { phone: "", website: "", address: "", city, region: "" };
+  try {
+    await waitForNominatimSlot();
+    const url = new URL(NOMINATIM_URL);
+    url.searchParams.set("q", directorySearchQuery(employer, city));
+    url.searchParams.set("format", "jsonv2");
+    url.searchParams.set("limit", "5");
+    url.searchParams.set("countrycodes", "de");
+    url.searchParams.set("addressdetails", "1");
+    url.searchParams.set("extratags", "1");
+    url.searchParams.set("namedetails", "1");
+    const response = await fetch(url, {
+      cache: "no-store",
+      headers: { "user-agent": NOMINATIM_USER_AGENT, "accept-language": "de" },
+      signal: AbortSignal.timeout(8_000),
+    });
+    if (!response.ok) return { phone: "", website: "", address: "", city, region: "" };
+    const places = await response.json() as NominatimPlace[];
+    const sameCity = places.filter((place) => {
+      const placeCity = place.address?.city || place.address?.town || place.address?.village || place.address?.municipality || "";
+      return !placeCity || placeCity.toLowerCase().includes(city.toLowerCase()) || city.toLowerCase().includes(placeCity.toLowerCase());
+    });
+    const candidates = sameCity.length ? sameCity : places;
+    const keyword = /diakoniestation/i.test(employer) ? /diakoniestation/i : /sozialstation/i.test(employer) ? /sozialstation/i : /pflegedienst/i.test(employer) ? /pflegedienst/i : null;
+    const match = candidates.find((place) => companyNamesMatch(employer, place.name || place.namedetails?.name || ""))
+      || (keyword ? candidates.find((place) => keyword.test(`${place.name || ""} ${place.display_name || ""}`)) : undefined)
+      || candidates[0];
+    if (!match) return { phone: "", website: "", address: "", city, region: "" };
+    const tags = match.extratags;
+    return {
+      phone: firstExtra(tags, ["contact:phone", "phone", "contact:mobile", "mobile"]),
+      website: normalizeWebsite(firstExtra(tags, ["contact:website", "website", "url"])),
+      address: placeAddress(match),
+      city: match.address?.city || match.address?.town || match.address?.village || match.address?.municipality || city,
+      region: match.address?.state || "",
+    };
+  } catch {
+    return { phone: "", website: "", address: "", city, region: "" };
+  }
 }
 
 export async function discoverHiringEmployers(location = "", options?: { days?: number; size?: number; radiusKm?: number }): Promise<HiringEmployerDiscovery> {
@@ -291,9 +389,9 @@ export async function discoverHiringEmployers(location = "", options?: { days?: 
       }))
       .filter((item) => item.employer)
       .sort((a, b) => b.jobGrowth.growthScore - a.jobGrowth.growthScore || b.jobGrowth.relevantOpenJobs - a.jobGrowth.relevantOpenJobs)
-      .slice(0, 12);
+      .slice(0, 10);
 
-    const employers = await Promise.all(preliminary.map(async (item): Promise<HiringEmployerSignal> => {
+    const detailed = await Promise.all(preliminary.map(async (item) => {
       const detail = await fetchJobDetail(item.roles.find((role) => role.reference)?.reference || "");
       const detailAddress = firstAddress(detail || {});
       const employer = detail?.arbeitgeber || detail?.firma || item.employer;
@@ -304,14 +402,32 @@ export async function discoverHiringEmployers(location = "", options?: { days?: 
         city,
         seedKey: item.seedKey,
         website: normalizeWebsite(detail?.arbeitgeberdarstellungUrl || ""),
+        phone: "",
         address: formatAddress(detailAddress),
         region: detailAddress?.region || "",
         companySize: detail?.betriebsgroesse || "",
         openPositions: Math.max(item.jobGrowth.relevantOpenJobs, Number(detail?.anzahlOffeneStellen || 0)),
         ambulatoryEvidence: AMBULATORY_TEXT.test(evidenceText),
         jobGrowth: item.jobGrowth,
-      };
+      } satisfies HiringEmployerSignal;
     }));
+
+    const employers: HiringEmployerSignal[] = [];
+    for (const item of detailed) {
+      if (!item.ambulatoryEvidence && !AMBULATORY_TEXT.test(item.employer)) {
+        employers.push(item);
+        continue;
+      }
+      const directory = await lookupPublicEmployer(item.employer, item.city);
+      employers.push({
+        ...item,
+        website: item.website || directory.website,
+        phone: directory.phone,
+        address: item.address || directory.address,
+        city: directory.city || item.city,
+        region: item.region || directory.region,
+      });
+    }
 
     return {
       source: "arbeitsagentur-jobsuche",
