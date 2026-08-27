@@ -13,7 +13,7 @@ export async function GET() {
 
 export async function POST() {
   try {
-    return Response.json(await runLeadFactoryCycle(3));
+    return Response.json(await runLeadFactoryCycle(5));
   } catch (error) {
     return Response.json({ error: error instanceof Error ? error.message : "Lead Factory konnte nicht gestartet werden." }, { status: 500 });
   }
