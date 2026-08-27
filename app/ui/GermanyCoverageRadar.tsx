@@ -37,7 +37,7 @@ type CoveragePayload = {
   error?: string;
 };
 
-type Props = { onCrmChanged?: () => void | Promise<void> };
+type Props = { onCrmChanged?: () => unknown };
 
 type Shape = { code: string; d: string; x: number; y: number };
 const SHAPES: Shape[] = [
