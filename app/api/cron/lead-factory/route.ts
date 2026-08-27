@@ -11,7 +11,7 @@ function authorized(request: Request) {
 async function run(request: Request) {
   if (!authorized(request)) return Response.json({ error: "Unauthorized" }, { status: 401 });
   try {
-    const result = await runLeadFactoryCycle(3);
+    const result = await runLeadFactoryCycle(5);
     return Response.json(result);
   } catch (error) {
     return Response.json({ error: error instanceof Error ? error.message : "Lead Factory fehlgeschlagen." }, { status: 500 });

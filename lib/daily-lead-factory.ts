@@ -1,8 +1,8 @@
 import { query } from "./db";
 import { discoverBusinesses, type DiscoveredBusiness } from "./business-discovery";
 import { enrichPublicContact, type ContactEnrichment } from "./contact-enrichment";
-import { coverageTasksForState, GERMANY_COVERAGE_STATES, normalizeGermanState } from "./germany-pflege-coverage";
-import { inspectJobGrowth, type JobGrowthSignal } from "./job-intelligence";
+import { GERMANY_COVERAGE_STATES } from "./germany-pflege-coverage";
+import { companyNamesMatch, discoverHiringEmployers, inspectJobGrowth, type HiringEmployerSignal, type JobGrowthSignal } from "./job-intelligence";
 import { ensureSalesOsSchema, scoreResearch } from "./sales-os";
 import { runWebsiteAudit, type WebsiteAuditResult } from "./website-audit";
 
@@ -40,8 +40,6 @@ type Qualification = {
   reasons: string[];
 };
 
-type DiscoveryTask = ReturnType<typeof coverageTasksForState>[number];
-
 type FactoryStats = {
   target: number;
   bufferTarget: number;
@@ -54,6 +52,13 @@ type FactoryStats = {
   status: "green" | "yellow" | "red";
 };
 
+type JobTask = { state: string; code: string; sector: string; queryKey: string };
+type LeadBusiness = Omit<DiscoveredBusiness, "source"> & { source: string };
+type ResolvedJobLead = { business: LeadBusiness; seed: HiringEmployerSignal };
+
+const TARGET_NAME_SQL = `(c.metadata->>'pflege_icp_verified'='true' or lower(c.name) ~ '(pflegedienst|ambulant|sozialstation|häuslich|haeuslich|krankenpflege|intensivpflege|pflegeteam|home care|home health)')
+  and lower(c.name) !~ '(pflegeheim|altenheim|seniorenheim|seniorenzentrum|seniorenresidenz|pflegezentrum|wohn-? und pflege|wohnpark|tagespflege|hospiz|krankenhaus|klinik|fußpflege|fusspflege|textilpflege|fahrzeugpflege|kosmetik|sanitätshaus|sanitaetshaus)'`;
+
 function clamp(value: number) { return Math.max(0, Math.min(100, Math.round(value))); }
 function normalizeWebsite(value = "") {
   const raw = value.trim();
@@ -63,11 +68,26 @@ function normalizeWebsite(value = "") {
 function domainFromWebsite(value = "") {
   try { return new URL(normalizeWebsite(value)).hostname.toLowerCase().replace(/^www\./, ""); } catch { return ""; }
 }
-function isPflegeCandidate(item: DiscoveredBusiness) {
-  const value = `${item.company} ${item.industry}`.toLowerCase();
-  const include = /(pflege|sozialstation|ambulant|intensiv|häuslich|haeuslich|home care|home health)/i.test(value);
-  const exclude = /(pflegeheim|seniorenheim|seniorenresidenz|wohnpark|krankenhaus|klinik|apotheke|physio|arztpraxis|sanitätshaus|sanitaetshaus)/i.test(value);
-  return include && !exclude;
+function isExcludedName(value = "") {
+  return /(pflegeheim|altenheim|seniorenheim|seniorenzentrum|seniorenresidenz|pflegezentrum|wohn-? und pflege|wohnpark|tagespflege|hospiz|krankenhaus|klinik|fußpflege|fusspflege|textilpflege|fahrzeugpflege|kosmetik|sanitätshaus|sanitaetshaus|pflegestützpunkt|pflegestuetzpunkt)/i.test(value);
+}
+function isStrongAmbulatoryText(value = "") {
+  return /(pflegedienst|ambulan(?:t|te|ter)|sozialstation|häuslich|haeuslich|krankenpflege|intensivpflege|pflegeteam|home care|home health|home_care|ambulatory_care|outreach)/i.test(value) && !isExcludedName(value);
+}
+function isAmbulatoryBusiness(item: Pick<LeadBusiness, "company" | "industry">) {
+  return isStrongAmbulatoryText(`${item.company} ${item.industry}`);
+}
+function isCandidateRowTarget(row: CandidateRow) {
+  return row.metadata?.pflege_icp_verified === true || isStrongAmbulatoryText(`${row.company} ${row.industry}`);
+}
+function seededJobGrowth(metadata: Record<string, unknown>): JobGrowthSignal | null {
+  const raw = metadata?.job_growth_seed;
+  if (!raw || typeof raw !== "object") return null;
+  const seed = raw as Partial<JobGrowthSignal>;
+  const checked = Date.parse(String(seed.checkedAt || ""));
+  if (!Number.isFinite(checked) || Date.now() - checked > QUALIFICATION_FRESH_DAYS * 86_400_000) return null;
+  if (!Number(seed.relevantOpenJobs || 0)) return null;
+  return seed as JobGrowthSignal;
 }
 
 async function ensureFactorySchema() {
@@ -133,8 +153,7 @@ export async function getLeadFactoryStats(): Promise<FactoryStats> {
     from sales_companies c
     join sales_leads l on l.company_id=c.id and l.workspace=c.workspace and l.status='active'
     left join sales_contacts ct on ct.id=l.contact_id
-    where c.workspace='default'
-      and (c.source like 'pflege%' or lower(c.industry) like '%pflege%' or lower(c.name) like '%pflege%')
+    where c.workspace='default' and ${TARGET_NAME_SQL}
   `);
   const aPlusReady = Number(row?.a_plus_ready || 0);
   const deficit = Math.max(0, A_PLUS_BUFFER_TARGET - aPlusReady);
@@ -151,93 +170,222 @@ export async function getLeadFactoryStats(): Promise<FactoryStats> {
   };
 }
 
-async function nextDiscoveryTask(): Promise<DiscoveryTask | null> {
-  const rows = await query<{ query_key: string; status: string; last_run_at: string | null }>(
-    `select query_key,status,last_run_at from sales_territory_scans where workspace='default'`,
+async function nextJobDiscoveryTask(): Promise<JobTask | null> {
+  const rows = await query<{ query_key: string; last_run_at: string | null }>(
+    `select query_key,last_run_at from sales_territory_scans where workspace='default' and query_key like 'job:%'`,
   );
   const state = new Map(rows.map((row) => [row.query_key, row]));
-  const tasks = GERMANY_COVERAGE_STATES.flatMap((item) => coverageTasksForState(item.name));
-  const neverDone = tasks.find((task) => state.get(task.queryKey)?.status !== "complete");
-  if (neverDone) return neverDone;
-  const sorted = tasks
-    .map((task) => ({ task, date: state.get(task.queryKey)?.last_run_at ? new Date(state.get(task.queryKey)!.last_run_at!).getTime() : 0 }))
-    .sort((a, b) => a.date - b.date);
-  return sorted[0]?.task || null;
+  const tasks: JobTask[] = GERMANY_COVERAGE_STATES.flatMap((item) => item.sectors.map((sector) => ({
+    state: item.name,
+    code: item.code,
+    sector,
+    queryKey: `job:${item.code}:${sector.toLowerCase()}`,
+  })));
+  const freshCutoff = Date.now() - 18 * 60 * 60_000;
+  const neverOrStale = tasks.find((task) => {
+    const row = state.get(task.queryKey);
+    if (!row?.last_run_at) return true;
+    const value = Date.parse(row.last_run_at);
+    return !Number.isFinite(value) || value < freshCutoff;
+  });
+  if (neverOrStale) return neverOrStale;
+  return tasks
+    .map((task) => ({ task, date: Date.parse(state.get(task.queryKey)?.last_run_at || "") || 0 }))
+    .sort((a, b) => a.date - b.date)[0]?.task || null;
 }
 
-async function persistDiscovered(task: DiscoveryTask, leads: DiscoveredBusiness[], source: string, warning: string) {
-  const candidates = leads.filter(isPflegeCandidate).filter((item) => {
-    const itemState = normalizeGermanState(item.state || "");
-    return !itemState || itemState === task.state;
-  });
-  const deduped = [...new Map(candidates.map((item) => [item.id, item])).values()];
-  if (deduped.length) {
-    const payload = JSON.stringify(deduped.map((item) => ({ ...item, state: task.state, stateCode: task.code, sector: task.sector, query: task.query })));
-    await query(
-      `with input as (
-         select * from jsonb_to_recordset($1::jsonb) as x(
-           id text, company text, contact text, email text, phone text, website text, city text, address text, state text, "stateCode" text,
-           "postalCode" text, industry text, lat double precision, lng double precision, rating double precision,
-           "reviewCount" integer, "businessStatus" text, source text, sector text, query text
-         )
-       ), existing as (
-         select distinct on (i.id) i.id source_input_id,c.id company_id
-         from input i
-         join sales_companies c on c.workspace='default' and (
-           c.source_id=i.id or
-           (i.website<>'' and c.website<>'' and lower(c.website)=lower(i.website)) or
-           (lower(c.name)=lower(i.company) and lower(c.city)=lower(i.city))
-         )
-         order by i.id,c.updated_at desc
-       ), updated as (
-         update sales_companies c set
-           website=case when i.website<>'' then i.website else c.website end,
-           city=case when i.city<>'' then i.city else c.city end,
-           phone=case when i.phone<>'' then i.phone else c.phone end,
-           source_id=case when c.source_id='' then i.id else c.source_id end,
-           metadata=coalesce(c.metadata,'{}'::jsonb) || jsonb_build_object(
-             'state',i.state,'state_code',i."stateCode",'postal_code',i."postalCode",'address',i.address,
-             'google_rating',i.rating,'google_reviews',i."reviewCount",'business_status',i."businessStatus",
-             'discovery_source',i.source,'discovery_sector',i.sector,'discovery_query',i.query,'discovered_at',now()
-           ),updated_at=now()
-         from input i join existing e on e.source_input_id=i.id
-         where c.id=e.company_id returning c.id
-       ), inserted as (
-         insert into sales_companies(id,workspace,name,domain,website,city,industry,phone,source,source_id,lat,lng,research_status,latest_score,metadata)
-         select md5('company:default:'||i.id),'default',i.company,'',i.website,i.city,i.industry,i.phone,concat('pflege-',i.source),i.id,i.lat,i.lng,'pending',20,
-           jsonb_build_object('state',i.state,'state_code',i."stateCode",'postal_code',i."postalCode",'address',i.address,
-             'google_rating',i.rating,'google_reviews',i."reviewCount",'business_status',i."businessStatus",
-             'discovery_source',i.source,'discovery_sector',i.sector,'discovery_query',i.query,'discovered_at',now())
-         from input i where not exists(select 1 from existing e where e.source_input_id=i.id)
-         on conflict do nothing returning id
-       ), touched as (select id from updated union select id from inserted)
-       insert into sales_leads(id,workspace,company_id,stage,status,deal_value,intent_score,fit_score,opportunity_score,priority_score,owner,notes)
-       select md5('lead:default:'||c.id),'default',c.id,'Research','active',0,0,55,55,25,'','Daily Lead Factory · Discovery · Qualifizierung offen'
-       from sales_companies c join touched t on t.id=c.id where c.workspace='default'
-       on conflict(workspace,company_id) where status='active' do update set updated_at=now()`,
-      [payload],
-    );
-  }
+async function markJobScan(task: JobTask, values: { found: number; rawJobs: number; relevantJobs: number; warning: string }) {
   await query(
     `insert into sales_territory_scans(workspace,state,state_code,sector,term,query_key,status,pages_scanned,found_count,last_page_token,metadata,last_run_at)
-     values('default',$1,$2,$3,$4,$5,'complete',1,$6,'',$7::jsonb,now())
+     values('default',$1,$2,$3,'Aktuelle Pflege-Stellen',$4,'complete',1,$5,'',$6::jsonb,now())
      on conflict(workspace,query_key) do update set status='complete',pages_scanned=sales_territory_scans.pages_scanned+1,
        found_count=sales_territory_scans.found_count+excluded.found_count,metadata=excluded.metadata,last_run_at=now(),updated_at=now()`,
-    [task.state, task.code, task.sector, task.term, task.queryKey, deduped.length, JSON.stringify({ query: task.query, source, warning, factory: true })],
+    [task.state, task.code, task.sector, task.queryKey, values.found, JSON.stringify({ jobFirst: true, rawJobs: values.rawJobs, relevantJobs: values.relevantJobs, warning: values.warning })],
   );
-  return deduped.length;
+}
+
+async function resolveHiringEmployer(seed: HiringEmployerSignal, task: JobTask): Promise<ResolvedJobLead | null> {
+  if (!seed.employer || isExcludedName(seed.employer)) return null;
+  let match: LeadBusiness | null = null;
+  try {
+    const result = await discoverBusinesses({
+      query: `${seed.employer} ${seed.city || task.sector}`,
+      pageSize: 12,
+      locationHint: `${seed.city || task.sector}, ${task.state}`,
+    });
+    const candidates = result.leads
+      .filter((item) => isAmbulatoryBusiness(item))
+      .filter((item) => companyNamesMatch(seed.employer, item.company))
+      .sort((a, b) => Number(Boolean(b.phone)) - Number(Boolean(a.phone)) || Number(Boolean(b.website)) - Number(Boolean(a.website)));
+    if (candidates[0]) match = { ...candidates[0], source: candidates[0].source };
+  } catch {}
+
+  if (!match && seed.website && isStrongAmbulatoryText(seed.employer)) {
+    match = {
+      id: `job:${seed.seedKey}`,
+      company: seed.employer,
+      contact: "",
+      email: "",
+      phone: "",
+      website: seed.website,
+      city: seed.city || task.sector,
+      address: seed.address,
+      state: seed.region || task.state,
+      postalCode: "",
+      industry: "Ambulanter Pflegedienst",
+      rating: 0,
+      reviewCount: 0,
+      businessStatus: "",
+      source: "arbeitsagentur-jobdetails",
+    };
+  }
+  if (!match) return null;
+  if (seed.website && !match.website) match.website = seed.website;
+  if (seed.address && !match.address) match.address = seed.address;
+  return { business: match, seed };
+}
+
+async function persistJobFirst(task: JobTask, leads: ResolvedJobLead[]) {
+  let persisted = 0;
+  for (const item of leads) {
+    const business = item.business;
+    if (!isAmbulatoryBusiness(business)) continue;
+    const website = normalizeWebsite(business.website || item.seed.website || "");
+    const domain = domainFromWebsite(website);
+    const sourceId = business.id || `job:${item.seed.seedKey}`;
+    const city = business.city || item.seed.city || task.sector;
+    const metadata = {
+      state: task.state,
+      state_code: task.code,
+      address: business.address || item.seed.address || "",
+      discovery_source: business.source,
+      discovery_sector: task.sector,
+      discovered_at: new Date().toISOString(),
+      pflege_icp_verified: true,
+      job_first: true,
+      job_growth_seed: item.seed.jobGrowth,
+      job_seed_checked_at: item.seed.jobGrowth.checkedAt,
+      job_seed_open_positions: item.seed.openPositions,
+      job_seed_company_size: item.seed.companySize,
+      job_seed_external_portals: item.seed.jobGrowth.externalPortals,
+    };
+
+    let existing = await query<{ id: string }>(
+      `select id from sales_companies where workspace='default' and (
+         source_id=$1 or ($2<>'' and domain=$2) or (lower(name)=lower($3) and lower(city)=lower($4))
+       ) order by updated_at desc limit 1`,
+      [sourceId, domain, business.company, city],
+    );
+    let companyId = existing[0]?.id || crypto.randomUUID();
+    if (!existing.length) {
+      const inserted = await query<{ id: string }>(
+        `insert into sales_companies(id,workspace,name,domain,website,city,industry,phone,source,source_id,lat,lng,research_status,latest_score,metadata)
+         values($1,'default',$2,$3,$4,$5,$6,$7,'pflege-job-first',$8,$9,$10,'pending',45,$11::jsonb)
+         on conflict do nothing returning id`,
+        [companyId, business.company, domain, website, city, business.industry || "Ambulanter Pflegedienst", business.phone || "", sourceId, business.lat ?? null, business.lng ?? null, JSON.stringify(metadata)],
+      );
+      if (!inserted.length) {
+        existing = await query<{ id: string }>(
+          `select id from sales_companies where workspace='default' and (($1<>'' and domain=$1) or (lower(name)=lower($2) and lower(city)=lower($3))) order by updated_at desc limit 1`,
+          [domain, business.company, city],
+        );
+        if (!existing[0]) continue;
+        companyId = existing[0].id;
+      }
+    }
+
+    await query(
+      `update sales_companies set
+         website=case when $2<>'' then $2 else website end,
+         domain=case when $3<>'' then $3 else domain end,
+         phone=case when $4<>'' then $4 else phone end,
+         city=case when $5<>'' then $5 else city end,
+         industry=case when $6<>'' then $6 else industry end,
+         source=case when source='manual' then 'pflege-job-first' else source end,
+         source_id=case when source_id='' then $7 else source_id end,
+         metadata=coalesce(metadata,'{}'::jsonb) || $8::jsonb,
+         updated_at=now()
+       where id=$1 and workspace='default'`,
+      [companyId, website, domain, business.phone || "", city, business.industry || "Ambulanter Pflegedienst", sourceId, JSON.stringify(metadata)],
+    );
+    await query(
+      `insert into sales_leads(id,workspace,company_id,stage,status,deal_value,intent_score,fit_score,opportunity_score,priority_score,owner,notes)
+       values($1,'default',$2,'Research','active',0,$3,65,65,55,'','Job-first Lead · offene Pflege-Stelle bestätigt · Qualifizierung offen')
+       on conflict(workspace,company_id) where status='active' do update set intent_score=greatest(sales_leads.intent_score,excluded.intent_score),updated_at=now()`,
+      [crypto.randomUUID(), companyId, item.seed.jobGrowth.growthScore],
+    );
+    persisted++;
+  }
+  return persisted;
+}
+
+async function persistFallback(leads: DiscoveredBusiness[], task: JobTask) {
+  const strict = leads.filter(isAmbulatoryBusiness);
+  let persisted = 0;
+  for (const business of strict) {
+    const website = normalizeWebsite(business.website || "");
+    const domain = domainFromWebsite(website);
+    const city = business.city || task.sector;
+    const metadata = {
+      state: task.state,
+      state_code: task.code,
+      discovery_source: business.source,
+      discovery_sector: task.sector,
+      discovered_at: new Date().toISOString(),
+      pflege_icp_verified: true,
+      job_first: false,
+    };
+    const existing = await query<{ id: string }>(
+      `select id from sales_companies where workspace='default' and (source_id=$1 or ($2<>'' and domain=$2) or (lower(name)=lower($3) and lower(city)=lower($4))) order by updated_at desc limit 1`,
+      [business.id, domain, business.company, city],
+    );
+    const companyId = existing[0]?.id || crypto.randomUUID();
+    if (!existing.length) {
+      const inserted = await query<{ id: string }>(
+        `insert into sales_companies(id,workspace,name,domain,website,city,industry,phone,source,source_id,lat,lng,research_status,latest_score,metadata)
+         values($1,'default',$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,'pending',20,$12::jsonb) on conflict do nothing returning id`,
+        [companyId, business.company, domain, website, city, business.industry || "Ambulanter Pflegedienst", business.phone || "", `pflege-${business.source}`, business.id, business.lat ?? null, business.lng ?? null, JSON.stringify(metadata)],
+      );
+      if (!inserted.length) continue;
+    } else {
+      await query(`update sales_companies set metadata=coalesce(metadata,'{}'::jsonb) || $2::jsonb,updated_at=now() where id=$1 and workspace='default'`, [companyId, JSON.stringify(metadata)]);
+    }
+    await query(
+      `insert into sales_leads(id,workspace,company_id,stage,status,deal_value,intent_score,fit_score,opportunity_score,priority_score,owner,notes)
+       values($1,'default',$2,'Research','active',0,0,55,55,25,'','Fallback Discovery · Stellenprüfung offen')
+       on conflict(workspace,company_id) where status='active' do update set updated_at=now()`,
+      [crypto.randomUUID(), companyId],
+    );
+    persisted++;
+  }
+  return persisted;
 }
 
 async function discoverNextBatch() {
-  const task = await nextDiscoveryTask();
-  if (!task) return { discovered: 0, task: "" };
-  const result = await discoverBusinesses({ query: task.query, pageSize: 20, locationHint: `${task.sector}, ${task.state}` });
-  const discovered = await persistDiscovered(task, result.leads, result.source, result.warning || "");
-  return { discovered, task: `${task.sector} · ${task.term}` };
+  const task = await nextJobDiscoveryTask();
+  if (!task) return { discovered: 0, jobSeeds: 0, task: "", warning: "Keine Discovery-Region verfügbar." };
+  const jobs = await discoverHiringEmployers(task.sector, { days: 21, size: 100, radiusKm: 60 });
+  const resolvedResults = await Promise.allSettled(jobs.employers.slice(0, 10).map((seed) => resolveHiringEmployer(seed, task)));
+  const resolved = resolvedResults.flatMap((result) => result.status === "fulfilled" && result.value ? [result.value] : []);
+  let discovered = await persistJobFirst(task, resolved);
+  let fallbackWarning = "";
+
+  if (discovered < 2) {
+    try {
+      const fallback = await discoverBusinesses({ query: `Ambulanter Pflegedienst ${task.sector}`, pageSize: 20, locationHint: `${task.sector}, ${task.state}` });
+      discovered += await persistFallback(fallback.leads, task);
+      fallbackWarning = fallback.warning || "";
+    } catch (error) {
+      fallbackWarning = error instanceof Error ? error.message : "Fallback Discovery fehlgeschlagen.";
+    }
+  }
+  const warning = [jobs.warning, fallbackWarning].filter(Boolean).join(" · ");
+  await markJobScan(task, { found: discovered, rawJobs: jobs.rawJobs, relevantJobs: jobs.relevantJobs, warning });
+  return { discovered, jobSeeds: jobs.employers.length, task: `${task.sector} · Job-first`, warning };
 }
 
 async function candidatesForQualification(limit: number) {
-  return query<CandidateRow>(`
+  const rows = await query<CandidateRow>(`
     select l.id lead_id,c.id company_id,c.name company,c.city,c.industry,c.website,
            coalesce(ct.phone,c.phone,'') phone,c.source_id,coalesce(c.metadata,'{}'::jsonb) metadata,
            l.stage,l.intent_score,l.last_contact_at
@@ -245,7 +393,6 @@ async function candidatesForQualification(limit: number) {
     join sales_leads l on l.company_id=c.id and l.workspace=c.workspace and l.status='active'
     left join sales_contacts ct on ct.id=l.contact_id
     where c.workspace='default'
-      and (c.source like 'pflege%' or lower(c.industry) like '%pflege%' or lower(c.name) like '%pflege%')
       and l.last_contact_at is null and l.stage in ('Neu','Research','Bereit')
       and not l.do_not_contact and l.phone_status<>'invalid'
       and (
@@ -253,9 +400,12 @@ async function candidatesForQualification(limit: number) {
         or coalesce(c.metadata->'daily_qualification'->>'checkedAt','')=''
         or (c.metadata->'daily_qualification'->>'checkedAt')::timestamptz < now() - interval '${QUALIFICATION_FRESH_DAYS} days'
       )
-    order by case when coalesce(c.phone,'')<>'' then 0 else 1 end,c.updated_at asc
+    order by case when c.metadata->'job_growth_seed' is not null then 0 else 1 end,
+             case when coalesce(c.phone,'')<>'' then 0 else 1 end,
+             l.intent_score desc,c.updated_at asc
     limit $1
-  `, [limit]);
+  `, [Math.max(limit * 5, 25)]);
+  return rows.filter(isCandidateRowTarget).slice(0, limit);
 }
 
 function websiteWeakness(audit: WebsiteAuditResult | undefined, contact: Partial<ContactEnrichment>, website: string) {
@@ -273,18 +423,19 @@ async function qualify(row: CandidateRow) {
   const website = normalizeWebsite(row.website || "");
   let contact: Partial<ContactEnrichment> = {};
   let audit: WebsiteAuditResult | undefined;
+  const seeded = seededJobGrowth(row.metadata);
   const [contactResult, auditResult, jobResult] = await Promise.allSettled([
     website ? enrichPublicContact(website) : Promise.resolve({} as ContactEnrichment),
     website ? runWebsiteAudit(website, row.company) : Promise.resolve(undefined),
-    inspectJobGrowth(row.company, row.city),
+    seeded ? Promise.resolve(seeded) : inspectJobGrowth(row.company, row.city),
   ]);
   if (contactResult.status === "fulfilled") contact = contactResult.value;
   if (auditResult.status === "fulfilled") audit = auditResult.value;
-  const jobGrowth = jobResult.status === "fulfilled" ? jobResult.value : await Promise.resolve({
+  const jobGrowth = jobResult.status === "fulfilled" ? jobResult.value : {
     source: "arbeitsagentur-jobsuche", checkedAt: new Date().toISOString(), openJobs: 0, relevantOpenJobs: 0,
     externalPortalJobs: 0, externalPortals: [], latestPublishedAt: "", roles: [], growthScore: 0,
     confidence: "low", warning: "Jobsignal fehlgeschlagen",
-  } as JobGrowthSignal);
+  } as JobGrowthSignal;
 
   const phone = contact.phone || row.phone || "";
   const candidate = { id: row.source_id || row.company_id, company: row.company, phone, website, city: row.city, industry: row.industry || "Pflege", source: "daily-lead-factory" };
@@ -308,7 +459,7 @@ async function qualify(row: CandidateRow) {
     ...(jobGrowth.externalPortals.length ? [`Extern: ${jobGrowth.externalPortals.join(", ")}`] : []),
   ];
   const qualification: Qualification = {
-    version: 1,
+    version: 2,
     checkedAt: new Date().toISOString(),
     tier,
     callReady,
@@ -329,7 +480,7 @@ async function qualify(row: CandidateRow) {
        phone=case when $4<>'' then $4 else phone end,
        research_status=case when $3<>'' then 'complete' else research_status end,
        latest_score=$5,
-       metadata=coalesce(metadata,'{}'::jsonb) || jsonb_build_object('daily_qualification',$6::jsonb),updated_at=now()
+       metadata=coalesce(metadata,'{}'::jsonb) || jsonb_build_object('daily_qualification',$6::jsonb,'pflege_icp_verified',true),updated_at=now()
      where id=$1 and workspace='default'`,
     [row.company_id, domain, website, phone, priorityScore, JSON.stringify(qualification)],
   );
@@ -354,7 +505,7 @@ async function qualify(row: CandidateRow) {
   const nextStage = tier === "A+" || tier === "A" ? "Bereit" : row.stage;
   await query(
     `update sales_leads set stage=$2,intent_score=$3,fit_score=$4,opportunity_score=$5,priority_score=$6,
-       next_action=case when $7='A+' then 'A+ Lead anrufen' else next_action end,updated_at=now()
+       next_action=case when $7='A+' then 'A+ Lead anrufen' when $7='A' and coalesce(next_action,'')='' then 'A Lead prüfen/anrufen' else next_action end,updated_at=now()
      where id=$1 and workspace='default'`,
     [row.lead_id, nextStage, intentScore, base.scores.fitScore, opportunityScore, priorityScore, tier],
   );
@@ -366,18 +517,19 @@ async function qualify(row: CandidateRow) {
   return { leadId: row.lead_id, company: row.company, tier, priorityScore, reasons };
 }
 
-export async function runLeadFactoryCycle(batchSize = 3) {
+export async function runLeadFactoryCycle(batchSize = 5) {
   await ensureFactorySchema();
   const before = await getLeadFactoryStats();
   if (before.aPlusReady >= A_PLUS_BUFFER_TARGET) return { ok: true, skipped: true, reason: "A+ Buffer voll", before, after: before, discovered: 0, qualified: [] };
 
-  const pending = await candidatesForQualification(Math.max(1, Math.min(5, batchSize)));
-  const shouldDiscover = pending.length < batchSize || before.untouchedPhoneReady < A_PLUS_BUFFER_TARGET * 2;
+  const safeBatch = Math.max(1, Math.min(5, batchSize));
+  const pending = await candidatesForQualification(safeBatch);
+  const shouldDiscover = before.aPlusReady < A_PLUS_BUFFER_TARGET || pending.length < safeBatch;
   const discoveryPromise = shouldDiscover
     ? discoverNextBatch()
         .then((value) => ({ ...value, error: "" }))
-        .catch((error) => ({ discovered: 0, task: "", error: error instanceof Error ? error.message : "Discovery vorübergehend nicht verfügbar" }))
-    : Promise.resolve({ discovered: 0, task: "", error: "" });
+        .catch((error) => ({ discovered: 0, jobSeeds: 0, task: "", warning: "", error: error instanceof Error ? error.message : "Discovery vorübergehend nicht verfügbar" }))
+    : Promise.resolve({ discovered: 0, jobSeeds: 0, task: "", warning: "", error: "" });
 
   const results = await Promise.allSettled(pending.map(qualify));
   const discovery = await discoveryPromise;
@@ -390,7 +542,9 @@ export async function runLeadFactoryCycle(batchSize = 3) {
     before,
     after,
     discovered: discovery.discovered,
+    jobSeeds: discovery.jobSeeds,
     discoveryTask: discovery.task,
+    discoveryWarning: discovery.warning,
     discoveryError: discovery.error,
     qualified,
     failed,
