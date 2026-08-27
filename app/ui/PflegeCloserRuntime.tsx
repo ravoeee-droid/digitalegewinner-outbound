@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect } from "react";
-import PflegeRapidFireOS from "./PflegeRapidFireOS";
+import PflegeCloserOS from "./PflegeCloserOS";
 
-const SESSION_KEY = "dg.pflege.rapidfire.auto-research.v3";
-const SESSION_BUDGET = 16;
+const SESSION_KEY = "dg.pflege.closer.auto-research.v1";
+const SESSION_BUDGET = 12;
 
 function AutoResearchBridge() {
   useEffect(() => {
@@ -13,7 +13,7 @@ function AutoResearchBridge() {
     async function run() {
       const used = Number(window.sessionStorage.getItem(SESSION_KEY) || "0");
       if (used >= SESSION_BUDGET) return;
-      await new Promise((resolve) => window.setTimeout(resolve, 1800));
+      await new Promise((resolve) => window.setTimeout(resolve, 2200));
       if (cancelled) return;
 
       try {
@@ -25,7 +25,7 @@ function AutoResearchBridge() {
 
         for (const leadId of ids) {
           if (cancelled) return;
-          await new Promise((resolve) => window.setTimeout(resolve, 850));
+          await new Promise((resolve) => window.setTimeout(resolve, 1200));
           const research = await fetch("/api/crm/enrichment", {
             method: "POST",
             headers: { "content-type": "application/json" },
@@ -49,5 +49,5 @@ function AutoResearchBridge() {
 }
 
 export default function PflegeCloserRuntime() {
-  return <><PflegeRapidFireOS /><AutoResearchBridge /></>;
+  return <><PflegeCloserOS /><AutoResearchBridge /></>;
 }
