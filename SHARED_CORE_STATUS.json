@@ -1,0 +1,25 @@
+{
+  "contractVersion": "1.0.0",
+  "instance": "DG-MAIN",
+  "updatedAt": "2026-08-27",
+  "policy": "same-task-adapt-both-directions",
+  "status": "parity-realignment-in-progress",
+  "sharedSurfaces": {
+    "pflegeV2PrimaryWorkspace": "restored",
+    "crmWorkflowCockpitV2": "needs-adaptation-from-peer",
+    "campaignControlPlane": "needs-parity-review",
+    "campaignRunTracking": "needs-parity-review",
+    "mailboxStatusWorkflow": "needs-parity-review",
+    "callerQueue": "local-implementation-exists-review-parity",
+    "leadDetailWorkspace": "local-implementation-exists-review-parity",
+    "salesBrief": "needs-parity-review",
+    "applicationFrame": "preserve-pflege-ui-adapt-shared-ux-only",
+    "studioGenericV3": "local-implementation-exists-review-parity"
+  },
+  "rules": [
+    "Never replace the established Pflege UX with a new parallel dashboard to port a shared feature.",
+    "Adapt shared behavior into the existing Pflege surface.",
+    "Never copy customer data, credentials, Supabase refs, branding or industry-specific logic between instances.",
+    "Do not mark a shared-core task complete until both instances are adapted or a blocker is recorded here."
+  ]
+}
