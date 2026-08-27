@@ -351,10 +351,10 @@ async function qualify(row: CandidateRow) {
     await query(`update sales_leads set contact_id=$2 where id=$1 and workspace='default'`, [row.lead_id, contactId]);
   }
 
-  const nextStage = tier === "A+" || tier === "A" ? (row.stage === "Bereit" ? "Bereit" : "Bereit") : row.stage;
+  const nextStage = tier === "A+" || tier === "A" ? "Bereit" : row.stage;
   await query(
     `update sales_leads set stage=$2,intent_score=$3,fit_score=$4,opportunity_score=$5,priority_score=$6,
-       next_action=case when $7='A+' then 'A+ Lead anrufen' when next_action='' then next_action else next_action end,updated_at=now()
+       next_action=case when $7='A+' then 'A+ Lead anrufen' else next_action end,updated_at=now()
      where id=$1 and workspace='default'`,
     [row.lead_id, nextStage, intentScore, base.scores.fitScore, opportunityScore, priorityScore, tier],
   );
@@ -371,16 +371,28 @@ export async function runLeadFactoryCycle(batchSize = 3) {
   const before = await getLeadFactoryStats();
   if (before.aPlusReady >= A_PLUS_BUFFER_TARGET) return { ok: true, skipped: true, reason: "A+ Buffer voll", before, after: before, discovered: 0, qualified: [] };
 
-  let pending = await candidatesForQualification(Math.max(1, Math.min(5, batchSize)));
-  let discovery = { discovered: 0, task: "" };
-  if (pending.length < batchSize || before.untouchedPhoneReady < A_PLUS_BUFFER_TARGET * 2) {
-    discovery = await discoverNextBatch();
-    pending = await candidatesForQualification(Math.max(1, Math.min(5, batchSize)));
-  }
+  const pending = await candidatesForQualification(Math.max(1, Math.min(5, batchSize)));
+  const shouldDiscover = pending.length < batchSize || before.untouchedPhoneReady < A_PLUS_BUFFER_TARGET * 2;
+  const discoveryPromise = shouldDiscover
+    ? discoverNextBatch()
+        .then((value) => ({ ...value, error: "" }))
+        .catch((error) => ({ discovered: 0, task: "", error: error instanceof Error ? error.message : "Discovery vorübergehend nicht verfügbar" }))
+    : Promise.resolve({ discovered: 0, task: "", error: "" });
 
   const results = await Promise.allSettled(pending.map(qualify));
+  const discovery = await discoveryPromise;
   const qualified = results.flatMap((result) => result.status === "fulfilled" ? [result.value] : []);
   const failed = results.filter((result) => result.status === "rejected").map((result) => result.reason instanceof Error ? result.reason.message : "Qualifizierung fehlgeschlagen");
   const after = await getLeadFactoryStats();
-  return { ok: true, skipped: false, before, after, discovered: discovery.discovered, discoveryTask: discovery.task, qualified, failed };
+  return {
+    ok: true,
+    skipped: false,
+    before,
+    after,
+    discovered: discovery.discovered,
+    discoveryTask: discovery.task,
+    discoveryError: discovery.error,
+    qualified,
+    failed,
+  };
 }
