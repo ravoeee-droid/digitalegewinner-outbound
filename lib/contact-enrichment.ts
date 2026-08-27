@@ -73,14 +73,20 @@ const ATS: Array<[RegExp, string]> = [
   [/jacando/i, "jacando"],
   [/indeed\.(?:com|de)/i, "Indeed"],
   [/arbeitsagentur\.de\/jobsuche/i, "Bundesagentur für Arbeit"],
+  [/stepstone\.de/i, "StepStone"],
+  [/meinestadt\.de\/jobs/i, "meinestadt.de"],
+  [/stellenanzeigen\.de/i, "stellenanzeigen.de"],
   [/hokify/i, "hokify"],
 ];
 const TRACKING: Array<[RegExp, string]> = [
+  [/AW-\d+|googleadservices\.com|pagead\/conversion|googleads\.g\.doubleclick/i, "Google Ads"],
   [/googletagmanager|gtag\(|google-analytics|analytics\.google/i, "Google Analytics / GTM"],
   [/connect\.facebook\.net|fbevents\.js|fbq\(/i, "Meta Pixel"],
   [/analytics\.tiktok|ttq\./i, "TikTok Pixel"],
   [/snap\.licdn\.com|linkedin\.com\/insight/i, "LinkedIn Insight"],
+  [/bat\.bing\.com|uetq/i, "Microsoft Ads UET"],
   [/clarity\.ms/i, "Microsoft Clarity"],
+  [/hotjar\.com|hj\(/i, "Hotjar"],
 ];
 
 type Extracted = {
@@ -142,7 +148,9 @@ function extract(html: string, base: URL): Extracted {
   if (/quereinsteiger|ausbildung|azubi|praktikum/i.test(body)) recruitingSignals.push("Ausbildungs-/Quereinsteiger-Ansprache erkannt");
   if (careerLinks.length) recruitingSignals.push("Karrierebereich verlinkt");
   if (jobsLinks.length) recruitingSignals.push("Stellen-/Bewerbungsseite verlinkt");
-  if (atsProviders.length) recruitingSignals.push(`ATS erkannt: ${atsProviders.join(", ")}`);
+  if (atsProviders.length) recruitingSignals.push(`Recruiting-/ATS-Kanäle: ${atsProviders.join(", ")}`);
+  if (trackingTools.includes("Meta Pixel")) recruitingSignals.push("Meta-Werbetracking erkannt");
+  if (trackingTools.includes("Google Ads")) recruitingSignals.push("Google-Ads-Tracking erkannt");
   if (linkedin || instagram || facebook || tiktok || youtube || xing) recruitingSignals.push("Social-Media-Präsenz erkannt");
 
   return {
@@ -171,7 +179,7 @@ async function getHtml(input: URL) {
     const response = await fetch(url, {
       redirect: "manual",
       cache: "no-store",
-      headers: { "user-agent": "DigitaleGewinner-ContactEnrichment/2.0", accept: "text/html,application/xhtml+xml" },
+      headers: { "user-agent": "DigitaleGewinner-ContactEnrichment/2.1", accept: "text/html,application/xhtml+xml" },
       signal: AbortSignal.timeout(9000),
     });
     if ([301, 302, 303, 307, 308].includes(response.status)) {

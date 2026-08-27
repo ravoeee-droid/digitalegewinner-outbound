@@ -1,6 +1,7 @@
 import OpenAI from "openai";
 import { z } from "zod";
 import { enrichPublicContact, type ContactEnrichment } from "@/lib/contact-enrichment";
+import { inspectAdIntelligence, type AdIntelligence } from "@/lib/ad-intelligence";
 import { getSecret } from "@/lib/secrets";
 import { query } from "@/lib/db";
 import { scoreResearch, type RadarCandidate } from "@/lib/sales-os";
@@ -10,7 +11,7 @@ export const runtime = "nodejs";
 export const maxDuration = 60;
 
 const postSchema = z.object({
-  leadIds: z.array(z.string().min(1).max(220)).min(1).max(5),
+  leadIds: z.array(z.string().min(1).max(220)).min(1).max(3),
   ai: z.boolean().optional().default(true),
 });
 
@@ -92,7 +93,7 @@ async function discoverPlace(company: string, city: string): Promise<Place | nul
       "X-Goog-Api-Key": key,
       "X-Goog-FieldMask": "places.id,places.displayName,places.formattedAddress,places.websiteUri,places.nationalPhoneNumber,places.primaryTypeDisplayName,places.location",
     },
-    body: JSON.stringify({ textQuery: [company, city].filter(Boolean).join(" "), pageSize: 1, languageCode: "de" }),
+    body: JSON.stringify({ textQuery: [company, city].filter(Boolean).join(" "), pageSize: 1, languageCode: "de", regionCode: "DE" }),
     signal: AbortSignal.timeout(12_000),
   });
   if (!response.ok) return null;
@@ -100,7 +101,7 @@ async function discoverPlace(company: string, city: string): Promise<Place | nul
   return json.places?.[0] || null;
 }
 
-function buildSignals(contact: Partial<ContactEnrichment>, audit?: WebsiteAuditResult, websiteDiscovered = false) {
+function buildSignals(contact: Partial<ContactEnrichment>, audit: WebsiteAuditResult | undefined, ads: AdIntelligence | undefined, websiteDiscovered = false) {
   const signals: string[] = [];
   if (websiteDiscovered) signals.push("Website via Google Places gefunden");
   if (contact.email) signals.push("Öffentliche E-Mail gefunden");
@@ -113,25 +114,27 @@ function buildSignals(contact: Partial<ContactEnrichment>, audit?: WebsiteAuditR
   else if (audit) signals.push("Kein klarer Karrierebereich erkannt");
   if (contact.jobsPage) signals.push("Stellen-/Bewerbungsseite erkannt");
   else if (audit) signals.push("Keine direkte Stellen-/Bewerbungsseite erkannt");
-  if (contact.atsProviders?.length) signals.push(`ATS: ${contact.atsProviders.join(", ")}`);
+  if (contact.atsProviders?.length) signals.push(`Recruiting-Kanäle / ATS: ${contact.atsProviders.join(", ")}`);
   else if (audit) signals.push("Kein ATS auf der Website erkannt");
   if (contact.trackingTools?.length) signals.push(`Tracking: ${contact.trackingTools.join(", ")}`);
   for (const signal of contact.recruitingSignals || []) signals.push(signal);
+  for (const signal of ads?.signals || []) signals.push(signal);
   for (const finding of audit?.findings?.filter((item) => item.severity === "critical" || item.severity === "warning").slice(0, 4) || []) {
     signals.push(`${finding.category}: ${finding.title}`);
   }
-  return [...new Set(signals)].slice(0, 18);
+  return [...new Set(signals)].slice(0, 24);
 }
 
-function researchQuality(input: { website: string; contact: Partial<ContactEnrichment>; audit?: WebsiteAuditResult; place?: Place | null }) {
+function researchQuality(input: { website: string; contact: Partial<ContactEnrichment>; audit?: WebsiteAuditResult; place?: Place | null; ads?: AdIntelligence }) {
   let value = 0;
-  if (input.website) value += 18;
-  if (input.contact.email) value += 18;
+  if (input.website) value += 16;
+  if (input.contact.email) value += 16;
   if (input.contact.phone || input.place?.nationalPhoneNumber) value += 14;
-  if (socialCount(input.contact) > 0) value += 10;
+  if (socialCount(input.contact) > 0) value += 9;
   if (input.contact.careersPage || input.contact.jobsPage) value += 12;
   if (input.contact.teamPage || input.contact.contactPage) value += 8;
-  if (input.audit) value += 20;
+  if (input.audit) value += 19;
+  if (input.ads) value += 6;
   return clamp(value);
 }
 
@@ -147,7 +150,7 @@ function fallbackBrief(company: string, contact: Partial<ContactEnrichment>, aud
   };
 }
 
-async function buildAiBrief(company: string, city: string, contact: Partial<ContactEnrichment>, audit: WebsiteAuditResult | undefined, signals: string[]) {
+async function buildAiBrief(company: string, city: string, contact: Partial<ContactEnrichment>, audit: WebsiteAuditResult | undefined, ads: AdIntelligence | undefined, signals: string[]) {
   const fallback = fallbackBrief(company, contact, audit, signals);
   const apiKey = process.env.OPENAI_API_KEY || await getSecret("openai_api_key");
   if (!apiKey) return fallback;
@@ -168,11 +171,12 @@ async function buildAiBrief(company: string, city: string, contact: Partial<Cont
       jobsPage: contact.jobsPage || "",
       ats: contact.atsProviders || [],
       tracking: contact.trackingTools || [],
+      advertising: ads ? { meta: ads.meta.status, google: ads.google.status, marketing: ads.marketing } : null,
       websiteScores: audit?.scores || null,
       topFindings: audit?.findings?.slice(0, 6).map((item) => ({ category: item.category, title: item.title, detail: item.detail })) || [],
       signals,
     };
-    const prompt = `Du erstellst einen faktentreuen B2B-Research-Brief für die Akquise von Social-Recruiting- und Karrierewebsite-Leistungen an Pflegeunternehmen. Verwende AUSSCHLIESSLICH die gelieferten Fakten. Keine erfundenen Ansprechpartner, offenen Stellen, Mitarbeiterzahlen, Budgets oder Ergebnisse. Formuliere präzise, kurz und natürlich auf Deutsch. Der Call-Opener darf maximal 2 Sätze haben und soll mit einer konkreten Beobachtung beginnen. likelyDecisionMaker ist eine Rollenempfehlung, kein erfundener Name. Gib ausschließlich valides JSON zurück: {"summary":"...","callOpening":"...","emailHook":"...","personalizationPoints":["..."],"likelyDecisionMaker":"...","nextResearchStep":"..."}. Fakten: ${JSON.stringify(facts)}`;
+    const prompt = `Du erstellst einen faktentreuen B2B-Research-Brief für die Akquise von Social-Recruiting- und Karrierewebsite-Leistungen an Pflegeunternehmen. Verwende AUSSCHLIESSLICH die gelieferten Fakten. Keine erfundenen Ansprechpartner, offenen Stellen, Mitarbeiterzahlen, Budgets oder Ergebnisse. Werbeaktivität darf nur als aktiv bezeichnet werden, wenn advertising.meta oder advertising.google exakt "active" ist; "likely" ist nur ein technisches Indiz. Formuliere präzise, kurz und natürlich auf Deutsch. Der Call-Opener darf maximal 2 Sätze haben und soll mit einer konkreten Beobachtung beginnen. likelyDecisionMaker ist eine Rollenempfehlung, kein erfundener Name. Gib ausschließlich valides JSON zurück: {"summary":"...","callOpening":"...","emailHook":"...","personalizationPoints":["..."],"likelyDecisionMaker":"...","nextResearchStep":"..."}. Fakten: ${JSON.stringify(facts)}`;
     const response = await client.responses.create({ model: process.env.OPENAI_MODEL || "gpt-5", input: prompt });
     const raw = response.output_text.trim().replace(/^```json\s*/i, "").replace(/```$/, "").trim();
     return aiSchema.parse(JSON.parse(raw));
@@ -218,6 +222,12 @@ async function enrichLead(leadId: string, useAi: boolean) {
     warnings.push("Keine Website gefunden");
   }
 
+  let ads: AdIntelligence | undefined;
+  if (website) {
+    try { ads = await inspectAdIntelligence(lead.company, website, contact.trackingTools || []); }
+    catch { warnings.push("Werbe-Intelligence nicht vollständig"); }
+  }
+
   const candidate: RadarCandidate = {
     id: place?.id || lead.source_id || lead.company_id,
     company: lead.company,
@@ -233,14 +243,21 @@ async function enrichLead(leadId: string, useAi: boolean) {
   };
   const base = scoreResearch(candidate, contact, audit);
   const recruitingGap = (audit && !contact.careersPage ? 8 : 0) + (audit && !contact.jobsPage ? 7 : 0) + (audit && !(contact.atsProviders?.length) ? 5 : 0) + (audit && socialCount(contact) === 0 ? 5 : 0);
+  const adActive = ads?.meta.status === "active" || ads?.google.status === "active";
+  const adLikely = ads?.meta.status === "likely" || ads?.google.status === "likely";
+  const adIntent = adActive ? 92 : adLikely ? 68 : 0;
+  const adOpportunity = adIntent && audit && audit.scores.conversion < 65 ? 8 : 0;
+  const opportunityScore = clamp(base.scores.opportunityScore + recruitingGap + adOpportunity);
+  const intentScore = Math.max(base.scores.intentScore, adIntent);
   const scores = {
     ...base.scores,
-    opportunityScore: clamp(base.scores.opportunityScore + recruitingGap),
-    priorityScore: clamp(base.scores.priorityScore + Math.round(recruitingGap * 0.35)),
+    intentScore,
+    opportunityScore,
+    priorityScore: clamp(base.scores.priorityScore + Math.round(recruitingGap * 0.35) + Math.round(adIntent * 0.12) + Math.round(adOpportunity * 0.25)),
   };
-  const signals = [...new Set([...base.signals, ...buildSignals(contact, audit, websiteDiscovered)])];
-  const quality = researchQuality({ website, contact, audit, place });
-  const brief = useAi ? await buildAiBrief(lead.company, city, contact, audit, signals) : fallbackBrief(lead.company, contact, audit, signals);
+  const signals = [...new Set([...base.signals, ...buildSignals(contact, audit, ads, websiteDiscovered)])];
+  const quality = researchQuality({ website, contact, audit, place, ads });
+  const brief = useAi ? await buildAiBrief(lead.company, city, contact, audit, ads, signals) : fallbackBrief(lead.company, contact, audit, signals);
   const enrichedAt = new Date().toISOString();
 
   const contactId = lead.contact_id || crypto.randomUUID();
@@ -277,12 +294,12 @@ async function enrichLead(leadId: string, useAi: boolean) {
   );
 
   const enrichment = {
-    version: 2,
+    version: 3,
     enrichedAt,
     quality,
     website,
     domain: domainFromWebsite(website),
-    googlePlaceId: place?.id || "",
+    googlePlaceId: place?.id || lead.source_id || "",
     googleAddress: place?.formattedAddress || "",
     email: contact.email || lead.contact_email || "",
     phone: contact.phone || companyPhone || "",
@@ -300,6 +317,8 @@ async function enrichLead(leadId: string, useAi: boolean) {
     teamPage: contact.teamPage || "",
     atsProviders: contact.atsProviders || [],
     trackingTools: contact.trackingTools || [],
+    marketing: ads?.marketing || {},
+    ads: ads || null,
     pagesScanned: contact.pagesScanned || 0,
     signals,
     warnings,
@@ -319,35 +338,34 @@ async function enrichLead(leadId: string, useAi: boolean) {
 
   const nextStage = ["Neu", "Research"].includes(lead.stage) ? "Bereit" : lead.stage;
   await query(
-    `update sales_leads set contact_id=$2,stage=$3,fit_score=$4,opportunity_score=$5,priority_score=$6,
-       next_action=case when next_action='' and $7<>'' then $7 else next_action end,updated_at=now()
+    `update sales_leads set contact_id=$2,stage=$3,intent_score=$4,fit_score=$5,opportunity_score=$6,priority_score=$7,
+       next_action=case when next_action='' and $8<>'' then $8 else next_action end,updated_at=now()
      where id=$1 and workspace='default'`,
-    [lead.id, contactId, nextStage, scores.fitScore, scores.opportunityScore, scores.priorityScore, contact.phone || companyPhone ? "Anrufen" : contact.email || lead.contact_email ? "Persönliche E-Mail vorbereiten" : "Ansprechpartner ergänzen"],
+    [lead.id, contactId, nextStage, scores.intentScore, scores.fitScore, scores.opportunityScore, scores.priorityScore, contact.phone || companyPhone ? "Anrufen" : contact.email || lead.contact_email ? "Persönliche E-Mail vorbereiten" : "Ansprechpartner ergänzen"],
   );
 
   const researchId = crypto.randomUUID();
   await query(
     `insert into sales_research_runs(id,workspace,company_id,status,website_score,contact_score,fit_score,opportunity_score,priority_score,signals,audit,contact,summary)
      values($1,'default',$2,'complete',$3,$4,$5,$6,$7,$8::jsonb,$9::jsonb,$10::jsonb,$11)`,
-    [researchId, lead.company_id, scores.websiteScore, scores.contactScore, scores.fitScore, scores.opportunityScore, scores.priorityScore, JSON.stringify(signals), JSON.stringify(audit || {}), JSON.stringify({ ...contact, place, quality, brief, warnings }), brief.summary],
+    [researchId, lead.company_id, scores.websiteScore, scores.contactScore, scores.fitScore, scores.opportunityScore, scores.priorityScore, JSON.stringify(signals), JSON.stringify(audit || {}), JSON.stringify({ ...contact, place, quality, brief, warnings, ads }), brief.summary],
   );
   await query(
     `insert into sales_activities(workspace,lead_id,company_id,type,summary,meta)
      values('default',$1,$2,'enrichment.completed',$3,$4::jsonb)`,
-    [lead.id, lead.company_id, `Research aktualisiert · ${quality}% Datenabdeckung · Priority ${scores.priorityScore}`, JSON.stringify({ researchId, quality, scores, warnings, signals })],
+    [lead.id, lead.company_id, `Research aktualisiert · ${quality}% Datenabdeckung · Priority ${scores.priorityScore}`, JSON.stringify({ researchId, quality, scores, warnings, signals, ads })],
   );
 
-  return { leadId: lead.id, company: lead.company, researchId, quality, scores, website, contact, audit, signals, brief, warnings };
+  return { leadId: lead.id, company: lead.company, researchId, quality, scores, website, contact, audit, ads, signals, brief, warnings };
 }
 
 export async function POST(request: Request) {
   try {
     const input = postSchema.parse(await request.json());
-    const results = [];
-    for (const leadId of input.leadIds) {
-      try { results.push({ ok: true, ...(await enrichLead(leadId, input.ai)) }); }
-      catch (error) { results.push({ ok: false, leadId, error: error instanceof Error ? error.message : "Enrichment fehlgeschlagen." }); }
-    }
+    const results = await Promise.all(input.leadIds.map(async (leadId) => {
+      try { return { ok: true, ...(await enrichLead(leadId, input.ai)) }; }
+      catch (error) { return { ok: false, leadId, error: error instanceof Error ? error.message : "Enrichment fehlgeschlagen." }; }
+    }));
     return Response.json({ ok: results.some((item) => item.ok), results });
   } catch (error) {
     return Response.json({ error: error instanceof Error ? error.message : "Enrichment konnte nicht gestartet werden." }, { status: 400 });
