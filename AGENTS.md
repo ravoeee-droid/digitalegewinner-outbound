@@ -14,13 +14,30 @@ This repository is the dedicated production instance for **Digitale Gewinner**.
 
 ## Hard isolation rules
 
-1. Never read from, write to, deploy to, or reuse credentials from a customer instance while working in this repository.
-2. Digitale Gewinner mailboxes, leads, campaigns, tracking data, integrations, secrets and auth belong only to this instance.
-3. Before any Vercel or Supabase operation, verify that the target IDs match the canonical identity above.
-4. Do not point this frontend/backend at another customer's Supabase project.
-5. Shared improvements may be ported as code to customer instances, but production customer data and secrets must never be copied into this repository.
+1. Never read from or write to another instance's production data, Supabase records, mailboxes, auth users, credentials, secrets, tracking data or integrations while working in this repository.
+2. Read-only inspection of peer **source code** is explicitly allowed when needed to keep shared product functionality in parity.
+3. Digitale Gewinner mailboxes, leads, campaigns, tracking data, integrations, secrets and auth belong only to this instance.
+4. Before any Vercel or Supabase operation, verify that the target IDs match the canonical identity above.
+5. Do not point this frontend/backend at another customer's Supabase project.
+6. Never copy customer data, credentials, branding or customer-specific business logic into this instance.
 
-## Explicitly forbidden cross-instance targets
+## Shared-core synchronization contract
+
+The product is one shared outbound/sales core with isolated production instances. A shared-core change is **not complete** when it only exists in one instance.
+
+When changing any shared product surface — CRM workflow UX, lead detail, caller queue, daily command center, campaign control, mailbox/status logic, pipeline, meetings, proposals, sales brief, navigation/application frame, generic Studio functionality, deliverability, system health or generic automation — you MUST:
+
+1. Inspect the corresponding implementation in the peer product codebase.
+2. Apply the equivalent improvement to both product instances in the same task, adapting APIs/data models instead of blindly copying files.
+3. Preserve instance-specific branding, scoring, industry logic, integrations, databases, credentials and customer data.
+4. Update `SHARED_CORE_STATUS.json` when a shared surface changes.
+5. If parity cannot be completed safely, record the exact compatibility blocker in `SHARED_CORE_STATUS.json` and do not claim that the shared-core task is finished.
+
+This contract applies in both directions: improvements created first in Digitale Gewinner must be adapted to customer instances, and reusable improvements created first in a customer instance must be adapted back into Digitale Gewinner.
+
+## Explicitly forbidden cross-instance runtime targets
+
+The following must never be used as runtime/deployment/data targets from DG-MAIN. Their source code may only be inspected read-only for shared-core parity.
 
 - `ravoeee-droid/walkenhorst`
 - Vercel project `walkenhorst`
@@ -28,4 +45,4 @@ This repository is the dedicated production instance for **Digitale Gewinner**.
 - Supabase project `walkenhorst-energy-radar`
 - Supabase ref `jiahshldcusphxtbqxpv`
 
-When a task is ambiguous, do not assume it belongs to a customer instance. Keep changes in DG-MAIN unless the user explicitly names the customer.
+When a task is ambiguous, do not assume it belongs to a customer instance. Keep production operations in DG-MAIN unless the user explicitly names the customer. Shared-code parity is the only cross-instance exception and never permits cross-instance data access.
