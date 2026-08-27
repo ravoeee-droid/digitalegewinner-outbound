@@ -32,6 +32,7 @@ export type HiringEmployerSignal = {
   region: string;
   companySize: string;
   openPositions: number;
+  ambulatoryEvidence: boolean;
   jobGrowth: JobGrowthSignal;
 };
 
@@ -45,31 +46,52 @@ export type HiringEmployerDiscovery = {
   warning: string;
 };
 
+type BaAddress = {
+  land?: string;
+  region?: string;
+  plz?: string | number;
+  ort?: string;
+  strasse?: string;
+  hausnummer?: string;
+  strasseHausnummer?: string;
+};
+type BaLocation = { adresse?: BaAddress };
 type BaJob = {
   beruf?: string;
+  stellenangebotsTitel?: string;
+  hauptberuf?: string;
+  alleBerufe?: string[];
   refnr?: string;
   referenznummer?: string;
   arbeitgeber?: string;
+  firma?: string;
   aktuelleVeroeffentlichungsdatum?: string;
+  datumErsteVeroeffentlichung?: string;
+  aenderungsdatum?: string;
+  veroeffentlichungszeitraum?: { von?: string };
   externeUrl?: string | null;
+  externeURL?: string | null;
   arbeitsort?: { ort?: string };
+  stellenlokationen?: BaLocation[];
 };
-
-type BaResponse = { stellenangebote?: BaJob[] };
-type BaAddress = { land?: string; region?: string; plz?: string; ort?: string; strasse?: string; strasseHausnummer?: string };
+type BaResponse = { stellenangebote?: BaJob[]; ergebnisliste?: BaJob[] };
 type BaJobDetail = {
   arbeitgeber?: string;
+  firma?: string;
   arbeitgeberdarstellungUrl?: string;
   arbeitgeberAdresse?: BaAddress;
+  stellenlokationen?: BaLocation[];
+  stellenangebotsBeschreibung?: string;
   betriebsgroesse?: string;
   anzahlOffeneStellen?: number;
 };
 
 const JOBS_URL = "https://rest.arbeitsagentur.de/jobboerse/jobsuche-service/pc/v6/jobs";
 const JOB_DETAIL_BASE = "https://rest.arbeitsagentur.de/jobboerse/jobsuche-service/pc/v4/jobdetails";
-const CARE_ROLE = /(pflegefach|pflegekraft|altenpfleg|krankenpfleg|gesundheits-.*pfleg|pflegehelfer|pflegeassist|pdl|pflegedienstleit|wundmanager|intensivpfleg|gerontopsychiatr|pflegefachmann|pflegefachfrau)/i;
+const CARE_ROLE = /(pflegefach|pflegekraft|altenpfleg|krankenpfleg|gesundheits-.{0,20}pfleg|pflegehelfer|pflegeassist|assistent.{0,24}pflege|pflege.{0,24}assistent|pflegedienstleit|\bpdl\b|wundmanager|intensivpfleg|gerontopsychiatr|pflegefachmann|pflegefachfrau|ambulante.{0,20}pflege|pflege.{0,20}ambulant)/i;
+const AMBULATORY_TEXT = /(ambulant|häuslich|haeuslich|pflegedienst|sozialstation|diakoniestation|home care|home health|intensivpflege|hausbesuch)/i;
 const LEGAL_FORM = /\b(gmbh|ggmbh|mbh|ug|haftungsbeschränkt|ag|eg|kg|ohg|e\.v\.?|ev)\b/gi;
-const STAFFING_EMPLOYER = /(zeitarbeit|personaldienst|personalservice|arbeitnehmerüberlass|arbeitnehmerueberlass|personalvermittlung|arbeitsvermittlung|leasing|staffing|recruiting agency|avanti|akut medizin|pluss personal|all\.medi)/i;
+const STAFFING_EMPLOYER = /(zeitarbeit|personaldienst|personalservice|arbeitnehmerüberlass|arbeitnehmerueberlass|personalvermittlung|arbeitsvermittlung|leasing|staffing|recruiting agency|avanti|akut medizin|pluss personal|all\.medi|tempton)/i;
 
 function normalizeName(value: string) {
   return value
@@ -106,6 +128,9 @@ function portalFromUrl(raw: string) {
     if (host.includes("personio")) return "Personio";
     if (host.includes("onlyfy") || host.includes("prescreen")) return "onlyfy";
     if (host.includes("arbeitsagentur.de")) return "Bundesagentur für Arbeit";
+    if (host.includes("finest-jobs")) return "finest jobs";
+    if (host.includes("jobexport")) return "jobexport";
+    if (host.includes("bewerbung.jobs")) return "bewerbung.jobs";
     return host;
   } catch { return ""; }
 }
@@ -119,9 +144,12 @@ function normalizeWebsite(value = "") {
   } catch { return ""; }
 }
 
+function firstAddress(job: { arbeitgeberAdresse?: BaAddress; stellenlokationen?: BaLocation[] }) {
+  return job.arbeitgeberAdresse || job.stellenlokationen?.[0]?.adresse;
+}
 function formatAddress(value?: BaAddress) {
   if (!value) return "";
-  const street = value.strasseHausnummer || value.strasse || "";
+  const street = value.strasseHausnummer || [value.strasse, value.hausnummer].filter(Boolean).join(" ");
   return [street, [value.plz, value.ort].filter(Boolean).join(" ")].filter(Boolean).join(", ");
 }
 
@@ -141,14 +169,24 @@ function emptySignal(warning = ""): JobGrowthSignal {
   };
 }
 
+function jobTitle(job: BaJob) {
+  return job.stellenangebotsTitel || job.beruf || job.hauptberuf || job.alleBerufe?.[0] || "Offene Stelle";
+}
+function jobEmployer(job: BaJob, fallback = "") { return job.firma || job.arbeitgeber || fallback; }
+function jobCity(job: BaJob, fallback = "") { return job.stellenlokationen?.[0]?.adresse?.ort || job.arbeitsort?.ort || fallback; }
+function jobPublishedAt(job: BaJob) {
+  return job.veroeffentlichungszeitraum?.von || job.aktuelleVeroeffentlichungsdatum || job.datumErsteVeroeffentlichung || job.aenderungsdatum?.slice(0, 10) || "";
+}
+function jobExternalUrl(job: BaJob) { return job.externeURL || job.externeUrl || ""; }
+
 function jobToSignal(job: BaJob, fallbackEmployer = "", fallbackCity = ""): JobSignalItem {
-  const title = job.beruf || "Offene Stelle";
-  const externalUrl = job.externeUrl || "";
+  const title = jobTitle(job);
+  const externalUrl = jobExternalUrl(job);
   return {
     title,
-    employer: job.arbeitgeber || fallbackEmployer,
-    city: job.arbeitsort?.ort || fallbackCity,
-    publishedAt: job.aktuelleVeroeffentlichungsdatum || "",
+    employer: jobEmployer(job, fallbackEmployer),
+    city: jobCity(job, fallbackCity),
+    publishedAt: jobPublishedAt(job),
     reference: job.referenznummer || job.refnr || "",
     externalUrl,
     portal: portalFromUrl(externalUrl),
@@ -188,7 +226,7 @@ async function apiGet<T>(url: URL, timeoutMs = 10_000): Promise<T> {
     headers: {
       "X-API-Key": "jobboerse-jobsuche",
       "accept": "application/json",
-      "user-agent": "DigitaleGewinner-PflegeLeadFactory/2.1",
+      "user-agent": "DigitaleGewinner-PflegeLeadFactory/2.2",
     },
     signal: AbortSignal.timeout(timeoutMs),
   });
@@ -198,7 +236,9 @@ async function apiGet<T>(url: URL, timeoutMs = 10_000): Promise<T> {
 
 async function fetchJobs(url: URL, timeoutMs = 10_000) {
   const json = await apiGet<BaResponse>(url, timeoutMs);
-  return Array.isArray(json.stellenangebote) ? json.stellenangebote : [];
+  if (Array.isArray(json.ergebnisliste)) return json.ergebnisliste;
+  if (Array.isArray(json.stellenangebote)) return json.stellenangebote;
+  return [];
 }
 
 async function fetchJobDetail(reference: string): Promise<BaJobDetail | null> {
@@ -224,7 +264,6 @@ export async function discoverHiringEmployers(location = "", options?: { days?: 
     url.searchParams.set("veroeffentlichtseit", String(days));
     url.searchParams.set("angebotsart", "1");
     url.searchParams.set("zeitarbeit", "false");
-    url.searchParams.set("pav", "false");
     url.searchParams.set("page", "1");
     url.searchParams.set("size", String(size));
 
@@ -256,16 +295,20 @@ export async function discoverHiringEmployers(location = "", options?: { days?: 
 
     const employers = await Promise.all(preliminary.map(async (item): Promise<HiringEmployerSignal> => {
       const detail = await fetchJobDetail(item.roles.find((role) => role.reference)?.reference || "");
-      const detailCity = detail?.arbeitgeberAdresse?.ort || item.city;
+      const detailAddress = firstAddress(detail || {});
+      const employer = detail?.arbeitgeber || detail?.firma || item.employer;
+      const city = detailAddress?.ort || item.city;
+      const evidenceText = `${employer} ${item.roles.map((role) => role.title).join(" ")} ${detail?.stellenangebotsBeschreibung || ""}`;
       return {
-        employer: detail?.arbeitgeber || item.employer,
-        city: detailCity,
+        employer,
+        city,
         seedKey: item.seedKey,
         website: normalizeWebsite(detail?.arbeitgeberdarstellungUrl || ""),
-        address: formatAddress(detail?.arbeitgeberAdresse),
-        region: detail?.arbeitgeberAdresse?.region || "",
+        address: formatAddress(detailAddress),
+        region: detailAddress?.region || "",
         companySize: detail?.betriebsgroesse || "",
         openPositions: Math.max(item.jobGrowth.relevantOpenJobs, Number(detail?.anzahlOffeneStellen || 0)),
+        ambulatoryEvidence: AMBULATORY_TEXT.test(evidenceText),
         jobGrowth: item.jobGrowth,
       };
     }));
@@ -277,7 +320,7 @@ export async function discoverHiringEmployers(location = "", options?: { days?: 
       employers,
       rawJobs: raw.length,
       relevantJobs: relevant.length,
-      warning: "",
+      warning: raw.length ? "" : "Jobsuche lieferte für die Region keine Ergebnisse.",
     };
   } catch (error) {
     return {
@@ -306,12 +349,11 @@ export async function inspectJobGrowth(company: string, city = ""): Promise<JobG
     url.searchParams.set("veroeffentlichtseit", "45");
     url.searchParams.set("angebotsart", "1");
     url.searchParams.set("zeitarbeit", "false");
-    url.searchParams.set("pav", "false");
     url.searchParams.set("page", "1");
     url.searchParams.set("size", "50");
 
     const raw = await fetchJobs(url);
-    const matched = raw.filter((job) => companyNamesMatch(company, job.arbeitgeber || ""));
+    const matched = raw.filter((job) => companyNamesMatch(company, jobEmployer(job)));
     const roles = matched.slice(0, 30).map((job) => jobToSignal(job, company, city));
     return signalFromRoles(roles, checkedAt);
   } catch (error) {
