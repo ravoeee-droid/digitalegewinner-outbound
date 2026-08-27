@@ -5,7 +5,8 @@
   "policy": "same-task-adapt-both-directions",
   "status": "parity-realignment-in-progress",
   "sharedSurfaces": {
-    "pflegeV2PrimaryWorkspace": "restored",
+    "pflegeV2PrimaryWorkspace": "single-workspace-current",
+    "germanyPflegeLeadRadar": "integrated-into-primary-workspace",
     "crmWorkflowCockpitV2": "needs-adaptation-from-peer",
     "campaignControlPlane": "needs-parity-review",
     "campaignRunTracking": "needs-parity-review",
@@ -13,12 +14,13 @@
     "callerQueue": "local-implementation-exists-review-parity",
     "leadDetailWorkspace": "local-implementation-exists-review-parity",
     "salesBrief": "needs-parity-review",
-    "applicationFrame": "preserve-pflege-ui-adapt-shared-ux-only",
+    "applicationFrame": "single-primary-workspace-no-parallel-pro-ui",
     "studioGenericV3": "local-implementation-exists-review-parity"
   },
   "rules": [
     "Never replace the established Pflege UX with a new parallel dashboard to port a shared feature.",
     "Adapt shared behavior into the existing Pflege surface.",
+    "Never create a second primary Pflege workspace; /pro must resolve back to the canonical root workspace.",
     "Never copy customer data, credentials, Supabase refs, branding or industry-specific logic between instances.",
     "Do not mark a shared-core task complete until both instances are adapted or a blocker is recorded here."
   ]
