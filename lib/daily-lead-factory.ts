@@ -56,7 +56,7 @@ type JobTask = { state: string; code: string; sector: string; queryKey: string }
 type LeadBusiness = Omit<DiscoveredBusiness, "source"> & { source: string };
 type ResolvedJobLead = { business: LeadBusiness; seed: HiringEmployerSignal };
 
-const TARGET_NAME_SQL = `(c.metadata->>'pflege_icp_verified'='true' or lower(c.name) ~ '(pflegedienst|ambulant|sozialstation|häuslich|haeuslich|krankenpflege|intensivpflege|pflegeteam|home care|home health)')
+const TARGET_NAME_SQL = `(c.metadata->>'pflege_icp_verified'='true' or lower(c.name) ~ '(pflegedienst|ambulant|sozialstation|diakoniestation|häuslich|haeuslich|krankenpflege|intensivpflege|pflegeteam|home care|home health)')
   and lower(c.name) !~ '(pflegeheim|altenheim|seniorenheim|seniorenzentrum|seniorenresidenz|pflegezentrum|wohn-? und pflege|wohnpark|tagespflege|hospiz|krankenhaus|klinik|fußpflege|fusspflege|textilpflege|fahrzeugpflege|kosmetik|sanitätshaus|sanitaetshaus)'`;
 
 function clamp(value: number) { return Math.max(0, Math.min(100, Math.round(value))); }
@@ -72,7 +72,7 @@ function isExcludedName(value = "") {
   return /(pflegeheim|altenheim|seniorenheim|seniorenzentrum|seniorenresidenz|pflegezentrum|wohn-? und pflege|wohnpark|tagespflege|hospiz|krankenhaus|klinik|fußpflege|fusspflege|textilpflege|fahrzeugpflege|kosmetik|sanitätshaus|sanitaetshaus|pflegestützpunkt|pflegestuetzpunkt)/i.test(value);
 }
 function isStrongAmbulatoryText(value = "") {
-  return /(pflegedienst|ambulan(?:t|te|ter)|sozialstation|häuslich|haeuslich|krankenpflege|intensivpflege|pflegeteam|home care|home health|home_care|ambulatory_care|outreach)/i.test(value) && !isExcludedName(value);
+  return /(pflegedienst|ambulan(?:t|te|ter)|sozialstation|diakoniestation|häuslich|haeuslich|krankenpflege|intensivpflege|pflegeteam|home care|home health|home_care|ambulatory_care|outreach)/i.test(value) && !isExcludedName(value);
 }
 function isAmbulatoryBusiness(item: Pick<LeadBusiness, "company" | "industry">) {
   return isStrongAmbulatoryText(`${item.company} ${item.industry}`);
@@ -204,29 +204,54 @@ async function markJobScan(task: JobTask, values: { found: number; rawJobs: numb
   );
 }
 
+function businessFromSeed(seed: HiringEmployerSignal, task: JobTask): LeadBusiness | null {
+  if (!(seed.phone || seed.website)) return null;
+  if (!(seed.ambulatoryEvidence || isStrongAmbulatoryText(seed.employer))) return null;
+  return {
+    id: `job:${seed.seedKey}`,
+    company: seed.employer,
+    contact: "",
+    email: "",
+    phone: seed.phone || "",
+    website: seed.website || "",
+    city: seed.city || task.sector,
+    address: seed.address || "",
+    state: seed.region || task.state,
+    postalCode: "",
+    industry: "Ambulanter Pflegedienst",
+    rating: 0,
+    reviewCount: 0,
+    businessStatus: "",
+    source: "arbeitsagentur-jobdetails+public-directory",
+  };
+}
+
 async function resolveHiringEmployer(seed: HiringEmployerSignal, task: JobTask): Promise<ResolvedJobLead | null> {
   if (!seed.employer || isExcludedName(seed.employer)) return null;
-  let match: LeadBusiness | null = null;
-  try {
-    const result = await discoverBusinesses({
-      query: `${seed.employer} ${seed.city || task.sector}`,
-      pageSize: 12,
-      locationHint: `${seed.city || task.sector}, ${task.state}`,
-    });
-    const candidates = result.leads
-      .filter((item) => isAmbulatoryBusiness(item))
-      .filter((item) => companyNamesMatch(seed.employer, item.company))
-      .sort((a, b) => Number(Boolean(b.phone)) - Number(Boolean(a.phone)) || Number(Boolean(b.website)) - Number(Boolean(a.website)));
-    if (candidates[0]) match = { ...candidates[0], source: candidates[0].source };
-  } catch {}
+  let match: LeadBusiness | null = businessFromSeed(seed, task);
 
-  if (!match && seed.website && isStrongAmbulatoryText(seed.employer)) {
+  if (!match) {
+    try {
+      const result = await discoverBusinesses({
+        query: `${seed.employer} ${seed.city || task.sector}`,
+        pageSize: 12,
+        locationHint: `${seed.city || task.sector}, ${task.state}`,
+      });
+      const candidates = result.leads
+        .filter((item) => isAmbulatoryBusiness(item))
+        .filter((item) => companyNamesMatch(seed.employer, item.company))
+        .sort((a, b) => Number(Boolean(b.phone)) - Number(Boolean(a.phone)) || Number(Boolean(b.website)) - Number(Boolean(a.website)));
+      if (candidates[0]) match = { ...candidates[0], source: candidates[0].source };
+    } catch {}
+  }
+
+  if (!match && seed.website && (seed.ambulatoryEvidence || isStrongAmbulatoryText(seed.employer))) {
     match = {
       id: `job:${seed.seedKey}`,
       company: seed.employer,
       contact: "",
       email: "",
-      phone: "",
+      phone: seed.phone || "",
       website: seed.website,
       city: seed.city || task.sector,
       address: seed.address,
@@ -241,6 +266,7 @@ async function resolveHiringEmployer(seed: HiringEmployerSignal, task: JobTask):
   }
   if (!match) return null;
   if (seed.website && !match.website) match.website = seed.website;
+  if (seed.phone && !match.phone) match.phone = seed.phone;
   if (seed.address && !match.address) match.address = seed.address;
   return { business: match, seed };
 }
