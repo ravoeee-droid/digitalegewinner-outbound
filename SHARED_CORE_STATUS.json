@@ -17,8 +17,16 @@
     "leadDetailWorkspace": "local-implementation-exists-review-parity",
     "salesBrief": "needs-parity-review",
     "applicationFrame": "single-primary-workspace-no-parallel-pro-ui",
-    "studioGenericV3": "local-implementation-exists-review-parity"
+    "studioGenericV3": "peer-webmotion-v3-blocked-no-equivalent-browser-render-seam"
   },
+  "blockers": [
+    {
+      "id": "studio-webmotion-v3-2026-08-27",
+      "surface": "studioGenericV3",
+      "peer": "CLIENT-WALKENHORST",
+      "detail": "CLIENT-WALKENHORST migrated its browser export core from realtime MediaRecorder/captureStream to deterministic WebMotion/WebCodecs. DG-MAIN currently has no lib/studio-v3-browser-render-core.ts or equivalent browser render seam to adapt safely without creating a parallel Studio architecture. No Walkenhorst runtime data, credentials, branding or customer logic were copied."
+    }
+  ],
   "rules": [
     "Never replace the established Pflege UX with a new parallel dashboard to port a shared feature.",
     "Adapt shared behavior into the existing Pflege surface.",
