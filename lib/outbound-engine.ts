@@ -199,7 +199,7 @@ export async function updateOutboundTask(id: string, status: string, workspace =
   );
 }
 
-export async function prepareLinkedInDrafts(limit = OUTBOUND_TARGETS.linkedin, workspace = "default") {
+export async function prepareLinkedInDrafts(limit: number = OUTBOUND_TARGETS.linkedin, workspace = "default") {
   await ensureOutboundEngineSchema();
   const safeLimit = Math.max(1, Math.min(50, Math.round(limit)));
   const rows = await query<TaskRow>(`
@@ -229,7 +229,7 @@ export async function prepareLinkedInDrafts(limit = OUTBOUND_TARGETS.linkedin, w
   return getOutboundEngineSnapshot(workspace);
 }
 
-export async function dispatchLinkedInQueue(limit = 10, workspace = "default") {
+export async function dispatchLinkedInQueue(limit: number = 10, workspace = "default") {
   await ensureOutboundEngineSchema();
   const workerUrl = (process.env.LINKEDIN_AGENT_WORKER_URL || "").replace(/\/$/, "");
   if (!workerUrl) {
