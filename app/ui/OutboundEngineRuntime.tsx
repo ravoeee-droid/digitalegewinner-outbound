@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 type Channel = "call" | "email" | "video" | "linkedin";
@@ -67,7 +68,10 @@ export default function OutboundEngineRuntime() {
     }
   }, []);
 
-  useEffect(() => { void run(); }, [run]);
+  useEffect(() => {
+    const timer = window.setTimeout(() => { void run(); }, 0);
+    return () => window.clearTimeout(timer);
+  }, [run]);
 
   const tasks = useMemo(() => (snapshot?.tasks || []).filter((task) => task.channel === channel), [snapshot, channel]);
 
@@ -80,7 +84,7 @@ export default function OutboundEngineRuntime() {
       <div style={{ maxWidth: 1540, margin: "0 auto" }}>
         <header style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 24, flexWrap: "wrap", marginBottom: 26 }}>
           <div>
-            <a href="/" style={{ color: "#8f98a6", textDecoration: "none", fontSize: 13 }}>← Pflege Sales OS</a>
+            <Link href="/" style={{ color: "#8f98a6", textDecoration: "none", fontSize: 13 }}>← Pflege Sales OS</Link>
             <div style={{ marginTop: 18, color: "#d5ff59", fontSize: 12, fontWeight: 800, letterSpacing: ".12em" }}>DAILY OUTBOUND ENGINE</div>
             <h1 style={{ margin: "10px 0 8px", fontSize: "clamp(38px,6vw,76px)", letterSpacing: "-.055em", lineHeight: .95 }}>120 Calls. 100 Mails.<br />Eine Queue.</h1>
             <p style={{ margin: 0, maxWidth: 800, color: "#a9b1bd", lineHeight: 1.6, fontSize: 15 }}>
@@ -89,7 +93,7 @@ export default function OutboundEngineRuntime() {
           </div>
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
             <button onClick={() => void run({ action: "build" })} disabled={Boolean(busy)} style={buttonStyle(false)}>↻ Tagesplan bauen</button>
-            <a href="/outreach" style={{ ...buttonStyle(true), textDecoration: "none" }}>E-Mail Queue →</a>
+            <Link href="/outreach" style={{ ...buttonStyle(true), textDecoration: "none" }}>E-Mail Queue →</Link>
           </div>
         </header>
 
