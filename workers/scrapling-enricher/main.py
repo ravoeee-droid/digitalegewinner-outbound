@@ -84,7 +84,7 @@ def _candidate_links(page: Any, base_url: str) -> dict[str, str]:
 
 
 def _fetch(url: str) -> Any:
-    return Fetcher.get(url, timeout=15_000, stealthy_headers=True)
+    return Fetcher.get(url, timeout=15, stealthy_headers=True)
 
 
 def _extract_one(target: Target) -> dict[str, Any]:
