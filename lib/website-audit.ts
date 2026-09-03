@@ -57,6 +57,9 @@ export type WebsiteAuditResult = {
     hasPhone: boolean;
     hasEmail: boolean;
     hasWhatsapp: boolean;
+    copyrightYear: number | null;
+    copyrightAgeYears: number | null;
+    copyrightIsStale10y: boolean;
   };
   snapshot: {
     title: string;
@@ -96,7 +99,8 @@ function decodeEntities(value: string) {
     .replace(/&quot;/gi, '"')
     .replace(/&#39;|&apos;/gi, "'")
     .replace(/&lt;/gi, "<")
-    .replace(/&gt;/gi, ">");
+    .replace(/&gt;/gi, ">")
+    .replace(/&copy;/gi, "©");
 }
 
 function cleanText(value: string) {
@@ -130,6 +134,26 @@ function metaContent(html: string, key: string, useProperty = false) {
     if (marker === key.toLowerCase()) return decodeEntities(attr(tag, "content"));
   }
   return "";
+}
+
+function extractCopyrightYear(html: string) {
+  const footerMatches = [...html.matchAll(/<footer\b[^>]*>([\s\S]*?)<\/footer>/gi)].map((match) => match[1] || "");
+  const source = footerMatches.length ? footerMatches.join(" ") : html.slice(-Math.min(html.length, 20_000));
+  const text = cleanText(source);
+  const years: number[] = [];
+  const patterns = [
+    /(?:©|copyright)\s*(?:\(c\)\s*)?((?:19|20)\d{2})(?:\s*[-–—]\s*((?:19|20)\d{2}))?/gi,
+    /((?:19|20)\d{2})(?:\s*[-–—]\s*((?:19|20)\d{2}))?\s*(?:©|copyright)/gi,
+  ];
+  for (const pattern of patterns) {
+    for (const match of text.matchAll(pattern)) {
+      const start = Number(match[1]);
+      const end = Number(match[2]);
+      const candidate = Number.isFinite(end) && end > 0 ? end : start;
+      if (candidate >= 1990 && candidate <= new Date().getUTCFullYear() + 1) years.push(candidate);
+    }
+  }
+  return years.length ? Math.max(...years) : null;
 }
 
 function isPrivateIp(ip: string) {
@@ -342,6 +366,10 @@ export async function runWebsiteAudit(rawUrl: string, companyInput = ""): Promis
   const h2 = allMatches(html, /<h2\b[^>]*>([\s\S]*?)<\/h2>/gi, 12);
   const bodyText = cleanText(html.replace(/<script\b[\s\S]*?<\/script>/gi, " ").replace(/<style\b[\s\S]*?<\/style>/gi, " "));
   const wordCount = bodyText ? bodyText.split(/\s+/).filter((word) => word.length > 1).length : 0;
+  const copyrightYear = extractCopyrightYear(html);
+  const currentYear = new Date().getUTCFullYear();
+  const copyrightAgeYears = copyrightYear ? Math.max(0, currentYear - copyrightYear) : null;
+  const copyrightIsStale10y = copyrightAgeYears !== null && copyrightAgeYears >= 10;
   const imageTags = html.match(/<img\b[^>]*>/gi) || [];
   const imagesMissingAlt = imageTags.filter((tag) => !attr(tag, "alt")).length;
   const lazyImages = imageTags.filter((tag) => /loading\s*=\s*["']lazy["']/i.test(tag)).length;
@@ -414,8 +442,15 @@ export async function runWebsiteAudit(rawUrl: string, companyInput = ""): Promis
     hasCaseStudies,
   });
 
+  if (copyrightIsStale10y) {
+    scores.trust = clamp(scores.trust - 18);
+    scores.content = clamp(scores.content - 8);
+    scores.overall = clamp(scores.seo * 0.22 + scores.conversion * 0.24 + scores.trust * 0.2 + scores.technical * 0.2 + scores.content * 0.14);
+  }
+
   const findings: AuditFinding[] = [];
   const add = (finding: AuditFinding) => findings.push(finding);
+  if (copyrightIsStale10y && copyrightYear && copyrightAgeYears !== null) add({ severity:"warning",category:"Trust",title:`Copyright-Jahr ${copyrightYear} ist ${copyrightAgeYears} Jahre alt`,detail:`Im Footer wurde als jüngstes Copyright-Jahr ${copyrightYear} erkannt. Das ist ein starkes Alterssignal, beweist aber allein nicht, dass die Website seitdem unverändert ist.`,impact:"Eine sichtbar ungepflegte Jahresangabe kann den Gesamteindruck veraltet wirken lassen und ist ein guter Anlass für eine Website-Modernisierung.",recommendation:"Website-Inhalte, Technik und Conversion-Pfade prüfen und das Copyright nur im Zuge einer tatsächlichen Aktualisierung sauber pflegen." });
   if (statusCode < 200 || statusCode >= 300) add({ severity:"critical",category:"Technical",title:`HTTP-Status ${statusCode}`,detail:"Die Startseite liefert keinen regulären 2xx-Status.",impact:"Crawler, Kampagnen-Traffic und Nutzer können auf Fehler oder Umleitungen treffen.",recommendation:"Statuscode und Redirect-Kette prüfen und eine stabile 200-Zielseite sicherstellen." });
   if (finalUrl.protocol !== "https:") add({ severity:"critical",category:"Technical",title:"Kein HTTPS",detail:"Die Zielseite wird nicht verschlüsselt ausgeliefert.",impact:"Vertrauen, Browser-Sicherheit und Conversion können leiden.",recommendation:"TLS/HTTPS erzwingen und alle internen Links auf HTTPS umstellen." });
   if (responseMs > 2500) add({ severity:"warning",category:"Technical",title:"Langsame Server-Antwort",detail:`Der Radar brauchte etwa ${responseMs} ms bis zur vollständigen HTML-Antwort.`,impact:"Langsame Seiten erhöhen Absprünge und verschlechtern Kampagnen-Effizienz.",recommendation:"Server, Caching und Render-Pfad prüfen; große Blocker priorisieren." });
@@ -507,6 +542,9 @@ export async function runWebsiteAudit(rawUrl: string, companyInput = ""): Promis
       hasPhone,
       hasEmail,
       hasWhatsapp,
+      copyrightYear,
+      copyrightAgeYears,
+      copyrightIsStale10y,
     },
     snapshot: { title, description, canonical, h1, h2, ctas },
     findings,
