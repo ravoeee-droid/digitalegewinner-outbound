@@ -33,13 +33,13 @@ export async function POST(request: Request) {
       `update sales_outbound_tasks
        set status='done',
            payload=payload || jsonb_build_object(
-             'callOutcome',$2,
-             'callNote',$3,
-             'openerTest',$4,
-             'callOutcomeAt',now()::text
+             'callOutcome', $2::text,
+             'callNote', $3::text,
+             'openerTest', $4::text,
+             'callOutcomeAt', now()::text
            ),
            updated_at=now()
-       where id=$1 and channel='call'`,
+       where id=$1::text and channel='call'`,
       [input.id, input.outcome, input.note, input.opener],
     );
     const snapshot = await getOutboundEngineSnapshot();
