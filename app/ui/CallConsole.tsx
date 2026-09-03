@@ -51,8 +51,18 @@ export default function CallConsole() {
   const phone = value(p, "phone");
   const website = value(p, "website");
   const contact = value(p, "contactName");
-  const hook = value(p, "message") || value(p, "reasons") || "Im Gespräch kurz prüfen, was mit verpassten oder parallelen Anrufen passiert.";
+  const campaign = value(p, "campaign");
+  const isPflegeRecruiting = /pflege website recruiting/i.test(campaign);
+  const hook = value(p, "message") || value(p, "reasons") || (isPflegeRecruiting
+    ? "Kurz den aktuellen Recruiting-Bedarf und den Bewerberweg über die Website prüfen."
+    : "Im Gespräch kurz prüfen, was mit verpassten oder parallelen Anrufen passiert.");
   const scriptName = firstNameForScript(contact);
+  const opener = isPflegeRecruiting
+    ? `„Hallo${scriptName ? ` ${scriptName}` : ""}, Raphael Hermann hier, grüße Sie. Ich hab gesehen, dass Sie aktuell Pflegekräfte suchen und hab mir deshalb kurz Ihren Online-Auftritt angesehen. Kann ich Ihnen in 30 Sekunden sagen, was mir aufgefallen ist?“`
+    : `„Hallo${scriptName ? ` ${scriptName}` : ""}, Raphael Hermann hier, grüße Sie. Ich wollte Ihnen eigentlich erst eine Mail schicken, dann dachte ich, ich ruf lieber kurz an. Kann ich kurz sagen, warum ich anrufe?“`;
+  const question = isPflegeRecruiting
+    ? "„Woher kommen Ihre Bewerbungen aktuell hauptsächlich – Jobportale, Empfehlungen oder tatsächlich über Ihre eigene Website?“"
+    : "„Was passiert bei Ihnen aktuell, wenn zwei Kunden gleichzeitig anrufen und keiner rangehen kann?“";
 
   const load = useCallback(async () => {
     setBusy(true);
@@ -127,7 +137,7 @@ export default function CallConsole() {
 
       <header className="rapid-head">
         <div>
-          <span>SHK · RAPID CALL</span>
+          <span>{isPflegeRecruiting ? "PFLEGE · WEBSITE CALL" : "SHK · RAPID CALL"}</span>
           <strong aria-live="polite">{pending.length} offen</strong>
         </div>
         <div className="rapid-keys" aria-label="Tastaturkürzel">ENTER = CALL · 1–6 = ERGEBNIS → NÄCHSTER</div>
@@ -139,7 +149,7 @@ export default function CallConsole() {
         <section className="rapid-done" aria-live="polite">
           <div aria-hidden="true">✓</div>
           <h1>Queue leer.</h1>
-          <p>Alle vorbereiteten SHK-Calls sind durch.</p>
+          <p>Alle vorbereiteten Calls sind durch.</p>
         </section>
       ) : (
         <section className="rapid-card" aria-label={`Aktiver Lead: ${company}`}>
@@ -176,9 +186,7 @@ export default function CallConsole() {
 
             <section className="rapid-script" id="call-script" aria-labelledby="script-title" tabIndex={-1}>
               <p id="script-title">DU SAGST</p>
-              <blockquote>
-                „Hallo{scriptName ? ` ${scriptName}` : ""}, Raphael Hermann hier, grüße Sie. Ich wollte Ihnen eigentlich erst eine Mail schicken, dann dachte ich, ich ruf lieber kurz an. Kann ich kurz sagen, warum ich anrufe?“
-              </blockquote>
+              <blockquote>{opener}</blockquote>
 
               <div className="rapid-hook">
                 <span>AUFHÄNGER FÜR DIESEN BETRIEB</span>
@@ -187,7 +195,7 @@ export default function CallConsole() {
 
               <div className="rapid-question">
                 <span>DANN FRAGEN</span>
-                <strong>„Was passiert bei Ihnen aktuell, wenn zwei Kunden gleichzeitig anrufen und keiner rangehen kann?“</strong>
+                <strong>{question}</strong>
               </div>
             </section>
           </div>
