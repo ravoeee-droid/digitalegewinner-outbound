@@ -6,6 +6,7 @@ export const REVENUE_STAGES = [
   "Geprüft",
   "Call bereit",
   "Kontaktiert",
+  "Nachfassen",
   "Interesse",
   "Termin",
   "Angebot",
@@ -80,6 +81,7 @@ type SeedLeadRow = {
   opportunity_score: number;
   metadata: JsonObject;
   website_score: number;
+  seo_score: number;
 };
 
 type OpportunityRow = {
@@ -90,6 +92,7 @@ type OpportunityRow = {
   product_key: ProductKey;
   stage: RevenueStage;
   status: string;
+  source: string;
   setup_value: number;
   monthly_value: number;
   probability: number;
@@ -109,6 +112,7 @@ type OpportunityRow = {
   lead_opportunity: number;
   company_metadata: JsonObject;
   website_score: number;
+  seo_score: number;
 };
 
 let schemaReady = false;
@@ -144,8 +148,7 @@ function websiteWeak(row: SeedLeadRow) {
   const daily = asObject(row.metadata?.daily_qualification);
   if (!row.website) return true;
   if (daily?.websiteWeak === true || text(daily?.websiteWeak).toLowerCase() === "true") return true;
-  if (row.website_score > 0 && row.website_score < 72) return true;
-  return row.opportunity_score >= 72;
+  return row.website_score > 0 && row.website_score < 72;
 }
 
 function defaultWebsiteSetup(row: SeedLeadRow) {
@@ -158,16 +161,16 @@ function defaultWebsiteSetup(row: SeedLeadRow) {
 function suggestedProducts(row: SeedLeadRow): ProductKey[] {
   const haystack = normalizedHaystack(row);
   const jobs = jobCount(row);
-  const careFit = /(pflege|pflegedienst|senior|ambulant|intensivpflege|tagespflege|altenpflege)/i.test(haystack);
+  const careFit = /(pflege|pflegedienst|senior|ambulant|intensivpflege|tagespflege|altenpflege|pflegeheim|pflegezentrum)/i.test(haystack);
+  const recruitingSignal = /(karriere|bewerb|stellenanzeige|mitarbeiter|fachkraft|personal|recruit)/i.test(haystack);
   const handworkFit = /(shk|haustechnik|sanitär|heizung|klima|elektro|handwerk|werkstatt|servicebetrieb|installateur)/i.test(haystack);
   const products = new Set<ProductKey>();
 
   if (websiteWeak(row)) products.add("website");
-  if (careFit || jobs > 0 || /(karriere|bewerb|stellenanzeige|mitarbeiter|fachkraft)/i.test(haystack)) products.add("pflege_recruiting");
-  if (row.website && (row.website_score === 0 ? row.priority_score >= 65 : row.website_score < 70)) products.add("seo");
+  if (careFit && (jobs > 0 || recruitingSignal || row.priority_score >= 70)) products.add("pflege_recruiting");
+  if (row.website && ((row.seo_score > 0 && row.seo_score < 70) || (row.seo_score === 0 && row.priority_score >= 78))) products.add("seo");
   if (row.phone && handworkFit) products.add("automation");
 
-  if (!products.size) products.add(row.website ? "seo" : "website");
   return [...products];
 }
 
@@ -187,6 +190,7 @@ function stageProbability(stage: RevenueStage) {
     "Geprüft": 10,
     "Call bereit": 12,
     Kontaktiert: 18,
+    Nachfassen: 22,
     Interesse: 40,
     Termin: 60,
     Angebot: 75,
@@ -195,6 +199,27 @@ function stageProbability(stage: RevenueStage) {
     Verloren: 0,
   };
   return values[stage];
+}
+
+function defaultActionForStage(stage: RevenueStage) {
+  const actions: Record<RevenueStage, string> = {
+    Neu: "Research vervollständigen",
+    "Geprüft": "Entscheider und Kontaktdaten prüfen",
+    "Call bereit": "Jetzt anrufen und Bedarf qualifizieren",
+    Kontaktiert: "Bedarf konkret qualifizieren",
+    Nachfassen: "Wiedervorlage anrufen",
+    Interesse: "Termin verbindlich fixieren",
+    Termin: "Termin vorbereiten",
+    Angebot: "Angebot nachfassen",
+    Verhandlung: "Entscheidung und nächsten Schritt sichern",
+    Gewonnen: "Onboarding starten",
+    Verloren: "",
+  };
+  return actions[stage];
+}
+
+function tomorrowIso() {
+  return new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
 }
 
 function signalSummary(row: OpportunityRow) {
@@ -210,22 +235,30 @@ function signalSummary(row: OpportunityRow) {
   }
   if (row.product_key === "pflege_recruiting") {
     if (jobs > 0) return `${jobs} offene Stelle${jobs === 1 ? "" : "n"} erkannt · Recruiting-Bedarf vorhanden`;
-    return rawReasons.find((reason) => /job|stelle|bewerb|recruit|pflege/i.test(reason)) || "Recruiting-Fit aus Branche und Research erkannt";
+    return rawReasons.find((reason) => /job|stelle|bewerb|recruit|pflege|fachkraft/i.test(reason)) || "Pflegebetrieb mit erkennbarem Recruiting-Potenzial";
   }
-  if (row.product_key === "seo") return row.website_score > 0 ? `Website-Score ${row.website_score}/100 · organisches Wachstumspotenzial` : "Website vorhanden · SEO-Potenzial prüfen";
+  if (row.product_key === "seo") {
+    if (row.seo_score > 0) return `SEO-Score ${row.seo_score}/100 · organisches Wachstumspotenzial`;
+    return "Website vorhanden · Local-/SEO-Potenzial priorisiert prüfen";
+  }
   return "Telefonischer Servicebetrieb · Automationspotenzial im Erstgespräch qualifizieren";
 }
 
 function callScore(row: OpportunityRow) {
   let score = Number(row.score || 0) * 2 + Number(row.lead_priority || 0) * 2 + Number(row.lead_opportunity || 0);
   if (row.stage === "Interesse") score += 300;
-  if (row.stage === "Termin") score += 220;
+  if (row.stage === "Nachfassen") score += 250;
   if (row.stage === "Kontaktiert") score += 120;
   if (row.stage === "Call bereit") score += 90;
   if (row.next_action_at && new Date(row.next_action_at).getTime() <= Date.now()) score += 420;
   if (row.product_key === "pflege_recruiting") score += 45;
   if (row.product_key === "website" && row.website_score > 0 && row.website_score < 50) score += 70;
+  if (row.product_key === "seo" && row.seo_score > 0 && row.seo_score < 50) score += 55;
   return Math.round(score);
+}
+
+function seoScoreSql(alias: string) {
+  return `case when coalesce(${alias}.audit->'scores'->>'seo','') ~ '^[0-9]+(\\.[0-9]+)?$' then round((${alias}.audit->'scores'->>'seo')::numeric)::int else 0 end`;
 }
 
 export async function ensureRevenueOpportunitySchema() {
@@ -240,6 +273,7 @@ export async function ensureRevenueOpportunitySchema() {
       product_key text not null,
       stage text not null default 'Neu',
       status text not null default 'open',
+      source text not null default 'signal',
       setup_value numeric(12,2) not null default 0,
       monthly_value numeric(12,2) not null default 0,
       probability integer not null default 5,
@@ -250,6 +284,7 @@ export async function ensureRevenueOpportunitySchema() {
       created_at timestamptz not null default now(),
       updated_at timestamptz not null default now()
     );
+    alter table sales_opportunities add column if not exists source text not null default 'signal';
     create unique index if not exists sales_opportunities_lead_product_idx
       on sales_opportunities(workspace, lead_id, product_key);
     create index if not exists sales_opportunities_pipeline_idx
@@ -265,12 +300,13 @@ async function seedRows(workspace: string, missingOnly = false) {
     select l.id lead_id,l.company_id,c.name company,c.city,c.industry,c.website,
            coalesce(ct.phone,c.phone,'') phone,coalesce(ct.email,'') email,l.notes,
            l.priority_score,l.opportunity_score,c.metadata,
-           coalesce(rr.website_score,0)::int website_score
+           coalesce(rr.website_score,0)::int website_score,
+           ${seoScoreSql("rr")} seo_score
     from sales_leads l
     join sales_companies c on c.id=l.company_id
     left join sales_contacts ct on ct.id=l.contact_id
     left join lateral (
-      select website_score from sales_research_runs r
+      select website_score,audit from sales_research_runs r
       where r.workspace=l.workspace and r.company_id=l.company_id
       order by r.created_at desc limit 1
     ) rr on true
@@ -284,24 +320,45 @@ async function seedRows(workspace: string, missingOnly = false) {
   `, [workspace, missingOnly]);
 }
 
-async function seedOne(row: SeedLeadRow, product: ProductKey, workspace: string) {
+async function seedOne(row: SeedLeadRow, product: ProductKey, workspace: string, source = "signal") {
   const values = defaultValues(product, row);
   const stage = defaultStage(row);
   const score = Math.max(0, Math.min(100, Math.round(row.priority_score * 0.55 + row.opportunity_score * 0.45)));
   await query(`
     insert into sales_opportunities(
-      id,workspace,lead_id,company_id,product_key,stage,status,setup_value,monthly_value,probability,score,next_action
-    ) values($1,$2,$3,$4,$5,$6,'open',$7,$8,$9,$10,$11)
-    on conflict(workspace,lead_id,product_key) do nothing
+      id,workspace,lead_id,company_id,product_key,stage,status,source,setup_value,monthly_value,probability,score,next_action
+    ) values($1,$2,$3,$4,$5,$6,'open',$7,$8,$9,$10,$11,$12)
+    on conflict(workspace,lead_id,product_key) do update set
+      source=case when excluded.source='manual' then 'manual' else sales_opportunities.source end
   `, [
-    crypto.randomUUID(), workspace, row.lead_id, row.company_id, product, stage,
-    values.setup, values.monthly, stageProbability(stage), score,
-    row.phone ? "Anrufen und Bedarf qualifizieren" : "Kontaktdaten vervollständigen",
+    crypto.randomUUID(), workspace, row.lead_id, row.company_id, product, stage, source,
+    values.setup, values.monthly, stageProbability(stage), score, defaultActionForStage(stage),
   ]);
+}
+
+async function reconcileSignalOpportunities(workspace: string) {
+  const rows = await seedRows(workspace, false);
+  const allowed = new Map(rows.map((row) => [row.lead_id, new Set(suggestedProducts(row))]));
+  const existing = await query<{ id: string; lead_id: string; product_key: ProductKey }>(`
+    select o.id,o.lead_id,o.product_key
+    from sales_opportunities o
+    where o.workspace=$1 and o.source='signal' and o.status='open'
+      and o.stage in ('Neu','Geprüft','Call bereit') and coalesce(o.notes,'')=''
+      and not exists (
+        select 1 from sales_activities a
+        where a.workspace=o.workspace and a.meta->>'opportunityId'=o.id
+      )
+  `, [workspace]);
+  const remove = existing.filter((item) => !allowed.get(item.lead_id)?.has(item.product_key));
+  for (const item of remove) {
+    await query(`delete from sales_opportunities where id=$1 and workspace=$2`, [item.id, workspace]);
+  }
+  return remove.length;
 }
 
 export async function seedRevenueOpportunities(workspace = "default", missingOnly = false) {
   await ensureRevenueOpportunitySchema();
+  if (!missingOnly) await reconcileSignalOpportunities(workspace);
   const rows = await seedRows(workspace, missingOnly);
   const batchSize = 12;
   for (let index = 0; index < rows.length; index += batchSize) {
@@ -313,18 +370,19 @@ export async function seedRevenueOpportunities(workspace = "default", missingOnl
 
 async function loadOpportunityRows(workspace: string) {
   return query<OpportunityRow>(`
-    select o.id,o.workspace,o.lead_id,o.company_id,o.product_key,o.stage,o.status,
+    select o.id,o.workspace,o.lead_id,o.company_id,o.product_key,o.stage,o.status,o.source,
            o.setup_value::float8 setup_value,o.monthly_value::float8 monthly_value,
            o.probability,o.score,o.next_action,o.next_action_at,o.notes,o.created_at,o.updated_at,
            c.name company,c.city,c.industry,c.website,coalesce(ct.phone,c.phone,'') phone,coalesce(ct.email,'') email,
            l.priority_score lead_priority,l.opportunity_score lead_opportunity,c.metadata company_metadata,
-           coalesce(rr.website_score,0)::int website_score
+           coalesce(rr.website_score,0)::int website_score,
+           ${seoScoreSql("rr")} seo_score
     from sales_opportunities o
     join sales_leads l on l.id=o.lead_id and l.workspace=o.workspace
     join sales_companies c on c.id=o.company_id and c.workspace=o.workspace
     left join sales_contacts ct on ct.id=l.contact_id
     left join lateral (
-      select website_score from sales_research_runs r
+      select website_score,audit from sales_research_runs r
       where r.workspace=o.workspace and r.company_id=o.company_id
       order by r.created_at desc limit 1
     ) rr on true
@@ -350,15 +408,19 @@ export async function getRevenueSnapshot(workspace = "default") {
   const won = opportunities.filter((item) => item.stage === "Gewonnen" || item.status === "won");
   const now = Date.now();
 
-  const [today] = await query<{ calls: number; meetings: number; wins: number; activities: number }>(`
+  const [today] = await query<{ calls: number; connected: number; interested: number; meetings: number; offers: number; wins: number; activities: number }>(`
     select count(*) filter(where type='revenue.outcome')::int calls,
+           count(*) filter(where type='revenue.outcome' and coalesce(meta->>'outcome','') not in ('','Nicht erreicht'))::int connected,
+           count(*) filter(where type='revenue.outcome' and meta->>'outcome' in ('Interesse','Termin','Angebot','Gewonnen'))::int interested,
            count(*) filter(where type='revenue.outcome' and meta->>'outcome'='Termin')::int meetings,
+           count(*) filter(where type='revenue.outcome' and meta->>'outcome' in ('Angebot','Gewonnen'))::int offers,
            count(*) filter(where type='revenue.outcome' and meta->>'outcome'='Gewonnen')::int wins,
            count(*)::int activities
     from sales_activities
     where workspace=$1 and created_at>=date_trunc('day',now())
   `, [workspace]);
 
+  const callableStages: RevenueStage[] = ["Neu", "Geprüft", "Call bereit", "Kontaktiert", "Nachfassen", "Interesse"];
   const productStats = (Object.keys(PRODUCT_CATALOG) as ProductKey[]).map((key) => {
     const rowsForProduct = opportunities.filter((item) => item.product_key === key);
     const openRows = rowsForProduct.filter((item) => item.stage !== "Gewonnen" && item.stage !== "Verloren" && item.status === "open");
@@ -369,7 +431,7 @@ export async function getRevenueSnapshot(workspace = "default") {
       description: PRODUCT_CATALOG[key].description,
       accent: PRODUCT_CATALOG[key].accent,
       open: openRows.length,
-      callReady: openRows.filter((item) => Boolean(item.phone) && ["Neu", "Geprüft", "Call bereit", "Kontaktiert", "Interesse"].includes(item.stage)).length,
+      callReady: openRows.filter((item) => Boolean(item.phone) && callableStages.includes(item.stage)).length,
       annualPotential: openRows.reduce((sum, item) => sum + item.annual_value, 0),
       weightedPotential: openRows.reduce((sum, item) => sum + item.weighted_value, 0),
       mrrPotential: openRows.reduce((sum, item) => sum + Number(item.monthly_value || 0), 0),
@@ -379,7 +441,7 @@ export async function getRevenueSnapshot(workspace = "default") {
   const activityRows = await query<{ id: number; lead_id: string; company_id: string; type: string; summary: string; meta: JsonObject; created_at: string }>(`
     select id,coalesce(lead_id,'') lead_id,coalesce(company_id,'') company_id,type,summary,meta,created_at
     from sales_activities where workspace=$1
-    order by created_at desc limit 80
+    order by created_at desc limit 120
   `, [workspace]);
 
   return {
@@ -387,7 +449,7 @@ export async function getRevenueSnapshot(workspace = "default") {
     stages: REVENUE_STAGES,
     stats: {
       openOpportunities: active.length,
-      callReady: active.filter((item) => Boolean(item.phone) && ["Neu", "Geprüft", "Call bereit", "Kontaktiert", "Interesse"].includes(item.stage)).length,
+      callReady: active.filter((item) => Boolean(item.phone) && callableStages.includes(item.stage)).length,
       annualPotential: active.reduce((sum, item) => sum + item.annual_value, 0),
       weightedPotential: active.reduce((sum, item) => sum + item.weighted_value, 0),
       mrrPotential: active.reduce((sum, item) => sum + Number(item.monthly_value || 0), 0),
@@ -396,7 +458,10 @@ export async function getRevenueSnapshot(workspace = "default") {
     },
     today: {
       calls: Number(today?.calls || 0),
+      connected: Number(today?.connected || 0),
+      interested: Number(today?.interested || 0),
       meetings: Number(today?.meetings || 0),
+      offers: Number(today?.offers || 0),
       wins: Number(today?.wins || 0),
       activities: Number(today?.activities || 0),
     },
@@ -411,12 +476,13 @@ async function getSeedLead(leadId: string, workspace: string) {
     select l.id lead_id,l.company_id,c.name company,c.city,c.industry,c.website,
            coalesce(ct.phone,c.phone,'') phone,coalesce(ct.email,'') email,l.notes,
            l.priority_score,l.opportunity_score,c.metadata,
-           coalesce(rr.website_score,0)::int website_score
+           coalesce(rr.website_score,0)::int website_score,
+           ${seoScoreSql("rr")} seo_score
     from sales_leads l
     join sales_companies c on c.id=l.company_id
     left join sales_contacts ct on ct.id=l.contact_id
     left join lateral (
-      select website_score from sales_research_runs r where r.workspace=l.workspace and r.company_id=l.company_id
+      select website_score,audit from sales_research_runs r where r.workspace=l.workspace and r.company_id=l.company_id
       order by r.created_at desc limit 1
     ) rr on true
     where l.workspace=$1 and l.id=$2 and l.status='active' limit 1
@@ -428,15 +494,14 @@ export async function addProductOpportunity(leadId: string, productKey: ProductK
   await ensureRevenueOpportunitySchema();
   const row = await getSeedLead(leadId, workspace);
   if (!row) throw new Error("Lead nicht gefunden.");
-  await seedOne(row, productKey, workspace);
+  await seedOne(row, productKey, workspace, "manual");
   return getRevenueSnapshot(workspace);
 }
 
 function outcomePatch(outcome: string, currentStage: RevenueStage) {
-  const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
-  if (outcome === "Nicht erreicht") return { stage: "Kontaktiert" as RevenueStage, probability: Math.max(15, stageProbability(currentStage)), nextAction: "Morgen erneut anrufen", nextActionAt: tomorrow, status: "open" };
-  if (outcome === "Erreicht") return { stage: "Kontaktiert" as RevenueStage, probability: Math.max(22, stageProbability(currentStage)), nextAction: "Bedarf qualifizieren", nextActionAt: null, status: "open" };
-  if (outcome === "Interesse") return { stage: "Interesse" as RevenueStage, probability: 40, nextAction: "Termin fixieren", nextActionAt: null, status: "open" };
+  if (outcome === "Nicht erreicht") return { stage: "Nachfassen" as RevenueStage, probability: Math.max(15, stageProbability(currentStage)), nextAction: "Morgen erneut anrufen", nextActionAt: tomorrowIso(), status: "open" };
+  if (outcome === "Erreicht") return { stage: "Kontaktiert" as RevenueStage, probability: Math.max(22, stageProbability(currentStage)), nextAction: "Bedarf konkret qualifizieren", nextActionAt: null, status: "open" };
+  if (outcome === "Interesse") return { stage: "Interesse" as RevenueStage, probability: 40, nextAction: "Termin verbindlich fixieren", nextActionAt: null, status: "open" };
   if (outcome === "Termin") return { stage: "Termin" as RevenueStage, probability: 60, nextAction: "Termin vorbereiten", nextActionAt: null, status: "open" };
   if (outcome === "Angebot") return { stage: "Angebot" as RevenueStage, probability: 75, nextAction: "Angebot nachfassen", nextActionAt: null, status: "open" };
   if (outcome === "Gewonnen") return { stage: "Gewonnen" as RevenueStage, probability: 100, nextAction: "Onboarding starten", nextActionAt: null, status: "won" };
@@ -450,6 +515,7 @@ function legacyStage(stage: RevenueStage) {
     "Geprüft": "Research",
     "Call bereit": "Bereit",
     Kontaktiert: "Kontaktiert",
+    Nachfassen: "Wiedervorlage",
     Interesse: "Engaged",
     Termin: "Termin",
     Angebot: "Angebot",
@@ -496,10 +562,17 @@ export async function updateRevenueOpportunity(id: string, patch: OpportunityPat
 
   const outcome = patch.outcome ? outcomePatch(patch.outcome, current.stage) : null;
   const stage = patch.stage ?? outcome?.stage ?? current.stage;
-  const probability = patch.probability ?? outcome?.probability ?? (patch.stage ? stageProbability(stage) : current.probability);
+  const stageChanged = Boolean(patch.stage && patch.stage !== current.stage);
+  const probability = patch.probability ?? outcome?.probability ?? (stageChanged ? stageProbability(stage) : current.probability);
   const status = outcome?.status ?? (stage === "Gewonnen" ? "won" : stage === "Verloren" ? "lost" : "open");
-  const nextAction = patch.nextAction ?? outcome?.nextAction ?? current.next_action;
-  const nextActionAt = patch.nextActionAt !== undefined ? patch.nextActionAt : outcome?.nextActionAt !== undefined ? outcome.nextActionAt : current.next_action_at;
+  const nextAction = patch.nextAction ?? outcome?.nextAction ?? (stageChanged ? defaultActionForStage(stage) : current.next_action);
+  const nextActionAt = patch.nextActionAt !== undefined
+    ? patch.nextActionAt
+    : outcome?.nextActionAt !== undefined
+      ? outcome.nextActionAt
+      : stageChanged
+        ? (stage === "Nachfassen" ? tomorrowIso() : null)
+        : current.next_action_at;
 
   await query(`
     update sales_opportunities set
