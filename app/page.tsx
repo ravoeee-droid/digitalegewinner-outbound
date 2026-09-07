@@ -29,7 +29,7 @@ export default function Page() {
           boxShadow: "0 14px 50px rgba(0,0,0,.3)",
         }}
       >
-        ⚡ Daily Outbound
+        ⚡ Revenue Outbound OS
       </a>
       <div id="pflege-sales-os">
         <PflegeUnifiedRuntime />
