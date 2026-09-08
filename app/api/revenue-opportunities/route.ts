@@ -9,6 +9,10 @@ import {
   type ProductKey,
   type OpportunityPatch,
 } from "@/lib/revenue-opportunities";
+import {
+  refreshDeepWebsiteSalesIntelligence,
+  refreshStoredWebsiteSalesIntelligence,
+} from "@/lib/website-sales-intelligence";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -39,7 +43,10 @@ function workspaceOf(request: Request) {
 
 export async function GET(request: Request) {
   try {
-    return Response.json(await getRevenueSnapshot(workspaceOf(request)));
+    const workspace = workspaceOf(request);
+    await refreshStoredWebsiteSalesIntelligence(workspace);
+    await seedRevenueOpportunities(workspace);
+    return Response.json(await getRevenueSnapshot(workspace));
   } catch (error) {
     return Response.json({ error: error instanceof Error ? error.message : "Revenue Pipeline konnte nicht geladen werden." }, { status: 503 });
   }
@@ -50,6 +57,8 @@ export async function POST(request: Request) {
     const workspace = workspaceOf(request);
     const input = actionSchema.parse(await request.json());
     if (input.action === "refresh") {
+      await refreshStoredWebsiteSalesIntelligence(workspace);
+      await refreshDeepWebsiteSalesIntelligence(workspace, 10);
       await seedRevenueOpportunities(workspace);
       return Response.json(await getRevenueSnapshot(workspace));
     }
