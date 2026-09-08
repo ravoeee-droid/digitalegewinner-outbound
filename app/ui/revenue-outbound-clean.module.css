@@ -201,6 +201,24 @@
   color:#66717d !important;
 }
 
+.root > main > div > section > div > section:first-of-type + div{
+  margin-top:-5px !important;
+  margin-bottom:16px !important;
+  padding:0 !important;
+  border:0 !important;
+  background:transparent !important;
+}
+
+.root > main > div > section > div > section:first-of-type + div > div{
+  gap:3px !important;
+}
+
+.root > main > div > section > div > section:first-of-type + div > div > button{
+  min-height:30px;
+  padding:5px 8px !important;
+  border-radius:7px !important;
+}
+
 .root button{
   box-shadow:none !important;
 }
@@ -226,6 +244,19 @@
 
   .root > main > div > aside{
     padding:17px 13px !important;
+  }
+
+  .root > main > div > section > header > div:nth-child(2){
+    display:none !important;
+  }
+
+  .root > main > div > section > header > div:nth-child(3){
+    max-width:520px !important;
+    margin-right:auto !important;
+  }
+
+  .root > main > div > section > div > section:first-of-type + div > span{
+    opacity:.58;
   }
 }
 
