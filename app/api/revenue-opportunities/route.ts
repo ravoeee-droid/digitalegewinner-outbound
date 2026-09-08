@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { query } from "@/lib/db";
 import {
   PRODUCT_CATALOG,
   REVENUE_STAGES,
@@ -41,11 +42,39 @@ function workspaceOf(request: Request) {
   return new URL(request.url).searchParams.get("workspace") || "default";
 }
 
+async function tagWebsiteSegments(workspace: string) {
+  await query(`
+    update sales_companies
+    set metadata=jsonb_set(
+      metadata,
+      '{website_sales_intelligence,label}',
+      to_jsonb(
+        case
+          when metadata->'website_sales_intelligence'->>'category' in ('no_website','parked') then
+            'Keine Website · ' || regexp_replace(coalesce(metadata->'website_sales_intelligence'->>'label',''), '^(Keine Website|Schlechte Website) · ', '')
+          when metadata->'website_sales_intelligence'->>'category' in ('maintenance_long','outdated','bad_website','broken') then
+            'Schlechte Website · ' || regexp_replace(coalesce(metadata->'website_sales_intelligence'->>'label',''), '^(Keine Website|Schlechte Website) · ', '')
+          else coalesce(metadata->'website_sales_intelligence'->>'label','')
+        end
+      ),
+      true
+    ),
+    updated_at=now()
+    where workspace=$1 and metadata->'website_sales_intelligence' is not null
+  `, [workspace]);
+}
+
+async function prepareWebsiteIntelligence(workspace: string, deep = false) {
+  await refreshStoredWebsiteSalesIntelligence(workspace);
+  if (deep) await refreshDeepWebsiteSalesIntelligence(workspace, 10);
+  await tagWebsiteSegments(workspace);
+  await seedRevenueOpportunities(workspace);
+}
+
 export async function GET(request: Request) {
   try {
     const workspace = workspaceOf(request);
-    await refreshStoredWebsiteSalesIntelligence(workspace);
-    await seedRevenueOpportunities(workspace);
+    await prepareWebsiteIntelligence(workspace, false);
     return Response.json(await getRevenueSnapshot(workspace));
   } catch (error) {
     return Response.json({ error: error instanceof Error ? error.message : "Revenue Pipeline konnte nicht geladen werden." }, { status: 503 });
@@ -57,9 +86,7 @@ export async function POST(request: Request) {
     const workspace = workspaceOf(request);
     const input = actionSchema.parse(await request.json());
     if (input.action === "refresh") {
-      await refreshStoredWebsiteSalesIntelligence(workspace);
-      await refreshDeepWebsiteSalesIntelligence(workspace, 10);
-      await seedRevenueOpportunities(workspace);
+      await prepareWebsiteIntelligence(workspace, true);
       return Response.json(await getRevenueSnapshot(workspace));
     }
     return Response.json(await addProductOpportunity(input.leadId, input.productKey, workspace));
