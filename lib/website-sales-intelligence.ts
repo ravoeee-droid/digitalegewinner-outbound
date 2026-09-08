@@ -98,11 +98,23 @@ function titleFromHtml(html: string) {
   return cleanText(html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1] || "").slice(0, 220);
 }
 
+function h1FromHtml(html: string) {
+  return cleanText(html.match(/<h1\b[^>]*>([\s\S]*?)<\/h1>/i)?.[1] || "").slice(0, 500);
+}
+
 function auditSnapshotText(audit: JsonObject) {
   const snapshot = asObject(audit.snapshot);
   const h1 = Array.isArray(snapshot.h1) ? snapshot.h1.map(String) : [];
-  const h2 = Array.isArray(snapshot.h2) ? snapshot.h2.map(String) : [];
-  return [snapshot.title, snapshot.description, ...h1, ...h2].filter(Boolean).join(" ");
+  return [snapshot.title, ...h1].filter(Boolean).join(" ");
+}
+
+function maintenancePage(html: string) {
+  const title = titleFromHtml(html);
+  const h1 = h1FromHtml(html);
+  if (MAINTENANCE_RE.test(`${title} ${h1}`)) return true;
+  const text = cleanText(html);
+  const words = text.split(/\s+/).filter(Boolean).length;
+  return words > 0 && words <= 220 && MAINTENANCE_RE.test(text.slice(0, 6000));
 }
 
 function normalizeWebsite(value = "") {
@@ -176,7 +188,7 @@ async function fetchHtml(rawUrl: string): Promise<HtmlSnapshot> {
       redirect: "manual",
       cache: "no-store",
       headers: {
-        "user-agent": "DigitaleGewinner-WebsiteSalesIntelligence/1.1",
+        "user-agent": "DigitaleGewinner-WebsiteSalesIntelligence/1.2",
         accept: "text/html,application/xhtml+xml",
       },
       signal: AbortSignal.timeout(10_000),
@@ -224,13 +236,13 @@ async function waybackClosest(rawUrl: string, daysAgo: number) {
   const target = normalizeWebsite(rawUrl);
   const endpoint = `https://archive.org/wayback/available?url=${encodeURIComponent(target)}&timestamp=${isoDaysAgo(daysAgo)}`;
   try {
-    const response = await fetch(endpoint, { cache: "no-store", signal: AbortSignal.timeout(6_000), headers: { "user-agent": "DigitaleGewinner-WebsiteSalesIntelligence/1.1" } });
+    const response = await fetch(endpoint, { cache: "no-store", signal: AbortSignal.timeout(6_000), headers: { "user-agent": "DigitaleGewinner-WebsiteSalesIntelligence/1.2" } });
     if (!response.ok) return null;
     const json = await response.json() as { archived_snapshots?: { closest?: { available?: boolean; timestamp?: string; url?: string; status?: string } } };
     const closest = json.archived_snapshots?.closest;
     if (!closest?.available || !closest.timestamp || !closest.url) return null;
     const rawArchiveUrl = `https://web.archive.org/web/${closest.timestamp}id_/${target}`;
-    const archived = await fetch(rawArchiveUrl, { cache: "no-store", signal: AbortSignal.timeout(8_000), headers: { "user-agent": "DigitaleGewinner-WebsiteSalesIntelligence/1.1" } });
+    const archived = await fetch(rawArchiveUrl, { cache: "no-store", signal: AbortSignal.timeout(8_000), headers: { "user-agent": "DigitaleGewinner-WebsiteSalesIntelligence/1.2" } });
     if (!archived.ok) return null;
     const html = (await archived.text()).slice(0, 2_000_000);
     return { timestamp: closest.timestamp, html };
@@ -245,10 +257,6 @@ function dateFromWaybackTimestamp(value: string) {
   const month = value.slice(4, 6);
   const day = value.slice(6, 8);
   return `${year}-${month}-${day}T00:00:00.000Z`;
-}
-
-function maintenanceText(text: string) {
-  return MAINTENANCE_RE.test(text);
 }
 
 function noWebsiteSourceVerified(row: Candidate) {
@@ -272,7 +280,7 @@ function storedClassification(row: Candidate): WebsiteSalesIntelligence {
   const statusCode = num(audit.statusCode, 0);
   const copyrightAge = num(metrics.copyrightAgeYears, 0);
   const stale10y = bool(metrics.copyrightIsStale10y) || copyrightAge >= 10;
-  const currentMaintenance = maintenanceText(snapshotText);
+  const currentMaintenance = MAINTENANCE_RE.test(snapshotText);
   const parked = PARKED_RE.test(snapshotText);
   const lowSubscores = [conversion, trust, technical, content].filter((score) => score > 0 && score < 45).length;
   const noViewport = metrics.hasViewport === false;
@@ -302,7 +310,7 @@ function storedClassification(row: Candidate): WebsiteSalesIntelligence {
   if (currentMaintenance) {
     return {
       version: 1, checkedAt, category: "maintenance_now", strongIntent: false, confidence: 72, score: 82,
-      label: "Aktuell Wartungsmodus / im Aufbau", evidence: ["Wartungs-/Im-Aufbau-Text aktuell erkannt", "Dauer noch nicht historisch bestätigt"],
+      label: "Aktuell Wartungsmodus / im Aufbau", evidence: ["Wartungs-/Im-Aufbau-Signal in Title/H1 erkannt", "Dauer noch nicht historisch bestätigt"],
       maintenance: { current: true, confirmedDays: 0, oldestConfirmedAt: "", archiveChecks: 0 },
       history: { unchangedYears: 0, similarity: 0, comparedAt: "" },
       current: { statusCode, responseMs: num(audit.responseMs), title: String(asObject(audit.snapshot).title || "") },
@@ -426,24 +434,34 @@ async function deepClassification(row: Candidate, base: WebsiteSalesIntelligence
   try {
     live = await fetchHtml(row.website);
   } catch (error) {
+    const previouslyBroken = base.category === "broken" && base.current.statusCode >= 400;
+    if (previouslyBroken) {
+      return {
+        ...base,
+        checkedAt,
+        strongIntent: true,
+        confidence: 92,
+        score: 95,
+        label: base.label || "Website mehrfach nicht erreichbar",
+        evidence: [...base.evidence, `Erneuter Live-Check fehlgeschlagen: ${error instanceof Error ? error.message : "nicht erreichbar"}`].slice(0, 5),
+      };
+    }
     return {
       ...base,
       checkedAt,
-      category: "broken",
-      strongIntent: true,
-      confidence: 95,
-      score: 97,
-      label: "Website aktuell nicht erreichbar",
-      evidence: [`Live-Check fehlgeschlagen: ${error instanceof Error ? error.message : "nicht erreichbar"}`],
-      current: { statusCode: 0, responseMs: 0, title: "" },
+      category: "unknown",
+      strongIntent: false,
+      confidence: 52,
+      score: 35,
+      label: "Live-Check einmalig fehlgeschlagen · nicht als kaputt gewertet",
+      evidence: [`Ein einzelner technischer Fehler reicht nicht als Verkaufssignal: ${error instanceof Error ? error.message : "Live-Check fehlgeschlagen"}`],
     };
   }
 
   const liveText = cleanText(live.html);
   const liveTitle = titleFromHtml(live.html);
-  const combined = `${liveTitle} ${liveText.slice(0, 12000)}`;
-  const maintenanceNow = maintenanceText(combined);
-  const parkedNow = PARKED_RE.test(combined);
+  const maintenanceNow = maintenancePage(live.html);
+  const parkedNow = PARKED_RE.test(`${liveTitle} ${liveText.slice(0, 6000)}`);
   const legacy = LEGACY_RE.test(live.html);
 
   if (live.statusCode >= 400) {
@@ -470,7 +488,7 @@ async function deepClassification(row: Candidate, base: WebsiteSalesIntelligence
       archiveChecks += 1;
       const archivedText = cleanText(archived.html);
       const archivedAt = dateFromWaybackTimestamp(archived.timestamp);
-      if (maintenanceNow && maintenanceText(archivedText.slice(0, 16000))) {
+      if (maintenanceNow && maintenancePage(archived.html)) {
         confirmedDays = Math.max(confirmedDays, days);
         oldestConfirmedAt = archivedAt || oldestConfirmedAt;
       }
@@ -541,6 +559,16 @@ async function deepClassification(row: Candidate, base: WebsiteSalesIntelligence
   };
 }
 
+function freshStrongExisting(row: Candidate) {
+  const intel = asObject(row.metadata?.website_sales_intelligence);
+  if (!bool(intel.strongIntent)) return null;
+  const checked = Date.parse(String(intel.checkedAt || ""));
+  if (!Number.isFinite(checked) || Date.now() - checked > 3 * 86_400_000) return null;
+  const category = String(intel.category || "");
+  if (!["maintenance_long", "outdated", "broken", "parked", "bad_website", "no_website"].includes(category)) return null;
+  return intel as unknown as WebsiteSalesIntelligence;
+}
+
 async function candidates(workspace: string, limit?: number, staleOnly = false) {
   const values: unknown[] = [workspace];
   let limiter = "";
@@ -552,8 +580,7 @@ async function candidates(workspace: string, limit?: number, staleOnly = false) 
     c.metadata->'website_sales_intelligence' is null
     or coalesce(c.metadata->'website_sales_intelligence'->>'checkedAt','')=''
     or (c.metadata->'website_sales_intelligence'->>'checkedAt')::timestamptz < now() - interval '3 days'
-    or c.metadata->'website_sales_intelligence'->>'category' in ('maintenance_now','unknown')
-    or (c.metadata->'website_sales_intelligence'->>'category'='no_website' and coalesce(c.metadata->'website_sales_intelligence'->>'strongIntent','false')<>'true')
+    or c.metadata->'website_sales_intelligence'->>'category' in ('maintenance_now','unknown','no_website')
   )` : "";
   return query<Candidate>(`
     select c.id company_id,l.id lead_id,c.name company,c.city,c.source,c.website,coalesce(ct.phone,c.phone,'') phone,c.metadata,
@@ -591,8 +618,9 @@ export async function refreshStoredWebsiteSalesIntelligence(workspace = "default
   let strong = 0;
   const categories: Record<string, number> = {};
   for (const row of rows) {
-    const intel = storedClassification(row);
-    await persist(row, intel, workspace);
+    const preserved = freshStrongExisting(row);
+    const intel = preserved || storedClassification(row);
+    if (!preserved) await persist(row, intel, workspace);
     if (intel.strongIntent) strong += 1;
     categories[intel.category] = (categories[intel.category] || 0) + 1;
   }
