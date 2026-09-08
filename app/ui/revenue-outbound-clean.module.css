@@ -2,9 +2,10 @@
   --clean-text:#e7ebef;
   --clean-muted:#87919e;
   --clean-faint:#626d7a;
-  --clean-line:rgba(255,255,255,.065);
-  --clean-panel:rgba(255,255,255,.018);
+  --clean-line:rgba(255,255,255,.06);
+  --clean-panel:rgba(255,255,255,.015);
   font-size:14px;
+  font-weight:400;
   letter-spacing:0;
 }
 
@@ -29,48 +30,91 @@
 }
 
 .root small{
+  font-size:9px !important;
   font-weight:400 !important;
+  line-height:1.4 !important;
 }
 
-.root aside{
+.root > main{
+  background:radial-gradient(circle at 70% -18%,rgba(213,255,89,.035),transparent 30%),#080b0f !important;
+}
+
+.root > main > div > aside{
   width:auto;
+  background:#090c10 !important;
+  backdrop-filter:none !important;
+  border-right-color:var(--clean-line) !important;
 }
 
-.root aside > div:first-child strong{
+.root > main > div > aside > div:first-child{
+  padding-bottom:17px !important;
+}
+
+.root > main > div > aside > div:first-child strong{
   font-weight:650 !important;
+  letter-spacing:-.01em;
 }
 
-.root aside nav button{
-  min-height:40px;
-  border-radius:9px !important;
+.root > main > div > aside nav{
+  gap:2px !important;
 }
 
-.root aside nav button span{
+.root > main > div > aside nav button{
+  min-height:38px;
+  padding:9px 9px !important;
+  border-radius:8px !important;
+  transition:background .15s ease,color .15s ease;
+}
+
+.root > main > div > aside nav button span{
   font-weight:500 !important;
   letter-spacing:0 !important;
 }
 
-.root aside nav button b{
+.root > main > div > aside nav button b{
   font-weight:500 !important;
-  opacity:.72;
+  opacity:.68;
 }
 
-.root aside button{
+.root > main > div > aside button{
   box-shadow:none !important;
 }
 
-.root aside button small{
-  line-height:1.35;
-  opacity:.78;
+.root > main > div > aside button small{
+  opacity:.75;
 }
 
-.root header button,
-.root header a{
+.root > main > div > aside > div:not(:first-child) button{
+  border-radius:10px !important;
+}
+
+.root > main > div > section > header{
+  min-height:58px !important;
+  height:58px !important;
+  padding:0 20px !important;
+  background:rgba(8,11,15,.9) !important;
+  backdrop-filter:blur(14px) !important;
+  border-bottom-color:var(--clean-line) !important;
+}
+
+.root > main > div > section > header button,
+.root > main > div > section > header a{
   letter-spacing:0 !important;
+  box-shadow:none !important;
+}
+
+.root > main > div > section > header > div:first-of-type button{
+  padding:6px 9px !important;
+}
+
+.root > main > div > section > div{
+  max-width:1640px !important;
+  padding-top:17px !important;
 }
 
 .root h1{
   max-width:760px;
+  margin-top:5px !important;
   font-size:clamp(25px,2.5vw,36px) !important;
   line-height:1.08 !important;
   letter-spacing:-.035em !important;
@@ -86,15 +130,39 @@
 
 .root section p{
   color:var(--clean-muted) !important;
+  line-height:1.55 !important;
 }
 
 .root article{
+  border-radius:12px !important;
   box-shadow:none !important;
 }
 
+.root article h3{
+  font-size:12px !important;
+  font-weight:560 !important;
+}
+
+.root article p{
+  font-size:9px !important;
+}
+
+.root article > div:first-child span{
+  font-weight:550 !important;
+}
+
+.root article footer{
+  opacity:.86;
+}
+
 .root table th{
+  font-size:8px !important;
   font-weight:520 !important;
   letter-spacing:.045em !important;
+}
+
+.root table td{
+  font-size:10px !important;
 }
 
 .root table td strong{
@@ -107,28 +175,77 @@
   font-size:12px !important;
 }
 
+.root > main > div > section > div > section:first-of-type{
+  border-radius:12px !important;
+  margin-bottom:17px !important;
+  background:rgba(255,255,255,.012) !important;
+  border-color:var(--clean-line) !important;
+}
+
+.root > main > div > section > div > section:first-of-type > div{
+  padding:11px 14px !important;
+}
+
+.root > main > div > section > div > section:first-of-type span{
+  font-size:9px !important;
+  font-weight:450 !important;
+}
+
+.root > main > div > section > div > section:first-of-type strong{
+  font-size:18px !important;
+  font-weight:580 !important;
+  letter-spacing:-.025em !important;
+}
+
+.root > main > div > section > div > section:first-of-type small{
+  color:#66717d !important;
+}
+
+.root button{
+  box-shadow:none !important;
+}
+
+.root button:hover{
+  filter:none !important;
+}
+
 .root [role="button"]:focus-visible,
 .root button:focus-visible,
 .root a:focus-visible,
 .root input:focus-visible,
 .root select:focus-visible,
 .root textarea:focus-visible{
-  outline:2px solid rgba(213,255,89,.55);
+  outline:2px solid rgba(213,255,89,.5);
   outline-offset:2px;
 }
 
 @media(min-width:961px){
-  .root > div{
+  .root > main > div{
     grid-template-columns:238px minmax(0,1fr) !important;
   }
 
-  .root aside{
+  .root > main > div > aside{
     padding:17px 13px !important;
+  }
+}
+
+@media(max-width:960px){
+  .root > main > div > section > header{
+    height:auto !important;
+    min-height:58px !important;
+  }
+
+  .root > main > div > section > div{
+    padding-top:13px !important;
   }
 }
 
 @media(max-width:680px){
   .root h1{
     font-size:27px !important;
+  }
+
+  .root > main > div > section > div > section:first-of-type strong{
+    font-size:16px !important;
   }
 }
