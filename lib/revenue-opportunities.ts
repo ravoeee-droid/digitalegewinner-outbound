@@ -134,6 +134,14 @@ function text(value: unknown) {
   return typeof value === "string" ? value : "";
 }
 
+function truthy(value: unknown) {
+  return value === true || text(value).toLowerCase() === "true";
+}
+
+function websiteIntel(metadata: JsonObject) {
+  return asObject(metadata?.website_sales_intelligence);
+}
+
 function normalizedHaystack(row: SeedLeadRow) {
   return [row.company, row.industry, row.notes, JSON.stringify(row.metadata)].join(" ").toLowerCase();
 }
@@ -145,14 +153,17 @@ function jobCount(row: SeedLeadRow) {
 }
 
 function websiteWeak(row: SeedLeadRow) {
-  const daily = asObject(row.metadata?.daily_qualification);
   if (!row.website) return true;
-  if (daily?.websiteWeak === true || text(daily?.websiteWeak).toLowerCase() === "true") return true;
-  return row.website_score > 0 && row.website_score < 72;
+  const intel = websiteIntel(row.metadata);
+  if (text(intel.checkedAt)) return truthy(intel.strongIntent);
+  return row.website_score > 0 && row.website_score <= 45;
 }
 
 function defaultWebsiteSetup(row: SeedLeadRow) {
-  if (!row.website) return 3490;
+  const intel = websiteIntel(row.metadata);
+  const category = text(intel.category);
+  if (!row.website || category === "no_website" || category === "parked" || category === "maintenance_long" || category === "broken") return 3490;
+  if (category === "outdated") return 3490;
   if (row.website_score > 0 && row.website_score < 40) return 3490;
   if (row.website_score > 0 && row.website_score < 65) return 2490;
   return 1490;
@@ -225,12 +236,18 @@ function tomorrowIso() {
 function signalSummary(row: OpportunityRow) {
   const metadata = asObject(row.company_metadata);
   const daily = asObject(metadata?.daily_qualification);
+  const intel = websiteIntel(metadata);
   const rawReasons = asArray(daily?.reasons).map(String).filter(Boolean);
   const jobs = Math.max(0, num(asObject(daily?.jobGrowth)?.relevantOpenJobs));
 
   if (row.product_key === "website") {
+    const label = text(intel.label);
+    const category = text(intel.category);
+    const confidence = num(intel.confidence);
+    if (label) return `${label}${confidence ? ` · ${confidence}% verifiziert` : ""}`;
     if (!row.website) return "Keine Website erkannt · maximaler Relaunch-Hebel";
-    if (row.website_score > 0) return `Website-Score ${row.website_score}/100 · sichtbarer Relaunch-Hebel`;
+    if (category === "maintenance_long") return "Wartungsmodus seit Monaten bestätigt · High-Intent Website Lead";
+    if (row.website_score > 0) return `Website-Score ${row.website_score}/100 · Website-Hebel prüfen`;
     return rawReasons[0] || "Website-Potenzial aus Research erkannt";
   }
   if (row.product_key === "pflege_recruiting") {
@@ -252,7 +269,23 @@ function callScore(row: OpportunityRow) {
   if (row.stage === "Call bereit") score += 90;
   if (row.next_action_at && new Date(row.next_action_at).getTime() <= Date.now()) score += 420;
   if (row.product_key === "pflege_recruiting") score += 45;
-  if (row.product_key === "website" && row.website_score > 0 && row.website_score < 50) score += 70;
+  if (row.product_key === "website") {
+    const intel = websiteIntel(asObject(row.company_metadata));
+    const category = text(intel.category);
+    if (text(intel.checkedAt)) {
+      if (truthy(intel.strongIntent)) {
+        score += 100 + num(intel.score);
+        if (category === "maintenance_long") score += 160;
+        if (category === "no_website" || category === "parked") score += 130;
+        if (category === "broken") score += 120;
+        if (category === "outdated") score += 90;
+      } else {
+        score -= 250;
+      }
+    } else if (row.website_score > 0 && row.website_score < 45) {
+      score += 70;
+    }
+  }
   if (row.product_key === "seo" && row.seo_score > 0 && row.seo_score < 50) score += 55;
   return Math.round(score);
 }
@@ -323,13 +356,18 @@ async function seedRows(workspace: string, missingOnly = false) {
 async function seedOne(row: SeedLeadRow, product: ProductKey, workspace: string, source = "signal") {
   const values = defaultValues(product, row);
   const stage = defaultStage(row);
-  const score = Math.max(0, Math.min(100, Math.round(row.priority_score * 0.55 + row.opportunity_score * 0.45)));
+  const intel = websiteIntel(row.metadata);
+  const intelligenceScore = product === "website" && truthy(intel.strongIntent) ? num(intel.score) : 0;
+  const score = Math.max(0, Math.min(100, Math.round(Math.max(intelligenceScore, row.priority_score * 0.55 + row.opportunity_score * 0.45))));
   await query(`
     insert into sales_opportunities(
       id,workspace,lead_id,company_id,product_key,stage,status,source,setup_value,monthly_value,probability,score,next_action
     ) values($1,$2,$3,$4,$5,$6,'open',$7,$8,$9,$10,$11,$12)
     on conflict(workspace,lead_id,product_key) do update set
-      source=case when excluded.source='manual' then 'manual' else sales_opportunities.source end
+      source=case when excluded.source='manual' then 'manual' else sales_opportunities.source end,
+      score=greatest(sales_opportunities.score,excluded.score),
+      setup_value=case when sales_opportunities.source='manual' then sales_opportunities.setup_value else excluded.setup_value end,
+      updated_at=now()
   `, [
     crypto.randomUUID(), workspace, row.lead_id, row.company_id, product, stage, source,
     values.setup, values.monthly, stageProbability(stage), score, defaultActionForStage(stage),
