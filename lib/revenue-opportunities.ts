@@ -153,9 +153,9 @@ function jobCount(row: SeedLeadRow) {
 }
 
 function websiteWeak(row: SeedLeadRow) {
-  if (!row.website) return true;
   const intel = websiteIntel(row.metadata);
   if (text(intel.checkedAt)) return truthy(intel.strongIntent);
+  if (!row.website) return false;
   return row.website_score > 0 && row.website_score <= 45;
 }
 
