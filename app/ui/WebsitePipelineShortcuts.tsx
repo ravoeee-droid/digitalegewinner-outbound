@@ -1,18 +1,16 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 
-type Opportunity = {
-  product_key: string;
-  website: string;
-  website_score: number;
-  annual_value: number;
-  status: string;
-  stage: string;
+type PipelineStat = { count: number; value: number };
+type Stats = {
+  noWebsite?: PipelineStat;
+  badWebsite?: PipelineStat;
+  maintenanceLong?: PipelineStat;
+  outdated?: PipelineStat;
+  broken?: PipelineStat;
 };
-
-type Snapshot = { opportunities?: Opportunity[] };
 
 type Mode = "no-website" | "bad-website";
 
@@ -35,9 +33,7 @@ function clickPipeline(mode: Mode) {
   websiteButton?.click();
 
   const input = document.querySelector<HTMLInputElement>('input[aria-label="Leads durchsuchen"]');
-  if (input) {
-    setReactInputValue(input, mode === "no-website" ? "Keine Website erkannt" : "Website-Score");
-  }
+  if (input) setReactInputValue(input, mode === "no-website" ? "Keine Website" : "Schlechte Website");
 
   const pipelineButton = buttons.find((button) => {
     const text = button.textContent || "";
@@ -48,7 +44,7 @@ function clickPipeline(mode: Mode) {
 
 export default function WebsitePipelineShortcuts() {
   const [target, setTarget] = useState<Element | null>(null);
-  const [data, setData] = useState<Snapshot>({});
+  const [stats, setStats] = useState<Stats>({});
 
   useEffect(() => {
     const findTarget = () => {
@@ -68,26 +64,20 @@ export default function WebsitePipelineShortcuts() {
 
   useEffect(() => {
     let cancelled = false;
-    fetch("/api/revenue-opportunities", { cache: "no-store" })
+    fetch("/api/website-sales-intelligence", { cache: "no-store" })
       .then((response) => response.ok ? response.json() : Promise.reject())
-      .then((json: Snapshot) => { if (!cancelled) setData(json); })
+      .then((json: Stats) => { if (!cancelled) setStats(json); })
       .catch(() => undefined);
     return () => { cancelled = true; };
   }, []);
 
-  const stats = useMemo(() => {
-    const websiteRows = (data.opportunities || []).filter((item) =>
-      item.product_key === "website" && item.status === "open" && !["Gewonnen", "Verloren"].includes(item.stage)
-    );
-    const noWebsite = websiteRows.filter((item) => !String(item.website || "").trim());
-    const badWebsite = websiteRows.filter((item) => Boolean(String(item.website || "").trim()) && Number(item.website_score || 0) > 0 && Number(item.website_score || 0) < 72);
-    return {
-      noWebsite: { count: noWebsite.length, value: noWebsite.reduce((sum, item) => sum + Number(item.annual_value || 0), 0) },
-      badWebsite: { count: badWebsite.length, value: badWebsite.reduce((sum, item) => sum + Number(item.annual_value || 0), 0) },
-    };
-  }, [data]);
-
   if (!target) return null;
+
+  const noWebsite = stats.noWebsite || { count: 0, value: 0 };
+  const badWebsite = stats.badWebsite || { count: 0, value: 0 };
+  const maintenance = stats.maintenanceLong?.count || 0;
+  const outdated = stats.outdated?.count || 0;
+  const broken = stats.broken?.count || 0;
 
   const baseStyle = {
     width: "100%",
@@ -107,13 +97,13 @@ export default function WebsitePipelineShortcuts() {
     <>
       <button type="button" onClick={() => clickPipeline("no-website")} style={{ ...baseStyle, borderColor: "rgba(213,255,89,.28)" }}>
         <span style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, fontWeight: 900 }}><i style={{ width: 8, height: 8, borderRadius: 999, background: "#d5ff59", display: "inline-block" }} />Keine Website</span>
-        <small style={{ color: "rgba(255,255,255,.58)", fontSize: 10 }}>{stats.noWebsite.count} offen · direkt Website verkaufen</small>
-        <b style={{ fontSize: 13 }}>{compactEuro(stats.noWebsite.value)}</b>
+        <small style={{ color: "rgba(255,255,255,.58)", fontSize: 10 }}>{noWebsite.count} verifiziert · direkter Website-Hebel</small>
+        <b style={{ fontSize: 13 }}>{compactEuro(noWebsite.value)}</b>
       </button>
       <button type="button" onClick={() => clickPipeline("bad-website")} style={{ ...baseStyle, borderColor: "rgba(180,120,255,.28)" }}>
         <span style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, fontWeight: 900 }}><i style={{ width: 8, height: 8, borderRadius: 999, background: "#b478ff", display: "inline-block" }} />Schlechte Website</span>
-        <small style={{ color: "rgba(255,255,255,.58)", fontSize: 10 }}>{stats.badWebsite.count} offen · Relaunch-Hebel vorhanden</small>
-        <b style={{ fontSize: 13 }}>{compactEuro(stats.badWebsite.value)}</b>
+        <small style={{ color: "rgba(255,255,255,.58)", fontSize: 10 }}>{badWebsite.count} verifiziert · {maintenance} Wartung · {outdated} veraltet · {broken} kaputt</small>
+        <b style={{ fontSize: 13 }}>{compactEuro(badWebsite.value)}</b>
       </button>
     </>,
     target,
