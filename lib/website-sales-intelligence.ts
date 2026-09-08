@@ -1,5 +1,6 @@
 import { lookup } from "node:dns/promises";
 import { isIP } from "node:net";
+import { discoverBusinesses } from "./business-discovery";
 import { query } from "./db";
 import { ensureSalesOsSchema } from "./sales-os";
 
@@ -47,6 +48,8 @@ type Candidate = {
   company_id: string;
   lead_id: string;
   company: string;
+  city: string;
+  source: string;
   website: string;
   phone: string;
   metadata: JsonObject;
@@ -112,6 +115,37 @@ function normalizeWebsite(value = "") {
   }
 }
 
+function domainFromWebsite(value = "") {
+  try {
+    return new URL(normalizeWebsite(value)).hostname.toLowerCase().replace(/^www\./, "");
+  } catch {
+    return "";
+  }
+}
+
+function companyKey(value = "") {
+  return value
+    .toLowerCase()
+    .replace(/\b(gmbh|ug|haftungsbeschränkt|haftungsbeschraenkt|ag|kg|ohg|e\.?k\.?|mbh|gesellschaft|service|services)\b/g, " ")
+    .replace(/[^a-zäöüß0-9]+/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function namesMatch(a: string, b: string) {
+  const aa = companyKey(a);
+  const bb = companyKey(b);
+  if (!aa || !bb) return false;
+  if (aa === bb) return true;
+  if (aa.length >= 7 && bb.length >= 7 && (aa.includes(bb) || bb.includes(aa))) return true;
+  const aw = new Set(aa.split(" ").filter((word) => word.length >= 4));
+  const bw = new Set(bb.split(" ").filter((word) => word.length >= 4));
+  if (!aw.size || !bw.size) return false;
+  let shared = 0;
+  for (const word of aw) if (bw.has(word)) shared += 1;
+  return shared / Math.min(aw.size, bw.size) >= 0.75;
+}
+
 function isPrivateIp(ip: string) {
   const normalized = ip.toLowerCase();
   if (isIP(ip) === 4) {
@@ -142,7 +176,7 @@ async function fetchHtml(rawUrl: string): Promise<HtmlSnapshot> {
       redirect: "manual",
       cache: "no-store",
       headers: {
-        "user-agent": "DigitaleGewinner-WebsiteSalesIntelligence/1.0",
+        "user-agent": "DigitaleGewinner-WebsiteSalesIntelligence/1.1",
         accept: "text/html,application/xhtml+xml",
       },
       signal: AbortSignal.timeout(10_000),
@@ -190,14 +224,13 @@ async function waybackClosest(rawUrl: string, daysAgo: number) {
   const target = normalizeWebsite(rawUrl);
   const endpoint = `https://archive.org/wayback/available?url=${encodeURIComponent(target)}&timestamp=${isoDaysAgo(daysAgo)}`;
   try {
-    const response = await fetch(endpoint, { cache: "no-store", signal: AbortSignal.timeout(6_000), headers: { "user-agent": "DigitaleGewinner-WebsiteSalesIntelligence/1.0" } });
+    const response = await fetch(endpoint, { cache: "no-store", signal: AbortSignal.timeout(6_000), headers: { "user-agent": "DigitaleGewinner-WebsiteSalesIntelligence/1.1" } });
     if (!response.ok) return null;
     const json = await response.json() as { archived_snapshots?: { closest?: { available?: boolean; timestamp?: string; url?: string; status?: string } } };
     const closest = json.archived_snapshots?.closest;
     if (!closest?.available || !closest.timestamp || !closest.url) return null;
-    const original = target;
-    const rawArchiveUrl = `https://web.archive.org/web/${closest.timestamp}id_/${original}`;
-    const archived = await fetch(rawArchiveUrl, { cache: "no-store", signal: AbortSignal.timeout(8_000), headers: { "user-agent": "DigitaleGewinner-WebsiteSalesIntelligence/1.0" } });
+    const rawArchiveUrl = `https://web.archive.org/web/${closest.timestamp}id_/${target}`;
+    const archived = await fetch(rawArchiveUrl, { cache: "no-store", signal: AbortSignal.timeout(8_000), headers: { "user-agent": "DigitaleGewinner-WebsiteSalesIntelligence/1.1" } });
     if (!archived.ok) return null;
     const html = (await archived.text()).slice(0, 2_000_000);
     return { timestamp: closest.timestamp, html };
@@ -216,6 +249,12 @@ function dateFromWaybackTimestamp(value: string) {
 
 function maintenanceText(text: string) {
   return MAINTENANCE_RE.test(text);
+}
+
+function noWebsiteSourceVerified(row: Candidate) {
+  const discoverySource = String(row.metadata?.discovery_source || "").toLowerCase();
+  const source = String(row.source || "").toLowerCase();
+  return source.includes("google-places") || discoverySource.includes("google-places") || bool(row.metadata?.no_website_verified);
 }
 
 function storedClassification(row: Candidate): WebsiteSalesIntelligence {
@@ -239,9 +278,11 @@ function storedClassification(row: Candidate): WebsiteSalesIntelligence {
   const noViewport = metrics.hasViewport === false;
 
   if (!website) {
+    const verified = noWebsiteSourceVerified(row);
     return {
-      version: 1, checkedAt, category: "no_website", strongIntent: true, confidence: 100, score: 100,
-      label: "Keine Website", evidence: ["Kein eigener Webauftritt erkannt"],
+      version: 1, checkedAt, category: "no_website", strongIntent: verified, confidence: verified ? 94 : 45, score: verified ? 100 : 35,
+      label: verified ? "Keine Website im Unternehmensprofil bestätigt" : "Keine Website in Datenquelle · Gegenprüfung offen",
+      evidence: verified ? ["Primärquelle führt keinen eigenen Webauftritt"] : ["Website-Feld fehlt, aber das beweist noch nicht, dass keine Website existiert"],
       maintenance: { current: false, confirmedDays: 0, oldestConfirmedAt: "", archiveChecks: 0 },
       history: { unchangedYears: 0, similarity: 0, comparedAt: "" },
       current: { statusCode: 0, responseMs: 0, title: "" },
@@ -312,8 +353,74 @@ function storedClassification(row: Candidate): WebsiteSalesIntelligence {
   };
 }
 
+async function verifyNoWebsite(row: Candidate, base: WebsiteSalesIntelligence): Promise<WebsiteSalesIntelligence> {
+  const checkedAt = new Date().toISOString();
+  try {
+    const discovery = await discoverBusinesses({
+      query: `${row.company} ${row.city}`.trim(),
+      pageSize: 8,
+      locationHint: row.city || undefined,
+    });
+    const match = discovery.leads
+      .filter((item) => namesMatch(row.company, item.company))
+      .sort((a, b) => Number(Boolean(b.website)) - Number(Boolean(a.website)))[0];
+
+    if (match?.website) {
+      const website = normalizeWebsite(match.website);
+      const domain = domainFromWebsite(website);
+      await query(
+        `update sales_companies set website=$2,domain=case when $3<>'' then $3 else domain end,metadata=coalesce(metadata,'{}'::jsonb) || jsonb_build_object('website_recovered_from',$4),updated_at=now() where id=$1`,
+        [row.company_id, website, domain, match.source],
+      );
+      return {
+        ...base,
+        checkedAt,
+        category: "unknown",
+        strongIntent: false,
+        confidence: 96,
+        score: 10,
+        label: "Gegenprüfung hat eine Website gefunden",
+        evidence: [`${match.source}: offizieller Webauftritt ${website} gefunden`, "Lead darf nicht als 'Keine Website' verkauft werden"],
+      };
+    }
+
+    if (match && discovery.source === "google-places") {
+      return {
+        ...base,
+        checkedAt,
+        category: "no_website",
+        strongIntent: true,
+        confidence: 98,
+        score: 100,
+        label: "Keine Website nach Gegenprüfung bestätigt",
+        evidence: ["Google Places Gegenprüfung: passendes Unternehmen gefunden, aber kein Website-Link vorhanden"],
+      };
+    }
+
+    return {
+      ...base,
+      checkedAt,
+      strongIntent: false,
+      confidence: match ? 68 : 50,
+      score: 35,
+      label: "Keine Website · Gegenprüfung noch nicht belastbar",
+      evidence: [match ? `${discovery.source}: passendes Unternehmen ohne Website-Feld, Quelle aber nicht stark genug` : "Kein sicherer Unternehmens-Match in der Gegenprüfung"],
+    };
+  } catch (error) {
+    return {
+      ...base,
+      checkedAt,
+      strongIntent: false,
+      confidence: 40,
+      score: 30,
+      label: "Keine Website · Gegenprüfung fehlgeschlagen",
+      evidence: [`Gegenprüfung fehlgeschlagen: ${error instanceof Error ? error.message : "unbekannter Fehler"}`],
+    };
+  }
+}
+
 async function deepClassification(row: Candidate, base: WebsiteSalesIntelligence): Promise<WebsiteSalesIntelligence> {
-  if (!row.website || base.category === "no_website") return base;
+  if (!row.website || base.category === "no_website") return verifyNoWebsite(row, base);
   const checkedAt = new Date().toISOString();
   let live: HtmlSnapshot;
   try {
@@ -381,7 +488,7 @@ async function deepClassification(row: Candidate, base: WebsiteSalesIntelligence
   if (maintenanceNow) {
     if (confirmedDays >= 90) {
       evidence.length = 0;
-      evidence.push(`Wartungs-/Im-Aufbau-Seite aktuell bestätigt`);
+      evidence.push("Wartungs-/Im-Aufbau-Seite aktuell bestätigt");
       evidence.push(`Historischer Snapshot zeigt denselben Zustand vor mindestens ${confirmedDays} Tagen`);
       return {
         ...base, checkedAt, category: "maintenance_long", strongIntent: true, confidence: confirmedDays >= 365 ? 99 : confirmedDays >= 180 ? 97 : 94,
@@ -446,9 +553,10 @@ async function candidates(workspace: string, limit?: number, staleOnly = false) 
     or coalesce(c.metadata->'website_sales_intelligence'->>'checkedAt','')=''
     or (c.metadata->'website_sales_intelligence'->>'checkedAt')::timestamptz < now() - interval '3 days'
     or c.metadata->'website_sales_intelligence'->>'category' in ('maintenance_now','unknown')
+    or (c.metadata->'website_sales_intelligence'->>'category'='no_website' and coalesce(c.metadata->'website_sales_intelligence'->>'strongIntent','false')<>'true')
   )` : "";
   return query<Candidate>(`
-    select c.id company_id,l.id lead_id,c.name company,c.website,coalesce(ct.phone,c.phone,'') phone,c.metadata,
+    select c.id company_id,l.id lead_id,c.name company,c.city,c.source,c.website,coalesce(ct.phone,c.phone,'') phone,c.metadata,
            coalesce(rr.website_score,0)::int website_score,coalesce(rr.audit,'{}'::jsonb) audit
     from sales_leads l
     join sales_companies c on c.id=l.company_id and c.workspace=l.workspace
@@ -464,16 +572,16 @@ async function candidates(workspace: string, limit?: number, staleOnly = false) 
   `, values);
 }
 
-async function persist(row: Candidate, intel: WebsiteSalesIntelligence) {
+async function persist(row: Candidate, intel: WebsiteSalesIntelligence, workspace: string) {
   await query(
-    `update sales_companies set metadata=coalesce(metadata,'{}'::jsonb) || jsonb_build_object('website_sales_intelligence',$2::jsonb),updated_at=now()
-     where id=$1`,
-    [row.company_id, JSON.stringify(intel)],
+    `update sales_companies set metadata=coalesce(metadata,'{}'::jsonb) || jsonb_build_object('website_sales_intelligence',$3::jsonb),updated_at=now()
+     where id=$1 and workspace=$2`,
+    [row.company_id, workspace, JSON.stringify(intel)],
   );
   await query(
     `update sales_opportunities set score=greatest(score,$3),next_action=case when coalesce(next_action,'')='' or next_action='Jetzt anrufen und Bedarf qualifizieren' then $4 else next_action end,updated_at=now()
      where workspace=$1 and company_id=$2 and product_key='website' and status='open'`,
-    ["default", row.company_id, intel.score, intel.strongIntent ? `Website-Hebel: ${intel.label}` : "Website-Verkaufsgrund weiter verifizieren"],
+    [workspace, row.company_id, intel.score, intel.strongIntent ? `Website-Hebel: ${intel.label}` : "Website-Verkaufsgrund weiter verifizieren"],
   );
 }
 
@@ -484,7 +592,7 @@ export async function refreshStoredWebsiteSalesIntelligence(workspace = "default
   const categories: Record<string, number> = {};
   for (const row of rows) {
     const intel = storedClassification(row);
-    await persist(row, intel);
+    await persist(row, intel, workspace);
     if (intel.strongIntent) strong += 1;
     categories[intel.category] = (categories[intel.category] || 0) + 1;
   }
@@ -498,7 +606,7 @@ export async function refreshDeepWebsiteSalesIntelligence(workspace = "default",
   for (const row of rows) {
     const base = storedClassification(row);
     const intel = await deepClassification(row, base);
-    await persist(row, intel);
+    await persist(row, intel, workspace);
     results.push(intel);
   }
   return {
@@ -512,18 +620,18 @@ export async function refreshDeepWebsiteSalesIntelligence(workspace = "default",
 
 export async function getWebsiteSalesPipelineStats(workspace = "default") {
   await ensureSalesOsSchema();
-  const rows = await query<{ category: string; strong_intent: boolean; count: number; value: number }>(`
+  const rows = await query<{ category: string; count: number; value: number }>(`
     select coalesce(c.metadata->'website_sales_intelligence'->>'category','unknown') category,
-           coalesce((c.metadata->'website_sales_intelligence'->>'strongIntent')::boolean,false) strong_intent,
            count(distinct l.id)::int count,
            coalesce(sum(case when o.id is not null and o.status='open' then o.setup_value + o.monthly_value*12 else 0 end),0)::float8 value
     from sales_leads l
     join sales_companies c on c.id=l.company_id and c.workspace=l.workspace
     left join sales_opportunities o on o.workspace=l.workspace and o.lead_id=l.id and o.product_key='website'
     where l.workspace=$1 and l.status='active'
-    group by 1,2
+      and coalesce(c.metadata->'website_sales_intelligence'->>'strongIntent','false')='true'
+    group by 1
   `, [workspace]);
-  const by = new Map(rows.map((row) => [row.category, { count: Number(row.count || 0), value: Number(row.value || 0), strong: row.strong_intent }]));
+  const by = new Map(rows.map((row) => [row.category, { count: Number(row.count || 0), value: Number(row.value || 0) }]));
   const sum = (...keys: string[]) => keys.reduce((acc, key) => ({ count: acc.count + (by.get(key)?.count || 0), value: acc.value + (by.get(key)?.value || 0) }), { count: 0, value: 0 });
   return {
     noWebsite: sum("no_website", "parked"),
@@ -531,6 +639,6 @@ export async function getWebsiteSalesPipelineStats(workspace = "default") {
     maintenanceLong: sum("maintenance_long"),
     outdated: sum("outdated"),
     broken: sum("broken", "parked"),
-    strongTotal: rows.filter((row) => row.strong_intent).reduce((acc, row) => acc + Number(row.count || 0), 0),
+    strongTotal: rows.reduce((acc, row) => acc + Number(row.count || 0), 0),
   };
 }
