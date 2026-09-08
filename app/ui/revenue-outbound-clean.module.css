@@ -1,0 +1,134 @@
+.root{
+  --clean-text:#e7ebef;
+  --clean-muted:#87919e;
+  --clean-faint:#626d7a;
+  --clean-line:rgba(255,255,255,.065);
+  --clean-panel:rgba(255,255,255,.018);
+  font-size:14px;
+  letter-spacing:0;
+}
+
+.root strong,
+.root b{
+  font-weight:600 !important;
+}
+
+.root h1,
+.root h2,
+.root h3{
+  font-weight:590 !important;
+  text-wrap:balance;
+}
+
+.root button,
+.root a,
+.root input,
+.root select,
+.root textarea{
+  font-weight:500 !important;
+}
+
+.root small{
+  font-weight:400 !important;
+}
+
+.root aside{
+  width:auto;
+}
+
+.root aside > div:first-child strong{
+  font-weight:650 !important;
+}
+
+.root aside nav button{
+  min-height:40px;
+  border-radius:9px !important;
+}
+
+.root aside nav button span{
+  font-weight:500 !important;
+  letter-spacing:0 !important;
+}
+
+.root aside nav button b{
+  font-weight:500 !important;
+  opacity:.72;
+}
+
+.root aside button{
+  box-shadow:none !important;
+}
+
+.root aside button small{
+  line-height:1.35;
+  opacity:.78;
+}
+
+.root header button,
+.root header a{
+  letter-spacing:0 !important;
+}
+
+.root h1{
+  max-width:760px;
+  font-size:clamp(25px,2.5vw,36px) !important;
+  line-height:1.08 !important;
+  letter-spacing:-.035em !important;
+}
+
+.root h2{
+  letter-spacing:-.025em !important;
+}
+
+.root h3{
+  letter-spacing:-.012em !important;
+}
+
+.root section p{
+  color:var(--clean-muted) !important;
+}
+
+.root article{
+  box-shadow:none !important;
+}
+
+.root table th{
+  font-weight:520 !important;
+  letter-spacing:.045em !important;
+}
+
+.root table td strong{
+  font-weight:560 !important;
+}
+
+.root input,
+.root select,
+.root textarea{
+  font-size:12px !important;
+}
+
+.root [role="button"]:focus-visible,
+.root button:focus-visible,
+.root a:focus-visible,
+.root input:focus-visible,
+.root select:focus-visible,
+.root textarea:focus-visible{
+  outline:2px solid rgba(213,255,89,.55);
+  outline-offset:2px;
+}
+
+@media(min-width:961px){
+  .root > div{
+    grid-template-columns:238px minmax(0,1fr) !important;
+  }
+
+  .root aside{
+    padding:17px 13px !important;
+  }
+}
+
+@media(max-width:680px){
+  .root h1{
+    font-size:27px !important;
+  }
+}
