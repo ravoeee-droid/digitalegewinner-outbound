@@ -1,14 +1,14 @@
 import RevenueCommandDeck from "@/app/ui/RevenueCommandDeck";
-import CallConsole from "@/app/ui/CallConsole";
+import WebsiteBuildCockpit from "@/app/ui/WebsiteBuildCockpit";
 import CloudTalkPhone from "@/app/ui/CloudTalkPhone";
 
 export const dynamic = "force-dynamic";
 
-export default function CallPage() {
+export default function WebsitesPage() {
   return (
     <>
       <RevenueCommandDeck />
-      <CallConsole />
+      <WebsiteBuildCockpit />
       <CloudTalkPhone />
     </>
   );
