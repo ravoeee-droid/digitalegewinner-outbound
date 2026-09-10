@@ -40,7 +40,10 @@ export default function WebsiteBuildCockpit() {
       setProjects(json.projects || []); setError("");
     } catch (err) { setError(err instanceof Error ? err.message : "Build Stream konnte nicht geladen werden."); }
   }, []);
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    const timer = window.setTimeout(() => { void load(); }, 0);
+    return () => window.clearTimeout(timer);
+  }, [load]);
   useEffect(() => { if (!toast) return; const timer = window.setTimeout(() => setToast(""), 2600); return () => window.clearTimeout(timer); }, [toast]);
 
   const active = useMemo(() => projects.filter((item) => item.status === "active" && item.progress < 100), [projects]);
