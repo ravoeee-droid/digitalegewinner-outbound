@@ -9,6 +9,8 @@
  */
 
 import http from "node:http";
+import { lookup } from "node:dns/promises";
+import { isIP } from "node:net";
 import { browserbase, Stagehand } from "@browserbasehq/stagehand";
 import { z } from "zod/v4";
 
@@ -44,11 +46,55 @@ function json(res, status, payload) {
 
 async function readBody(req) {
   const chunks = [];
-  for await (const chunk of req) chunks.push(chunk);
+  let size = 0;
+  for await (const chunk of req) {
+    size += chunk.length;
+    if (size > 32_768) throw new Error("request_too_large");
+    chunks.push(chunk);
+  }
   return JSON.parse(Buffer.concat(chunks).toString("utf8") || "{}");
 }
 
-async function research(url) {
+function isPrivateIpv4(ip) {
+  const parts = ip.split(".").map(Number);
+  if (parts.length !== 4 || parts.some(part => !Number.isInteger(part) || part < 0 || part > 255)) return true;
+  const [a, b] = parts;
+  return a === 0 || a === 10 || a === 127
+    || (a === 100 && b >= 64 && b <= 127)
+    || (a === 169 && b === 254)
+    || (a === 172 && b >= 16 && b <= 31)
+    || (a === 192 && b === 168)
+    || (a === 198 && (b === 18 || b === 19))
+    || a >= 224;
+}
+
+function isPrivateAddress(address) {
+  const kind = isIP(address);
+  if (kind === 4) return isPrivateIpv4(address);
+  if (kind === 6) {
+    const value = address.toLowerCase();
+    return value === "::" || value === "::1" || value.startsWith("fe80:") || value.startsWith("fc") || value.startsWith("fd");
+  }
+  return true;
+}
+
+async function safePublicUrl(input) {
+  const parsed = new URL(input);
+  if (!["http:", "https:"].includes(parsed.protocol)) throw new Error("public_http_url_required");
+  if (parsed.username || parsed.password) throw new Error("embedded_credentials_blocked");
+  const hostname = parsed.hostname.toLowerCase().replace(/\.$/, "");
+  if (!hostname || hostname === "localhost" || hostname.endsWith(".localhost") || hostname.endsWith(".local") || hostname.endsWith(".internal")) {
+    throw new Error("private_target_blocked");
+  }
+  if (isIP(hostname) && isPrivateAddress(hostname)) throw new Error("private_target_blocked");
+  const addresses = await lookup(hostname, { all: true, verbatim: true }).catch(() => []);
+  if (!addresses.length || addresses.some(item => isPrivateAddress(item.address))) throw new Error("private_or_unresolvable_target_blocked");
+  parsed.hash = "";
+  return parsed.toString();
+}
+
+async function research(inputUrl) {
+  const url = await safePublicUrl(inputUrl);
   const BROWSERBASE_API_KEY = process.env.BROWSERBASE_API_KEY;
   const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
   if (!BROWSERBASE_API_KEY) throw new Error("BROWSERBASE_API_KEY fehlt im Stagehand Worker.");
@@ -109,7 +155,9 @@ const server = http.createServer(async (req, res) => {
     const data = await research(url);
     return json(res, 200, { ok: true, data });
   } catch (error) {
-    return json(res, 500, { error: error instanceof Error ? error.message : String(error) });
+    const message = error instanceof Error ? error.message : String(error);
+    const status = /blocked|required|too_large|unresolvable/.test(message) ? 400 : 500;
+    return json(res, status, { error: message });
   }
 });
 
