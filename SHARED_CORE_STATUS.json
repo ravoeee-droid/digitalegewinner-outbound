@@ -1,7 +1,7 @@
 {
   "contractVersion": "1.0.0",
   "instance": "DG-MAIN",
-  "updatedAt": "2026-08-27",
+  "updatedAt": "2026-09-11",
   "policy": "same-task-adapt-both-directions",
   "status": "parity-realignment-in-progress",
   "sharedSurfaces": {
@@ -17,7 +17,8 @@
     "leadDetailWorkspace": "local-implementation-exists-review-parity",
     "salesBrief": "needs-parity-review",
     "applicationFrame": "single-primary-workspace-no-parallel-pro-ui",
-    "studioGenericV3": "peer-webmotion-v3-blocked-no-equivalent-browser-render-seam"
+    "studioGenericV3": "peer-webmotion-v3-blocked-no-equivalent-browser-render-seam",
+    "autopilotOssIntelligence": "experimental-branch-adapted-peer-branch-in-progress"
   },
   "blockers": [
     {
