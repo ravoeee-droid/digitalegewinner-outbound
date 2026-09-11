@@ -25,9 +25,9 @@ export async function GET() {
       },
       trigger: {
         configured: triggerConfigured(),
-        version: "v3 REST",
+        version: "@trigger.dev/sdk 4.5.16 / v3 REST API",
         upstream: "triggerdotdev/trigger.dev",
-        license: "Apache-2.0",
+        license: "MIT (SDK)",
       },
       posthog: {
         configured: posthogConfigured(),
