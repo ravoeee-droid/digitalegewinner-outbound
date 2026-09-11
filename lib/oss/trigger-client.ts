@@ -1,11 +1,13 @@
 /*
- * Trigger.dev v3 REST adapter for DG Autopilot.
+ * Trigger.dev REST adapter for DG Autopilot.
  *
  * Upstream source used directly as implementation reference:
  * triggerdotdev/trigger.dev packages/core/src/v3/apiClient/index.ts
- * Apache-2.0. The official client calls
- * POST /api/v1/tasks/{taskIdentifier}/trigger and uses exponential retry
- * defaults of 5 attempts, 1s min, 30s max, factor 1.6.
+ * and packages/trigger-sdk/src/v3/shared.ts.
+ * Current observed @trigger.dev/sdk 4.5.16 is MIT licensed.
+ * The official client calls POST /api/v1/tasks/{taskIdentifier}/trigger,
+ * sends payload + TriggerOptions in the request body, and uses exponential
+ * retry defaults of 5 attempts, 1s min, 30s max, factor 1.6.
  */
 
 const DEFAULT_RETRY = {
@@ -30,7 +32,7 @@ function sleep(ms: number) {
 export async function triggerTask<TPayload extends Record<string, unknown>>(
   taskIdentifier: string,
   payload: TPayload,
-  options: { idempotencyKey?: string; tags?: string[]; maxAttempts?: number } = {},
+  options: { idempotencyKey?: string; idempotencyKeyTTL?: string; tags?: string[]; maxAttempts?: number } = {},
 ) {
   const secret = process.env.TRIGGER_SECRET_KEY?.trim();
   if (!secret) throw new Error("TRIGGER_SECRET_KEY fehlt.");
@@ -41,6 +43,11 @@ export async function triggerTask<TPayload extends Record<string, unknown>>(
 
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     try {
+      const triggerOptions = {
+        ...(options.tags?.length ? { tags: options.tags } : {}),
+        ...(options.idempotencyKey ? { idempotencyKey: options.idempotencyKey } : {}),
+        ...(options.idempotencyKeyTTL ? { idempotencyKeyTTL: options.idempotencyKeyTTL } : {}),
+      };
       const response = await fetch(
         `${triggerBaseUrl()}/api/v1/tasks/${encodeURIComponent(taskIdentifier)}/trigger`,
         {
@@ -48,11 +55,10 @@ export async function triggerTask<TPayload extends Record<string, unknown>>(
           headers: {
             authorization: `Bearer ${secret}`,
             "content-type": "application/json",
-            ...(options.idempotencyKey ? { "idempotency-key": options.idempotencyKey } : {}),
           },
           body: JSON.stringify({
             payload,
-            ...(options.tags?.length ? { options: { tags: options.tags } } : {}),
+            ...(Object.keys(triggerOptions).length ? { options: triggerOptions } : {}),
           }),
           cache: "no-store",
         },
