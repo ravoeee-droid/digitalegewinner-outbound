@@ -6,6 +6,7 @@ import { researchWithStagehand, stagehandConfigured, type StagehandResearch } fr
 import { buildAutopilotIntelligence } from "@/lib/oss/autopilot-intelligence";
 import { capturePosthogEvent } from "@/lib/oss/posthog-client";
 import { triggerConfigured, triggerTask } from "@/lib/oss/trigger-client";
+import { assertPublicHttpUrl } from "@/lib/oss/url-safety";
 
 export const dynamic = "force-dynamic";
 
@@ -39,11 +40,12 @@ async function nativeFallback(url: string): Promise<FirecrawlDocument> {
       redirect: "follow",
     });
     if (!response.ok) throw new Error(`Website HTTP ${response.status}`);
+    const finalUrl = await assertPublicHttpUrl(response.url || url);
     const html = await response.text();
     return {
       markdown: stripHtml(html),
       html: html.slice(0, 80_000),
-      metadata: { source: "native-fallback", status: response.status, finalUrl: response.url },
+      metadata: { source: "native-fallback", status: response.status, finalUrl },
     };
   } finally {
     clearTimeout(timeout);
@@ -66,7 +68,14 @@ export async function POST(request: Request) {
   const parsed = Input.safeParse(await request.json().catch(() => ({})));
   if (!parsed.success) return NextResponse.json({ error: "Ungültige Eingabe", issues: parsed.error.issues }, { status: 400 });
 
-  const { url, company, leadId, queueDurableWorkflow } = parsed.data;
+  const { company, leadId, queueDurableWorkflow } = parsed.data;
+  let url: string;
+  try {
+    url = await assertPublicHttpUrl(parsed.data.url);
+  } catch (error) {
+    return NextResponse.json({ error: error instanceof Error ? error.message : "Website wurde aus Sicherheitsgründen blockiert." }, { status: 400 });
+  }
+
   const distinctId = leadId || `research:${new URL(url).hostname}`;
   const startedAt = Date.now();
 
