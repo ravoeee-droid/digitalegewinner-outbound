@@ -1,24 +1,11 @@
-import RevenueCommandDeck from "@/app/ui/RevenueCommandDeck";
-import RevenueOutboundOS from "@/app/ui/RevenueOutboundOS";
-import WebsitePipelineShortcuts from "@/app/ui/WebsitePipelineShortcuts";
-import CloudTalkPhone from "@/app/ui/CloudTalkPhone";
-import DomainMailCenter from "@/app/ui/DomainMailCenter";
-import DomainMailBridge from "@/app/ui/DomainMailBridge";
-import clean from "@/app/ui/revenue-outbound-clean.module.css";
+import OutboundCommandCenter from "@/app/ui/OutboundCommandCenter";
+import IntegrationVaultWidget from "@/app/ui/IntegrationVaultWidget";
 
 export const dynamic = "force-dynamic";
 
 export default function OutboundPage() {
-  return (
-    <>
-      <RevenueCommandDeck />
-      <div className={clean.root}>
-        <RevenueOutboundOS />
-        <WebsitePipelineShortcuts />
-        <CloudTalkPhone />
-        <DomainMailCenter />
-        <DomainMailBridge />
-      </div>
-    </>
-  );
+  return <>
+    <OutboundCommandCenter />
+    <IntegrationVaultWidget />
+  </>;
 }

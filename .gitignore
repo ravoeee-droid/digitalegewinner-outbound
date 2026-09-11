@@ -1,2 +1,6 @@
 # ProjectAtlas local repository intelligence
 .projectatlas/
+
+# Local runtime secrets
+.env.local
+.env.*.local
