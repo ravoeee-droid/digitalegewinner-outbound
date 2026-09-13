@@ -11,6 +11,7 @@ export type DailyQualityLead = {
   city: string;
   website: string;
   domain: string;
+  email: string;
   phone: string;
   priorityScore: number;
   checkedAt: string;
@@ -39,6 +40,7 @@ export type DailyQualityReport = {
     legacyAPlus: number;
     unqualified: number;
     unqualifiedWithPhoneAndWebsite: number;
+    unqualifiedWithEmailAndWebsite: number;
     strictReady: number;
   };
   leads: DailyQualityLead[];
@@ -52,6 +54,7 @@ type QualityRow = {
   city: string;
   website: string;
   domain: string;
+  email: string;
   phone: string;
   priority_score: number | string;
   checked_at: string;
@@ -67,6 +70,7 @@ type FunnelRow = {
   legacy_a_plus: number | string;
   unqualified: number | string;
   unqualified_phone_website: number | string;
+  unqualified_email_website: number | string;
   strict_ready: number | string;
 };
 
@@ -101,6 +105,7 @@ function strictGateWhere() {
     and jsonb_typeof(c.metadata->'daily_qualification'->'websiteReason')='array'
     and jsonb_array_length(c.metadata->'daily_qualification'->'websiteReason') >= 1
     and coalesce(c.website,'') <> ''
+    and coalesce(ct.email,'') <> ''
     and coalesce(ct.phone,c.phone,'') <> ''
     and l.last_contact_at is null
     and l.stage in ('Neu','Research','Bereit')
@@ -133,6 +138,7 @@ export async function getDailyQualityLeadReport(limit = DAILY_QUALITY_TARGET): P
       count(*) filter(where l.status='active' and c.metadata->'daily_qualification'->>'tier'='A+' and ${ICP_SQL})::int legacy_a_plus,
       count(*) filter(where l.status='active' and c.metadata->'daily_qualification' is null and ${ICP_SQL})::int unqualified,
       count(*) filter(where l.status='active' and c.metadata->'daily_qualification' is null and coalesce(ct.phone,c.phone,'')<>'' and coalesce(c.website,'')<>'' and ${ICP_SQL})::int unqualified_phone_website,
+      count(*) filter(where l.status='active' and c.metadata->'daily_qualification' is null and coalesce(ct.email,'')<>'' and coalesce(c.website,'')<>'' and ${ICP_SQL})::int unqualified_email_website,
       (select count(*) from strict_ranked where rn=1)::int strict_ready
     from sales_companies c
     join sales_leads l on l.company_id=c.id and l.workspace=c.workspace
@@ -144,6 +150,7 @@ export async function getDailyQualityLeadReport(limit = DAILY_QUALITY_TARGET): P
     with ranked as (
       select
         l.id lead_id,c.id company_id,c.name company,c.city,c.website,c.domain,
+        coalesce(ct.email,'') email,
         coalesce(ct.phone,c.phone,'') phone,
         coalesce(nullif(c.metadata->'daily_qualification'->>'priorityScore','')::numeric,l.priority_score,0) priority_score,
         c.metadata->'daily_qualification'->>'checkedAt' checked_at,
@@ -161,7 +168,7 @@ export async function getDailyQualityLeadReport(limit = DAILY_QUALITY_TARGET): P
       left join sales_contacts ct on ct.id=l.contact_id
       where c.workspace='default' and ${strictWhere}
     )
-    select lead_id,company_id,company,city,website,domain,phone,priority_score,checked_at,relevant_open_jobs,latest_published_at,job_titles,website_reasons,website_scores
+    select lead_id,company_id,company,city,website,domain,email,phone,priority_score,checked_at,relevant_open_jobs,latest_published_at,job_titles,website_reasons,website_scores
     from ranked
     where rn=1
     order by priority_score desc, relevant_open_jobs desc, checked_at desc
@@ -179,6 +186,7 @@ export async function getDailyQualityLeadReport(limit = DAILY_QUALITY_TARGET): P
       city: row.city,
       website: row.website,
       domain: row.domain,
+      email: row.email,
       phone: row.phone,
       priorityScore: Math.round(Number(row.priority_score || 0)),
       checkedAt: row.checked_at,
@@ -190,6 +198,7 @@ export async function getDailyQualityLeadReport(limit = DAILY_QUALITY_TARGET): P
       proof: [
         `${jobs} bestätigte offene Pflege-Stelle${jobs === 1 ? "" : "n"}`,
         ...websiteReasons,
+        "E-Mail vorhanden",
         "Telefon vorhanden",
         "Firmentyp hart geprüft",
         "Firma/Dublette geprüft",
@@ -217,6 +226,7 @@ export async function getDailyQualityLeadReport(limit = DAILY_QUALITY_TARGET): P
       legacyAPlus: Number(funnel?.legacy_a_plus || 0),
       unqualified: Number(funnel?.unqualified || 0),
       unqualifiedWithPhoneAndWebsite: Number(funnel?.unqualified_phone_website || 0),
+      unqualifiedWithEmailAndWebsite: Number(funnel?.unqualified_email_website || 0),
       strictReady: ready,
     },
     leads,
@@ -225,7 +235,8 @@ export async function getDailyQualityLeadReport(limit = DAILY_QUALITY_TARGET): P
       "Mindestens eine aktuell bestätigte Pflege-Stelle",
       "Erreichbare Website vorhanden",
       "Website-Audit belegt mindestens ein konkretes Problem",
-      "Telefonnummer vorhanden",
+      "Öffentliche E-Mail-Adresse für Loom-Outreach vorhanden",
+      "Telefonnummer für Follow-up vorhanden",
       "Noch nicht kontaktiert / nicht gesperrt",
       `Qualifizierung maximal ${QUALITY_FRESH_DAYS} Tage alt`,
       "Dedupliziert nach Domain bzw. Firma + Ort",
