@@ -1,6 +1,7 @@
-import { getDailyQualityLeadReport, runDailyQualityLeadFill } from "@/lib/daily-quality-leads";
+import { getDailyQualityLeadReport } from "@/lib/daily-quality-leads";
 import { buildDailyOutboundPlan } from "@/lib/outbound-engine";
 import { triggerConfigured, triggerTask } from "@/lib/oss/trigger-client";
+import { runQualityLeadFill } from "@/lib/quality-lead-runner";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -15,7 +16,7 @@ async function run(request: Request) {
   try {
     const before = await getDailyQualityLeadReport();
     let durableRun: Record<string, unknown> | null = null;
-    let fallbackRun: Awaited<ReturnType<typeof runDailyQualityLeadFill>> | null = null;
+    let fallbackRun: Awaited<ReturnType<typeof runQualityLeadFill>> | null = null;
 
     if (before.ready < before.target && triggerConfigured()) {
       try {
@@ -26,10 +27,10 @@ async function run(request: Request) {
           { idempotencyKey: `dg-daily-quality-leads:${date}`, idempotencyKeyTTL: "24h", tags: ["daily-quality-leads", date] },
         );
       } catch {
-        fallbackRun = await runDailyQualityLeadFill({ maxCycles: 4, timeBudgetMs: 70_000 });
+        fallbackRun = await runQualityLeadFill({ maxCycles: 6, batchSize: 10, timeBudgetMs: 70_000 });
       }
     } else if (before.ready < before.target) {
-      fallbackRun = await runDailyQualityLeadFill({ maxCycles: 4, timeBudgetMs: 70_000 });
+      fallbackRun = await runQualityLeadFill({ maxCycles: 6, batchSize: 10, timeBudgetMs: 70_000 });
     }
 
     const quality = fallbackRun?.after || await getDailyQualityLeadReport();
