@@ -18,19 +18,19 @@ async function run(request: Request) {
     let durableRun: Record<string, unknown> | null = null;
     let fallbackRun: Awaited<ReturnType<typeof runQualityLeadFill>> | null = null;
 
-    if (before.ready < before.target && triggerConfigured()) {
+    if (before.ready < before.bufferTarget && triggerConfigured()) {
       try {
         const date = new Date().toISOString().slice(0, 10);
         durableRun = await triggerTask(
           "dg-daily-quality-leads",
-          { target: before.target, ready: before.ready, maxCycles: 48 },
-          { idempotencyKey: `dg-daily-quality-leads:${date}`, idempotencyKeyTTL: "24h", tags: ["daily-quality-leads", date] },
+          { dailyTarget: before.target, target: before.bufferTarget, ready: before.ready, maxCycles: 120 },
+          { idempotencyKey: `dg-daily-quality-leads:${date}`, idempotencyKeyTTL: "24h", tags: ["daily-quality-leads", date, "loom-120"] },
         );
       } catch {
-        fallbackRun = await runQualityLeadFill({ maxCycles: 6, batchSize: 10, timeBudgetMs: 70_000 });
+        fallbackRun = await runQualityLeadFill({ maxCycles: 8, batchSize: 15, timeBudgetMs: 100_000 });
       }
-    } else if (before.ready < before.target) {
-      fallbackRun = await runQualityLeadFill({ maxCycles: 6, batchSize: 10, timeBudgetMs: 70_000 });
+    } else if (before.ready < before.bufferTarget) {
+      fallbackRun = await runQualityLeadFill({ maxCycles: 8, batchSize: 15, timeBudgetMs: 100_000 });
     }
 
     const quality = fallbackRun?.after || await getDailyQualityLeadReport();
