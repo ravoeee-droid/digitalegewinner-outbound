@@ -93,7 +93,7 @@ export async function runDgAgent(input: {
       const rawArgs = safeJson(call.function.arguments);
       let toolContent = "";
       try {
-        const args = validateDgAgentToolArgs(name, rawArgs);
+        const args = validateDgAgentToolArgs(name, rawArgs) as Record<string, unknown>;
         const risk = dgAgentToolRisk(name) || "safe";
         if (dgAgentToolNeedsApproval(name)) {
           const actionId = await createPendingAgentAction({ threadId, toolName: name, args, risk }, workspace);
