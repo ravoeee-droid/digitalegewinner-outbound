@@ -4,26 +4,38 @@ function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-function endpoint() {
+function baseUrl() {
   const base = String(process.env.DG_APP_BASE_URL || "").trim().replace(/\/$/, "");
   if (!base) throw new Error("DG_APP_BASE_URL fehlt.");
-  return `${base}/api/cron/quality-lead-cycle`;
+  return base;
 }
 
-async function runCycle() {
+function authHeaders() {
   const secret = String(process.env.DG_CRON_SECRET || process.env.CRON_SECRET || "").trim();
   if (!secret) throw new Error("DG_CRON_SECRET/CRON_SECRET fehlt.");
-  const response = await fetch(endpoint(), {
+  return {
+    authorization: `Bearer ${secret}`,
+    "content-type": "application/json",
+  };
+}
+
+async function postJson(path) {
+  const response = await fetch(`${baseUrl()}${path}`, {
     method: "POST",
-    headers: {
-      authorization: `Bearer ${secret}`,
-      "content-type": "application/json",
-    },
+    headers: authHeaders(),
     body: "{}",
   });
   const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(String(data?.error || `Quality cycle HTTP ${response.status}`));
+  if (!response.ok) throw new Error(String(data?.error || `${path} HTTP ${response.status}`));
   return data;
+}
+
+async function runCycle() {
+  return postJson("/api/cron/quality-lead-cycle");
+}
+
+async function buildOutboundPlan() {
+  return postJson("/api/cron/outbound-plan");
 }
 
 export const dgDailyQualityLeads = task({
@@ -51,16 +63,22 @@ export const dgDailyQualityLeads = task({
       const strictPassed = Number(result?.strict?.passed || 0);
       const strictRejected = Number(result?.strict?.rejected || 0);
       const discovered = Number(result?.discovery?.discovered || 0);
-      const discoveryQualified = Array.isArray(result?.discovery?.qualified) ? result.discovery.qualified.length : 0;
-      runs.push({ cycle, ready, strictSelected, strictPassed, strictRejected, discovered, discoveryQualified, skipped: Boolean(result?.skipped) });
+      const jobSeeds = Number(result?.discovery?.jobSeeds || 0);
+      runs.push({ cycle, ready, strictSelected, strictPassed, strictRejected, discovered, jobSeeds, skipped: Boolean(result?.skipped) });
 
-      const activity = strictSelected + discovered + discoveryQualified;
+      const activity = strictSelected + discovered + jobSeeds;
       if (ready > previousReady || activity > 0) stalled = 0;
       else stalled += 1;
       previousReady = ready;
 
       if (result?.skipped || stalled >= 12) break;
       if (ready < target) await sleep(400);
+    }
+
+    let outbound = null;
+    if (ready >= dailyTarget) {
+      // Absichtlich erst NACH dem Quality Gate: so entstehen nie 120 Loom-Tasks aus einem schwächeren Ersatzpool.
+      outbound = await buildOutboundPlan();
     }
 
     return {
@@ -73,6 +91,8 @@ export const dgDailyQualityLeads = task({
       reachedDailyTarget: ready >= dailyTarget,
       reachedBuffer: ready >= target,
       daysOfCoverage: Number((ready / dailyTarget).toFixed(2)),
+      outboundPlanned: Boolean(outbound),
+      outbound,
       cycles: runs.length,
       stoppedBecause: ready >= target ? "buffer_reached" : stalled >= 12 ? "stalled" : runs.length >= maxCycles ? "cycle_limit" : "complete",
       runs,
