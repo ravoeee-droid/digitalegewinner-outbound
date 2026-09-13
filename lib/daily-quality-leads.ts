@@ -1,0 +1,270 @@
+import { query } from "./db";
+import { runLeadFactoryCycle } from "./daily-lead-factory";
+
+export const DAILY_QUALITY_TARGET = 60;
+export const QUALITY_FRESH_DAYS = 7;
+
+export type DailyQualityLead = {
+  leadId: string;
+  companyId: string;
+  company: string;
+  city: string;
+  website: string;
+  domain: string;
+  phone: string;
+  priorityScore: number;
+  checkedAt: string;
+  relevantOpenJobs: number;
+  latestPublishedAt: string;
+  jobTitles: string[];
+  websiteReasons: string[];
+  websiteScores: Record<string, number>;
+  proof: string[];
+};
+
+export type DailyQualityReport = {
+  target: number;
+  ready: number;
+  deficit: number;
+  status: "green" | "yellow" | "red";
+  generatedAt: string;
+  gateVersion: 3;
+  funnel: {
+    activeCandidates: number;
+    legacyAPlus: number;
+    unqualified: number;
+    unqualifiedWithPhoneAndWebsite: number;
+    strictReady: number;
+  };
+  leads: DailyQualityLead[];
+  gate: string[];
+};
+
+type QualityRow = {
+  lead_id: string;
+  company_id: string;
+  company: string;
+  city: string;
+  website: string;
+  domain: string;
+  phone: string;
+  priority_score: number | string;
+  checked_at: string;
+  relevant_open_jobs: number | string;
+  latest_published_at: string;
+  job_titles: unknown;
+  website_reasons: unknown;
+  website_scores: unknown;
+};
+
+type FunnelRow = {
+  active_candidates: number | string;
+  legacy_a_plus: number | string;
+  unqualified: number | string;
+  unqualified_phone_website: number | string;
+  strict_ready: number | string;
+};
+
+const ICP_SQL = `(c.metadata->>'pflege_icp_verified'='true' or lower(c.name) ~ '(pflegedienst|ambulant|sozialstation|diakoniestation|häuslich|haeuslich|krankenpflege|intensivpflege|pflegeteam|home care|home health)')
+  and lower(c.name) !~ '(pflegeheim|altenheim|seniorenheim|seniorenzentrum|seniorenresidenz|pflegezentrum|wohn-? und pflege|wohnpark|tagespflege|hospiz|krankenhaus|klinik|fußpflege|fusspflege|textilpflege|fahrzeugpflege|kosmetik|sanitätshaus|sanitaetshaus)'`;
+
+function toStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.map((item) => String(item || "").trim()).filter(Boolean);
+}
+
+function toNumberRecord(value: unknown): Record<string, number> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  return Object.fromEntries(
+    Object.entries(value as Record<string, unknown>).map(([key, item]) => [key, Number(item || 0)]),
+  );
+}
+
+function statusFor(ready: number): DailyQualityReport["status"] {
+  if (ready >= DAILY_QUALITY_TARGET) return "green";
+  if (ready >= Math.ceil(DAILY_QUALITY_TARGET * 0.65)) return "yellow";
+  return "red";
+}
+
+function strictGateWhere() {
+  return `
+    c.metadata->'daily_qualification'->>'tier'='A+'
+    and coalesce(c.metadata->'daily_qualification'->>'callReady','false')='true'
+    and coalesce(c.metadata->'daily_qualification'->>'websiteWeak','false')='true'
+    and coalesce(nullif(c.metadata->'daily_qualification'->>'version','')::int,0) >= 2
+    and coalesce(nullif(c.metadata->'daily_qualification'->'jobGrowth'->>'relevantOpenJobs','')::int,0) >= 1
+    and jsonb_typeof(c.metadata->'daily_qualification'->'websiteReason')='array'
+    and jsonb_array_length(c.metadata->'daily_qualification'->'websiteReason') >= 1
+    and coalesce(c.website,'') <> ''
+    and coalesce(ct.phone,c.phone,'') <> ''
+    and l.last_contact_at is null
+    and l.stage in ('Neu','Research','Bereit')
+    and not l.do_not_contact
+    and l.phone_status <> 'invalid'
+    and (c.metadata->'daily_qualification'->>'checkedAt')::timestamptz >= now() - interval '${QUALITY_FRESH_DAYS} days'
+    and ${ICP_SQL}
+  `;
+}
+
+export async function getDailyQualityLeadReport(limit = DAILY_QUALITY_TARGET): Promise<DailyQualityReport> {
+  const safeLimit = Math.max(1, Math.min(DAILY_QUALITY_TARGET, Math.round(limit || DAILY_QUALITY_TARGET)));
+  const strictWhere = strictGateWhere();
+
+  const [funnel] = await query<FunnelRow>(`
+    with strict_ranked as (
+      select
+        l.id,
+        row_number() over (
+          partition by coalesce(nullif(lower(c.domain),''), lower(c.name)||'|'||lower(c.city))
+          order by coalesce(nullif(c.metadata->'daily_qualification'->>'priorityScore','')::numeric,l.priority_score,0) desc,l.updated_at desc
+        ) rn
+      from sales_companies c
+      join sales_leads l on l.company_id=c.id and l.workspace=c.workspace and l.status='active'
+      left join sales_contacts ct on ct.id=l.contact_id
+      where c.workspace='default' and ${strictWhere}
+    )
+    select
+      count(*) filter(where l.status='active' and l.last_contact_at is null and ${ICP_SQL})::int active_candidates,
+      count(*) filter(where l.status='active' and c.metadata->'daily_qualification'->>'tier'='A+' and ${ICP_SQL})::int legacy_a_plus,
+      count(*) filter(where l.status='active' and c.metadata->'daily_qualification' is null and ${ICP_SQL})::int unqualified,
+      count(*) filter(where l.status='active' and c.metadata->'daily_qualification' is null and coalesce(ct.phone,c.phone,'')<>'' and coalesce(c.website,'')<>'' and ${ICP_SQL})::int unqualified_phone_website,
+      (select count(*) from strict_ranked where rn=1)::int strict_ready
+    from sales_companies c
+    join sales_leads l on l.company_id=c.id and l.workspace=c.workspace
+    left join sales_contacts ct on ct.id=l.contact_id
+    where c.workspace='default'
+  `);
+
+  const rows = await query<QualityRow>(`
+    with ranked as (
+      select
+        l.id lead_id,c.id company_id,c.name company,c.city,c.website,c.domain,
+        coalesce(ct.phone,c.phone,'') phone,
+        coalesce(nullif(c.metadata->'daily_qualification'->>'priorityScore','')::numeric,l.priority_score,0) priority_score,
+        c.metadata->'daily_qualification'->>'checkedAt' checked_at,
+        coalesce(nullif(c.metadata->'daily_qualification'->'jobGrowth'->>'relevantOpenJobs','')::int,0) relevant_open_jobs,
+        coalesce(c.metadata->'daily_qualification'->'jobGrowth'->>'latestPublishedAt','') latest_published_at,
+        coalesce((select jsonb_agg(role->>'title') from jsonb_array_elements(coalesce(c.metadata->'daily_qualification'->'jobGrowth'->'roles','[]'::jsonb)) role where coalesce(role->>'title','')<>''),'[]'::jsonb) job_titles,
+        coalesce(c.metadata->'daily_qualification'->'websiteReason','[]'::jsonb) website_reasons,
+        coalesce(c.metadata->'daily_qualification'->'websiteScores','{}'::jsonb) website_scores,
+        row_number() over (
+          partition by coalesce(nullif(lower(c.domain),''), lower(c.name)||'|'||lower(c.city))
+          order by coalesce(nullif(c.metadata->'daily_qualification'->>'priorityScore','')::numeric,l.priority_score,0) desc,l.updated_at desc
+        ) rn
+      from sales_companies c
+      join sales_leads l on l.company_id=c.id and l.workspace=c.workspace and l.status='active'
+      left join sales_contacts ct on ct.id=l.contact_id
+      where c.workspace='default' and ${strictWhere}
+    )
+    select lead_id,company_id,company,city,website,domain,phone,priority_score,checked_at,relevant_open_jobs,latest_published_at,job_titles,website_reasons,website_scores
+    from ranked
+    where rn=1
+    order by priority_score desc, relevant_open_jobs desc, checked_at desc
+    limit $1
+  `, [safeLimit]);
+
+  const leads = rows.map((row) => {
+    const websiteReasons = toStringArray(row.website_reasons);
+    const jobTitles = toStringArray(row.job_titles);
+    const jobs = Number(row.relevant_open_jobs || 0);
+    return {
+      leadId: row.lead_id,
+      companyId: row.company_id,
+      company: row.company,
+      city: row.city,
+      website: row.website,
+      domain: row.domain,
+      phone: row.phone,
+      priorityScore: Math.round(Number(row.priority_score || 0)),
+      checkedAt: row.checked_at,
+      relevantOpenJobs: jobs,
+      latestPublishedAt: row.latest_published_at,
+      jobTitles,
+      websiteReasons,
+      websiteScores: toNumberRecord(row.website_scores),
+      proof: [
+        `${jobs} bestätigte offene Pflege-Stelle${jobs === 1 ? "" : "n"}`,
+        ...websiteReasons,
+        "Telefon vorhanden",
+        "Firma/Dublette geprüft",
+      ],
+    } satisfies DailyQualityLead;
+  });
+
+  const ready = Number(funnel?.strict_ready || leads.length || 0);
+  return {
+    target: DAILY_QUALITY_TARGET,
+    ready,
+    deficit: Math.max(0, DAILY_QUALITY_TARGET - ready),
+    status: statusFor(ready),
+    generatedAt: new Date().toISOString(),
+    gateVersion: 3,
+    funnel: {
+      activeCandidates: Number(funnel?.active_candidates || 0),
+      legacyAPlus: Number(funnel?.legacy_a_plus || 0),
+      unqualified: Number(funnel?.unqualified || 0),
+      unqualifiedWithPhoneAndWebsite: Number(funnel?.unqualified_phone_website || 0),
+      strictReady: ready,
+    },
+    leads,
+    gate: [
+      "Ambulanter Pflegedienst im ICP",
+      "Mindestens eine aktuell bestätigte Pflege-Stelle",
+      "Erreichbare Website vorhanden",
+      "Website-Audit belegt mindestens ein konkretes Problem",
+      "Telefonnummer vorhanden",
+      "Noch nicht kontaktiert / nicht gesperrt",
+      `Qualifizierung maximal ${QUALITY_FRESH_DAYS} Tage alt`,
+      "Dedupliziert nach Domain bzw. Firma + Ort",
+      "Kein Auffüllen mit A/B/C-Leads",
+    ],
+  };
+}
+
+export async function runDailyQualityLeadFill(options: {
+  maxCycles?: number;
+  timeBudgetMs?: number;
+} = {}) {
+  const startedAt = Date.now();
+  const maxCycles = Math.max(1, Math.min(60, options.maxCycles ?? 12));
+  const timeBudgetMs = Math.max(10_000, Math.min(280_000, options.timeBudgetMs ?? 250_000));
+  const before = await getDailyQualityLeadReport();
+  let report = before;
+  let noProgress = 0;
+  const cycles: Array<Record<string, unknown>> = [];
+
+  while (report.ready < DAILY_QUALITY_TARGET && cycles.length < maxCycles && Date.now() - startedAt < timeBudgetMs) {
+    const previousReady = report.ready;
+    const cycle = await runLeadFactoryCycle(5);
+    report = await getDailyQualityLeadReport();
+    cycles.push({
+      cycle: cycles.length + 1,
+      strictReadyBefore: previousReady,
+      strictReadyAfter: report.ready,
+      discovered: cycle.discovered,
+      qualified: cycle.qualified,
+      failed: cycle.failed,
+      discoveryTask: cycle.discoveryTask,
+      discoveryWarning: cycle.discoveryWarning,
+      discoveryError: cycle.discoveryError,
+    });
+
+    noProgress = report.ready > previousReady ? 0 : noProgress + 1;
+    if (cycle.skipped || noProgress >= 5) break;
+  }
+
+  return {
+    ok: true,
+    target: DAILY_QUALITY_TARGET,
+    reachedTarget: report.ready >= DAILY_QUALITY_TARGET,
+    before,
+    after: report,
+    cycles,
+    elapsedMs: Date.now() - startedAt,
+    stoppedBecause:
+      report.ready >= DAILY_QUALITY_TARGET ? "target_reached" :
+      cycles.length >= maxCycles ? "cycle_limit" :
+      noProgress >= 5 ? "no_progress" :
+      Date.now() - startedAt >= timeBudgetMs ? "time_budget" : "complete",
+  };
+}
