@@ -1,4 +1,5 @@
-import { getDailyQualityLeadReport, runDailyQualityLeadFill } from "@/lib/daily-quality-leads";
+import { getDailyQualityLeadReport } from "@/lib/daily-quality-leads";
+import { runQualityLeadFill } from "@/lib/quality-lead-runner";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -17,7 +18,7 @@ export async function GET() {
 
 export async function POST() {
   try {
-    return Response.json(await runDailyQualityLeadFill({ maxCycles: 12, timeBudgetMs: 250_000 }));
+    return Response.json(await runQualityLeadFill({ maxCycles: 20, batchSize: 10, timeBudgetMs: 250_000 }));
   } catch (error) {
     return Response.json(
       { error: error instanceof Error ? error.message : "Quality-Lead-Lauf konnte nicht gestartet werden." },
