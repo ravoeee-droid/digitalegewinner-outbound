@@ -46,11 +46,15 @@ export const dgDailyQualityLeads = task({
     for (let cycle = 1; cycle <= maxCycles && ready < target; cycle += 1) {
       const result = await runCycle();
       ready = Number(result?.quality?.ready || 0);
-      const discovered = Number(result?.cycle?.discovered || 0);
-      const qualified = Array.isArray(result?.cycle?.qualified) ? result.cycle.qualified.length : 0;
-      runs.push({ cycle, ready, discovered, qualified, skipped: Boolean(result?.skipped) });
+      const strictSelected = Number(result?.strict?.selected || 0);
+      const strictPassed = Number(result?.strict?.passed || 0);
+      const strictRejected = Number(result?.strict?.rejected || 0);
+      const discovered = Number(result?.discovery?.discovered || 0);
+      const discoveryQualified = Array.isArray(result?.discovery?.qualified) ? result.discovery.qualified.length : 0;
+      runs.push({ cycle, ready, strictSelected, strictPassed, strictRejected, discovered, discoveryQualified, skipped: Boolean(result?.skipped) });
 
-      if (ready > previousReady || discovered > 0 || qualified > 0) stalled = 0;
+      const activity = strictSelected + discovered + discoveryQualified;
+      if (ready > previousReady || activity > 0) stalled = 0;
       else stalled += 1;
       previousReady = ready;
 
