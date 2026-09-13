@@ -65,8 +65,8 @@ type FunnelRow = {
   strict_ready: number | string;
 };
 
-const ICP_SQL = `(c.metadata->>'pflege_icp_verified'='true' or lower(c.name) ~ '(pflegedienst|ambulant|sozialstation|diakoniestation|häuslich|haeuslich|krankenpflege|intensivpflege|pflegeteam|home care|home health)')
-  and lower(c.name) !~ '(pflegeheim|altenheim|seniorenheim|seniorenzentrum|seniorenresidenz|pflegezentrum|wohn-? und pflege|wohnpark|tagespflege|hospiz|krankenhaus|klinik|fußpflege|fusspflege|textilpflege|fahrzeugpflege|kosmetik|sanitätshaus|sanitaetshaus)'`;
+const ICP_SQL = `lower(c.name||' '||coalesce(c.industry,'')) ~ '(pflegedienst|ambulant|ambulatory_care|sozialstation|diakoniestation|häuslich|haeuslich|krankenpflege|intensivpflege|pflegeteam|home care|home health)'
+  and lower(c.name) !~ '(pflegeheim|altenheim|seniorenheim|seniorenzentrum|seniorenresidenz|pflegezentrum|wohn-? und pflege|wohnpark|tagespflege|hospiz|krankenhaus|klinik|psychiatr|recrut|recruit|zeitarbeit|personaldienst|personalservice|arbeitnehmerüberlass|arbeitnehmerueberlass|arbeitsvermittlung|personalvermittlung|staffing|fußpflege|fusspflege|textilpflege|fahrzeugpflege|kosmetik|sanitätshaus|sanitaetshaus)'`;
 
 function toStringArray(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
@@ -186,6 +186,7 @@ export async function getDailyQualityLeadReport(limit = DAILY_QUALITY_TARGET): P
         `${jobs} bestätigte offene Pflege-Stelle${jobs === 1 ? "" : "n"}`,
         ...websiteReasons,
         "Telefon vorhanden",
+        "Firmentyp hart geprüft",
         "Firma/Dublette geprüft",
       ],
     } satisfies DailyQualityLead;
@@ -208,7 +209,7 @@ export async function getDailyQualityLeadReport(limit = DAILY_QUALITY_TARGET): P
     },
     leads,
     gate: [
-      "Ambulanter Pflegedienst im ICP",
+      "Firmentyp hart als ambulanter Pflegedienst bestätigt (kein Recruiter, Heim, Klinik oder Psychiatrie)",
       "Mindestens eine aktuell bestätigte Pflege-Stelle",
       "Erreichbare Website vorhanden",
       "Website-Audit belegt mindestens ein konkretes Problem",
