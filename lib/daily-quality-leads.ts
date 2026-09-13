@@ -1,7 +1,7 @@
 import { query } from "./db";
-import { runLeadFactoryCycle } from "./daily-lead-factory";
 
-export const DAILY_QUALITY_TARGET = 60;
+export const DAILY_QUALITY_TARGET = 120;
+export const DAILY_QUALITY_BUFFER_TARGET = 240;
 export const QUALITY_FRESH_DAYS = 7;
 
 export type DailyQualityLead = {
@@ -24,8 +24,13 @@ export type DailyQualityLead = {
 
 export type DailyQualityReport = {
   target: number;
+  bufferTarget: number;
   ready: number;
+  availableToday: number;
+  reserveReady: number;
   deficit: number;
+  bufferDeficit: number;
+  daysOfCoverage: number;
   status: "green" | "yellow" | "red";
   generatedAt: string;
   gateVersion: 3;
@@ -81,8 +86,8 @@ function toNumberRecord(value: unknown): Record<string, number> {
 }
 
 function statusFor(ready: number): DailyQualityReport["status"] {
-  if (ready >= DAILY_QUALITY_TARGET) return "green";
-  if (ready >= Math.ceil(DAILY_QUALITY_TARGET * 0.65)) return "yellow";
+  if (ready >= DAILY_QUALITY_BUFFER_TARGET) return "green";
+  if (ready >= DAILY_QUALITY_TARGET) return "yellow";
   return "red";
 }
 
@@ -91,7 +96,7 @@ function strictGateWhere() {
     c.metadata->'daily_qualification'->>'tier'='A+'
     and coalesce(c.metadata->'daily_qualification'->>'callReady','false')='true'
     and coalesce(c.metadata->'daily_qualification'->>'websiteWeak','false')='true'
-    and coalesce(nullif(c.metadata->'daily_qualification'->>'version','')::int,0) >= 2
+    and coalesce(nullif(c.metadata->'daily_qualification'->>'version','')::int,0) >= 3
     and coalesce(nullif(c.metadata->'daily_qualification'->'jobGrowth'->>'relevantOpenJobs','')::int,0) >= 1
     and jsonb_typeof(c.metadata->'daily_qualification'->'websiteReason')='array'
     and jsonb_array_length(c.metadata->'daily_qualification'->'websiteReason') >= 1
@@ -193,10 +198,17 @@ export async function getDailyQualityLeadReport(limit = DAILY_QUALITY_TARGET): P
   });
 
   const ready = Number(funnel?.strict_ready || leads.length || 0);
+  const availableToday = Math.min(DAILY_QUALITY_TARGET, ready);
+  const reserveReady = Math.max(0, ready - DAILY_QUALITY_TARGET);
   return {
     target: DAILY_QUALITY_TARGET,
+    bufferTarget: DAILY_QUALITY_BUFFER_TARGET,
     ready,
+    availableToday,
+    reserveReady,
     deficit: Math.max(0, DAILY_QUALITY_TARGET - ready),
+    bufferDeficit: Math.max(0, DAILY_QUALITY_BUFFER_TARGET - ready),
+    daysOfCoverage: Number((ready / DAILY_QUALITY_TARGET).toFixed(2)),
     status: statusFor(ready),
     generatedAt: new Date().toISOString(),
     gateVersion: 3,
@@ -218,54 +230,7 @@ export async function getDailyQualityLeadReport(limit = DAILY_QUALITY_TARGET): P
       `Qualifizierung maximal ${QUALITY_FRESH_DAYS} Tage alt`,
       "Dedupliziert nach Domain bzw. Firma + Ort",
       "Kein Auffüllen mit A/B/C-Leads",
+      `Tagesziel ${DAILY_QUALITY_TARGET}; Sicherheitsbestand ${DAILY_QUALITY_BUFFER_TARGET}`,
     ],
-  };
-}
-
-export async function runDailyQualityLeadFill(options: {
-  maxCycles?: number;
-  timeBudgetMs?: number;
-} = {}) {
-  const startedAt = Date.now();
-  const maxCycles = Math.max(1, Math.min(60, options.maxCycles ?? 12));
-  const timeBudgetMs = Math.max(10_000, Math.min(280_000, options.timeBudgetMs ?? 250_000));
-  const before = await getDailyQualityLeadReport();
-  let report = before;
-  let noProgress = 0;
-  const cycles: Array<Record<string, unknown>> = [];
-
-  while (report.ready < DAILY_QUALITY_TARGET && cycles.length < maxCycles && Date.now() - startedAt < timeBudgetMs) {
-    const previousReady = report.ready;
-    const cycle = await runLeadFactoryCycle(5);
-    report = await getDailyQualityLeadReport();
-    cycles.push({
-      cycle: cycles.length + 1,
-      strictReadyBefore: previousReady,
-      strictReadyAfter: report.ready,
-      discovered: cycle.discovered,
-      qualified: cycle.qualified,
-      failed: cycle.failed,
-      discoveryTask: cycle.discoveryTask,
-      discoveryWarning: cycle.discoveryWarning,
-      discoveryError: cycle.discoveryError,
-    });
-
-    noProgress = report.ready > previousReady ? 0 : noProgress + 1;
-    if (cycle.skipped || noProgress >= 5) break;
-  }
-
-  return {
-    ok: true,
-    target: DAILY_QUALITY_TARGET,
-    reachedTarget: report.ready >= DAILY_QUALITY_TARGET,
-    before,
-    after: report,
-    cycles,
-    elapsedMs: Date.now() - startedAt,
-    stoppedBecause:
-      report.ready >= DAILY_QUALITY_TARGET ? "target_reached" :
-      cycles.length >= maxCycles ? "cycle_limit" :
-      noProgress >= 5 ? "no_progress" :
-      Date.now() - startedAt >= timeBudgetMs ? "time_budget" : "complete",
   };
 }
