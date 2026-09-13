@@ -18,7 +18,7 @@ export async function GET() {
 
 export async function POST() {
   try {
-    return Response.json(await runQualityLeadFill({ maxCycles: 20, batchSize: 10, timeBudgetMs: 250_000 }));
+    return Response.json(await runQualityLeadFill({ maxCycles: 24, batchSize: 15, timeBudgetMs: 250_000 }));
   } catch (error) {
     return Response.json(
       { error: error instanceof Error ? error.message : "Quality-Lead-Lauf konnte nicht gestartet werden." },
