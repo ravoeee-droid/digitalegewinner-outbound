@@ -1,5 +1,4 @@
-import { getDailyQualityLeadReport } from "@/lib/daily-quality-leads";
-import { runLeadFactoryCycle } from "@/lib/daily-lead-factory";
+import { runQualityLeadCycle } from "@/lib/quality-lead-runner";
 
 export const runtime = "nodejs";
 export const maxDuration = 90;
@@ -13,11 +12,8 @@ function authorized(request: Request) {
 async function run(request: Request) {
   if (!authorized(request)) return Response.json({ error: "Unauthorized" }, { status: 401 });
   try {
-    const before = await getDailyQualityLeadReport();
-    if (before.deficit === 0) return Response.json({ ok: true, skipped: true, quality: before });
-    const cycle = await runLeadFactoryCycle(5);
-    const quality = await getDailyQualityLeadReport();
-    return Response.json({ ok: true, skipped: false, cycle, quality });
+    const result = await runQualityLeadCycle(10);
+    return Response.json({ ...result, quality: result.after });
   } catch (error) {
     return Response.json(
       { error: error instanceof Error ? error.message : "Quality-Lead-Cycle fehlgeschlagen." },
