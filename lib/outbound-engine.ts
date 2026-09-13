@@ -4,7 +4,7 @@ import { ensureSalesOsSchema } from "./sales-os";
 export const OUTBOUND_TARGETS = {
   call: 120,
   email: 100,
-  video: 30,
+  video: 120,
   linkedin: 30,
 } as const;
 
@@ -73,6 +73,7 @@ const baseCandidateSql = `
   where l.workspace=$1
     and l.status='active'
     and l.stage in ('Neu','Research','Bereit')
+    and l.last_contact_at is null
     and coalesce(l.do_not_contact,false)=false
 `;
 
@@ -81,6 +82,12 @@ function insertChannelSql(channel: OutboundChannel, extraWhere: string, target: 
     with candidates as (
       ${baseCandidateSql}
       and ${extraWhere}
+    ), deduped as (
+      select *, row_number() over (
+        partition by coalesce(nullif(lower(website),''), lower(company)||'|'||lower(city))
+        order by score desc,job_count desc,company asc
+      ) as company_rn
+      from candidates
     ), ranked as (
       select *, row_number() over (
         order by
@@ -89,7 +96,8 @@ function insertChannelSql(channel: OutboundChannel, extraWhere: string, target: 
           job_count desc,
           company asc
       )::int as rn
-      from candidates
+      from deduped
+      where company_rn=1
     )
     insert into sales_outbound_tasks(
       id,workspace,task_date,lead_id,company_id,channel,rank,score,status,payload
@@ -126,12 +134,24 @@ function insertChannelSql(channel: OutboundChannel, extraWhere: string, target: 
   `;
 }
 
+const LOOM_READY_SQL = `
+  coalesce(ct.email,'')<>''
+  and coalesce(ct.phone,c.phone,'')<>''
+  and coalesce(c.website,'')<>''
+  and c.metadata->'daily_qualification'->>'tier'='A+'
+  and coalesce(c.metadata->'daily_qualification'->>'qualityGatePassed','false')='true'
+  and coalesce(c.metadata->'daily_qualification'->>'websiteWeak','false')='true'
+  and coalesce(nullif(c.metadata->'daily_qualification'->>'version','')::int,0)>=3
+  and coalesce(nullif(c.metadata->'daily_qualification'->'jobGrowth'->>'relevantOpenJobs','')::int,0)>=1
+  and (c.metadata->'daily_qualification'->>'checkedAt')::timestamptz >= now() - interval '7 days'
+`;
+
 export async function buildDailyOutboundPlan(workspace = "default") {
   await ensureOutboundEngineSchema();
 
   await query(insertChannelSql("call", "coalesce(ct.phone,c.phone,'')<>''", OUTBOUND_TARGETS.call), [workspace]);
   await query(insertChannelSql("email", "coalesce(ct.email,'')<>''", OUTBOUND_TARGETS.email), [workspace]);
-  await query(insertChannelSql("video", "coalesce(ct.email,'')<>'' and coalesce(c.website,'')<>''", OUTBOUND_TARGETS.video), [workspace]);
+  await query(insertChannelSql("video", LOOM_READY_SQL, OUTBOUND_TARGETS.video), [workspace]);
   await query(insertChannelSql("linkedin", "coalesce(ct.linkedin,'')<>''", OUTBOUND_TARGETS.linkedin), [workspace]);
 
   return getOutboundEngineSnapshot(workspace);
@@ -154,7 +174,7 @@ export async function getOutboundEngineSnapshot(workspace = "default") {
     from sales_outbound_tasks
     where workspace=$1 and task_date=(now() at time zone 'Europe/Berlin')::date
     order by case channel when 'call' then 0 when 'email' then 1 when 'video' then 2 else 3 end, rank asc
-    limit 320
+    limit 500
   `, [workspace]);
 
   const byChannel = Object.fromEntries((Object.keys(OUTBOUND_TARGETS) as OutboundChannel[]).map((channel) => {
@@ -193,10 +213,16 @@ export async function updateOutboundTask(id: string, status: string, workspace =
   await ensureOutboundEngineSchema();
   const allowed = new Set(["ready", "drafted", "queued", "sent", "done", "completed", "skipped", "failed"]);
   if (!allowed.has(status)) throw new Error("Ungültiger Task-Status.");
-  await query(
-    `update sales_outbound_tasks set status=$3,updated_at=now() where id=$1 and workspace=$2`,
+  const rows = await query<{ lead_id: string }>(
+    `update sales_outbound_tasks set status=$3,updated_at=now() where id=$1 and workspace=$2 returning lead_id`,
     [id, workspace, status],
   );
+  if (rows[0]?.lead_id && ["sent", "done", "completed"].includes(status)) {
+    await query(
+      `update sales_leads set last_contact_at=coalesce(last_contact_at,now()),updated_at=now() where id=$1 and workspace=$2`,
+      [rows[0].lead_id, workspace],
+    );
+  }
 }
 
 export async function prepareLinkedInDrafts(limit: number = OUTBOUND_TARGETS.linkedin, workspace = "default") {
