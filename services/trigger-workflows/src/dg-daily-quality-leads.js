@@ -43,9 +43,9 @@ export const dgDailyQualityLeads = task({
   retry: {
     maxAttempts: 4,
     factor: 1.6,
-    minTimeoutInMs: 2000,
-    maxTimeoutInMs: 30_000,
-    randomize: false,
+    minTimeoutInMs: 5000,
+    maxTimeoutInMs: 60_000,
+    randomize: true,
   },
   run: async payload => {
     const dailyTarget = Math.max(1, Math.min(200, Number(payload?.dailyTarget || 120)));
@@ -75,26 +75,29 @@ export const dgDailyQualityLeads = task({
       if (ready < target) await sleep(400);
     }
 
-    let outbound = null;
-    if (ready >= dailyTarget) {
-      // Absichtlich erst NACH dem Quality Gate: so entstehen nie 120 Loom-Tasks aus einem schwächeren Ersatzpool.
-      outbound = await buildOutboundPlan();
+    if (ready < dailyTarget) {
+      // Unter 120 ist der Lauf operativ nicht erfolgreich. Throw aktiviert die Trigger-Retries,
+      // statt einen roten Tagesbestand fälschlich als erfolgreich abzuschließen.
+      throw new Error(`Loom Lead Supply unter Tagesziel: ${ready}/${dailyTarget}. Automatischer Retry erforderlich.`);
     }
+
+    // Absichtlich erst NACH dem Quality Gate: so entstehen nie 120 Loom-Tasks aus einem schwächeren Ersatzpool.
+    const outbound = await buildOutboundPlan();
 
     return {
       ok: true,
       dailyTarget,
       target,
       ready,
-      dailyDeficit: Math.max(0, dailyTarget - ready),
+      dailyDeficit: 0,
       bufferDeficit: Math.max(0, target - ready),
-      reachedDailyTarget: ready >= dailyTarget,
+      reachedDailyTarget: true,
       reachedBuffer: ready >= target,
       daysOfCoverage: Number((ready / dailyTarget).toFixed(2)),
-      outboundPlanned: Boolean(outbound),
+      outboundPlanned: true,
       outbound,
       cycles: runs.length,
-      stoppedBecause: ready >= target ? "buffer_reached" : stalled >= 12 ? "stalled" : runs.length >= maxCycles ? "cycle_limit" : "complete",
+      stoppedBecause: ready >= target ? "buffer_reached" : stalled >= 12 ? "daily_ready_buffer_stalled" : runs.length >= maxCycles ? "daily_ready_cycle_limit" : "daily_ready",
       runs,
     };
   },
