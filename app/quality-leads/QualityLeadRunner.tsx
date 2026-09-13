@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import styles from "./quality-leads.module.css";
 
 export default function QualityLeadRunner() {
   const [state, setState] = useState<"idle" | "running" | "done" | "error">("idle");
@@ -26,7 +27,7 @@ export default function QualityLeadRunner() {
   }
 
   return (
-    <div className="qualityRunner">
+    <div className={styles.runner}>
       <button type="button" onClick={run} disabled={state === "running"}>
         {state === "running" ? "Quality-Lauf läuft …" : "Jetzt bis 60 nachqualifizieren"}
       </button>
