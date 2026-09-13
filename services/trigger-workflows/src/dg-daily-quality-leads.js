@@ -29,15 +29,16 @@ async function runCycle() {
 export const dgDailyQualityLeads = task({
   id: "dg-daily-quality-leads",
   retry: {
-    maxAttempts: 3,
+    maxAttempts: 4,
     factor: 1.6,
     minTimeoutInMs: 2000,
     maxTimeoutInMs: 30_000,
     randomize: false,
   },
   run: async payload => {
-    const target = Math.max(1, Math.min(60, Number(payload?.target || 60)));
-    const maxCycles = Math.max(1, Math.min(60, Number(payload?.maxCycles || 48)));
+    const dailyTarget = Math.max(1, Math.min(200, Number(payload?.dailyTarget || 120)));
+    const target = Math.max(dailyTarget, Math.min(400, Number(payload?.target || 240)));
+    const maxCycles = Math.max(1, Math.min(160, Number(payload?.maxCycles || 120)));
     const runs = [];
     let ready = Number(payload?.ready || 0);
     let previousReady = ready;
@@ -58,18 +59,22 @@ export const dgDailyQualityLeads = task({
       else stalled += 1;
       previousReady = ready;
 
-      if (result?.skipped || stalled >= 8) break;
-      if (ready < target) await sleep(350);
+      if (result?.skipped || stalled >= 12) break;
+      if (ready < target) await sleep(400);
     }
 
     return {
       ok: true,
+      dailyTarget,
       target,
       ready,
-      deficit: Math.max(0, target - ready),
-      reachedTarget: ready >= target,
+      dailyDeficit: Math.max(0, dailyTarget - ready),
+      bufferDeficit: Math.max(0, target - ready),
+      reachedDailyTarget: ready >= dailyTarget,
+      reachedBuffer: ready >= target,
+      daysOfCoverage: Number((ready / dailyTarget).toFixed(2)),
       cycles: runs.length,
-      stoppedBecause: ready >= target ? "target_reached" : stalled >= 8 ? "stalled" : runs.length >= maxCycles ? "cycle_limit" : "complete",
+      stoppedBecause: ready >= target ? "buffer_reached" : stalled >= 12 ? "stalled" : runs.length >= maxCycles ? "cycle_limit" : "complete",
       runs,
     };
   },
