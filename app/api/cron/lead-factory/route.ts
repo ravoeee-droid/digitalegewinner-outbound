@@ -1,8 +1,9 @@
-import { runLeadFactoryCycle } from "@/lib/daily-lead-factory";
+import { getDailyQualityLeadReport, runDailyQualityLeadFill } from "@/lib/daily-quality-leads";
 import { buildDailyOutboundPlan } from "@/lib/outbound-engine";
+import { triggerConfigured, triggerTask } from "@/lib/oss/trigger-client";
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 function authorized(request: Request) {
   const expected = process.env.CRON_SECRET;
@@ -12,10 +13,33 @@ function authorized(request: Request) {
 async function run(request: Request) {
   if (!authorized(request)) return Response.json({ error: "Unauthorized" }, { status: 401 });
   try {
-    const result = await runLeadFactoryCycle(5);
+    const before = await getDailyQualityLeadReport();
+    let durableRun: Record<string, unknown> | null = null;
+    let fallbackRun: Awaited<ReturnType<typeof runDailyQualityLeadFill>> | null = null;
+
+    if (before.ready < before.target && triggerConfigured()) {
+      try {
+        const date = new Date().toISOString().slice(0, 10);
+        durableRun = await triggerTask(
+          "dg-daily-quality-leads",
+          { target: before.target, ready: before.ready, maxCycles: 48 },
+          { idempotencyKey: `dg-daily-quality-leads:${date}`, idempotencyKeyTTL: "24h", tags: ["daily-quality-leads", date] },
+        );
+      } catch {
+        fallbackRun = await runDailyQualityLeadFill({ maxCycles: 4, timeBudgetMs: 70_000 });
+      }
+    } else if (before.ready < before.target) {
+      fallbackRun = await runDailyQualityLeadFill({ maxCycles: 4, timeBudgetMs: 70_000 });
+    }
+
+    const quality = fallbackRun?.after || await getDailyQualityLeadReport();
     const outbound = await buildDailyOutboundPlan();
     return Response.json({
-      ...result,
+      ok: true,
+      quality,
+      durableQueued: Boolean(durableRun),
+      durableRun,
+      fallbackRun,
       outbound: {
         date: outbound.date,
         channels: outbound.channels,
