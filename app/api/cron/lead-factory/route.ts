@@ -34,18 +34,21 @@ async function run(request: Request) {
     }
 
     const quality = fallbackRun?.after || await getDailyQualityLeadReport();
-    const outbound = await buildDailyOutboundPlan();
+    const canPlanNow = !durableRun && quality.ready >= quality.target;
+    const outbound = canPlanNow ? await buildDailyOutboundPlan() : null;
+
     return Response.json({
       ok: true,
       quality,
       durableQueued: Boolean(durableRun),
       durableRun,
       fallbackRun,
-      outbound: {
+      outboundDeferred: Boolean(durableRun) || quality.ready < quality.target,
+      outbound: outbound ? {
         date: outbound.date,
         channels: outbound.channels,
         targets: outbound.targets,
-      },
+      } : null,
     });
   } catch (error) {
     return Response.json({ error: error instanceof Error ? error.message : "Lead Factory fehlgeschlagen." }, { status: 500 });
