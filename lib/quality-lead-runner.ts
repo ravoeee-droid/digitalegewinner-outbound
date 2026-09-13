@@ -1,5 +1,5 @@
 import { DAILY_QUALITY_BUFFER_TARGET, DAILY_QUALITY_TARGET, getDailyQualityLeadReport } from "./daily-quality-leads";
-import { runLeadFactoryCycle } from "./daily-lead-factory";
+import { runQualitySupplyDiscovery } from "./quality-lead-discovery";
 import { runStrictQualityQualificationBatch } from "./strict-quality-qualifier";
 
 export async function runQualityLeadCycle(batchSize = 15) {
@@ -8,14 +8,19 @@ export async function runQualityLeadCycle(batchSize = 15) {
     return { ok: true, skipped: true, reason: "buffer_reached", before, after: before, strict: null, discovery: null };
   }
 
-  const strict = await runStrictQualityQualificationBatch(batchSize);
-  let discovery: Awaited<ReturnType<typeof runLeadFactoryCycle>> | null = null;
+  // Discovery und Qualifizierung arbeiten auf getrennten Kandidatenmengen:
+  // Discovery fügt nur neue/aktualisierte Firmen hinzu, Gate v3 entscheidet anschließend unabhängig über A+.
+  const [strictResult, discoveryResult] = await Promise.allSettled([
+    runStrictQualityQualificationBatch(batchSize),
+    runQualitySupplyDiscovery(),
+  ]);
 
-  // Discovery bleibt bewusst warm, solange der 2-Tages-Puffer nicht voll ist.
-  // Sie läuft NACH der strengen Qualifizierung, damit v2/v3-Metadaten nicht parallel dieselben Leads überschreiben.
-  if (before.ready < DAILY_QUALITY_BUFFER_TARGET) {
-    discovery = await runLeadFactoryCycle(5);
-  }
+  const strict = strictResult.status === "fulfilled"
+    ? strictResult.value
+    : { selected: 0, passed: 0, rejected: 0, qualified: [], failed: [strictResult.reason instanceof Error ? strictResult.reason.message : String(strictResult.reason)] };
+  const discovery = discoveryResult.status === "fulfilled"
+    ? discoveryResult.value
+    : { discovered: 0, jobSeeds: 0, task: "", warning: discoveryResult.reason instanceof Error ? discoveryResult.reason.message : String(discoveryResult.reason) };
 
   const after = await getDailyQualityLeadReport();
   return {
@@ -41,7 +46,7 @@ export async function runQualityLeadFill(options: { maxCycles?: number; timeBudg
   while (report.ready < DAILY_QUALITY_BUFFER_TARGET && cycles.length < maxCycles && Date.now() - startedAt < timeBudgetMs) {
     const cycle = await runQualityLeadCycle(batchSize);
     report = cycle.after;
-    const activity = Number(cycle.strict?.selected || 0) + Number(cycle.discovery?.discovered || 0) + Number(cycle.discovery?.qualified?.length || 0);
+    const activity = Number(cycle.strict?.selected || 0) + Number(cycle.discovery?.discovered || 0) + Number(cycle.discovery?.jobSeeds || 0);
     if (report.ready > Number(cycle.before.ready || 0) || activity > 0) stalled = 0;
     else stalled += 1;
     cycles.push({
@@ -53,8 +58,9 @@ export async function runQualityLeadFill(options: { maxCycles?: number; timeBudg
       strictRejected: cycle.strict?.rejected || 0,
       strictFailed: cycle.strict?.failed || [],
       discovered: cycle.discovery?.discovered || 0,
-      discoveryTask: cycle.discovery?.discoveryTask || "",
-      discoveryWarning: cycle.discovery?.discoveryWarning || "",
+      jobSeeds: cycle.discovery?.jobSeeds || 0,
+      discoveryTask: cycle.discovery?.task || "",
+      discoveryWarning: cycle.discovery?.warning || "",
     });
     if (cycle.skipped || stalled >= 12) break;
   }
