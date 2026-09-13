@@ -1,5 +1,10 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
+  "git": {
+    "deploymentEnabled": {
+      "feature/dg-autopilot-oss-stack": false
+    }
+  },
   "crons": [
     {
       "path": "/api/cron/lead-factory",

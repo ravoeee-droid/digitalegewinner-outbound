@@ -19,7 +19,7 @@ export type DgAgentRisk = "safe" | "internal_write" | "external_action";
 type ToolSpec = {
   definition: DgAgentToolDefinition;
   risk: DgAgentRisk;
-  schema: { parse: (value: unknown) => any };
+  schema: { parse: (value: unknown) => unknown };
   run: (args: Record<string, unknown>, workspace: string) => Promise<unknown>;
 };
 
@@ -28,7 +28,7 @@ const tool = (
   description: string,
   parameters: Record<string, unknown>,
   risk: DgAgentRisk,
-  schema: { parse: (value: unknown) => any },
+  schema: { parse: (value: unknown) => unknown },
   run: ToolSpec["run"],
 ): ToolSpec => ({ definition: { type: "function", function: { name, description, parameters } }, risk, schema, run });
 
@@ -261,5 +261,6 @@ export async function executeDgAgentTool(name: string, args: Record<string, unkn
   const spec = BY_NAME.get(name);
   if (!spec) throw new Error(`Unbekanntes Tool: ${name}`);
   const parsed = spec.schema.parse(args);
-  return spec.run(parsed, workspace);
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error(`Ungültige Tool-Argumente: ${name}`);
+  return spec.run(parsed as Record<string, unknown>, workspace);
 }

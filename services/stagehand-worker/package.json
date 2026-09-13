@@ -1,0 +1,16 @@
+{
+  "name": "dg-stagehand-research-worker",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "engines": {
+    "node": ">=22.18.0"
+  },
+  "scripts": {
+    "start": "node server.mjs"
+  },
+  "dependencies": {
+    "@browserbasehq/stagehand": "4.1.0",
+    "zod": "4.3.6"
+  }
+}
