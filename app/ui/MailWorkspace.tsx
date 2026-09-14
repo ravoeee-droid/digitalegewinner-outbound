@@ -108,7 +108,8 @@ export default function MailWorkspace() {
   }
 
   useEffect(() => {
-    void loadConfig();
+    const timer = window.setTimeout(() => void loadConfig(), 0);
+    return () => window.clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -116,7 +117,6 @@ export default function MailWorkspace() {
     if (!activeId) return;
     const timer = window.setInterval(() => void loadInbox(activeId, true), 60_000);
     return () => window.clearInterval(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeId]);
 
   const selected = useMemo(() => messages.find((item) => item.uid === selectedUid) || null, [messages, selectedUid]);
