@@ -33,7 +33,7 @@ export default function OpenOutreachSyncButton() {
         zIndex: 120,
         border: "1px solid rgba(213,255,89,.3)",
         background: "rgba(8,11,15,.92)",
-        color: "#d5ff59",
+        color: "#34c759",
         borderRadius: 999,
         padding: "9px 13px",
         fontSize: 11,

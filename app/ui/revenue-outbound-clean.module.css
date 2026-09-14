@@ -36,7 +36,7 @@
 }
 
 .root > main{
-  background:radial-gradient(circle at 70% -18%,rgba(213,255,89,.035),transparent 30%),#080b0f !important;
+  background:radial-gradient(circle at 70% -18%,rgba(52,199,89,.035),transparent 30%),#080b0f !important;
 }
 
 .root > main > div > aside{
@@ -233,7 +233,7 @@
 .root input:focus-visible,
 .root select:focus-visible,
 .root textarea:focus-visible{
-  outline:2px solid rgba(213,255,89,.5);
+  outline:2px solid rgba(52,199,89,.5);
   outline-offset:2px;
 }
 

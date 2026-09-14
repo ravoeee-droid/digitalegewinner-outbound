@@ -65,7 +65,7 @@ export default async function OutreachPage() {
               <span style={{ color: "#8f98a6", fontSize: 13 }}>/ 100 heute</span>
             </div>
             <div style={{ height: 7, borderRadius: 999, background: "rgba(255,255,255,.08)", overflow: "hidden", marginTop: 10 }}>
-              <div style={{ height: "100%", width: `${progress}%`, borderRadius: 999, background: "linear-gradient(90deg,#d5ff59,#5df0b8)" }} />
+              <div style={{ height: "100%", width: `${progress}%`, borderRadius: 999, background: "linear-gradient(90deg,#34c759,#5df0b8)" }} />
             </div>
             <div style={{ color: ready >= 100 ? "#bffb84" : "#f2d98c", fontSize: 12, marginTop: 10 }}>
               {ready >= 100 ? "Tagesziel erreicht" : `${100 - ready} frische 1A Leads fehlen noch`}
@@ -100,14 +100,14 @@ export default async function OutreachPage() {
                       <span style={{ display: "block", marginTop: 5, color: "#7f8998", fontSize: 12 }}>{row.email}</span>
                     </td>
                     <td style={{ padding: "18px 16px", borderBottom: "1px solid rgba(255,255,255,.06)" }}>
-                      <span style={{ display: "inline-flex", minWidth: 42, justifyContent: "center", padding: "7px 9px", borderRadius: 10, background: "rgba(213,255,89,.1)", color: "#d5ff59", fontWeight: 700, fontSize: 12 }}>{row.score}</span>
+                      <span style={{ display: "inline-flex", minWidth: 42, justifyContent: "center", padding: "7px 9px", borderRadius: 10, background: "rgba(213,255,89,.1)", color: "#34c759", fontWeight: 700, fontSize: 12 }}>{row.score}</span>
                     </td>
                     <td style={{ padding: "18px 16px", borderBottom: "1px solid rgba(255,255,255,.06)" }}>
                       <span style={{ display: "inline-flex", padding: "6px 9px", borderRadius: 999, background: "rgba(93,240,184,.09)", border: "1px solid rgba(93,240,184,.16)", color: "#84f5c8", fontSize: 11 }}>1A · {row.status}</span>
                     </td>
                     <td style={{ padding: "18px 16px", borderBottom: "1px solid rgba(255,255,255,.06)", minWidth: 210 }}>
                       <details>
-                        <summary style={{ cursor: "pointer", fontSize: 12, color: "#d5ff59" }}>Entwurf ansehen</summary>
+                        <summary style={{ cursor: "pointer", fontSize: 12, color: "#34c759" }}>Entwurf ansehen</summary>
                         <div style={{ marginTop: 12, padding: 14, borderRadius: 14, background: "#0b0e13", border: "1px solid rgba(255,255,255,.07)", width: 420, maxWidth: "70vw" }}>
                           <strong style={{ display: "block", fontSize: 12, marginBottom: 10 }}>{row.subject}</strong>
                           <pre style={{ margin: 0, whiteSpace: "pre-wrap", fontFamily: "inherit", color: "#aeb6c2", fontSize: 12, lineHeight: 1.55 }}>{row.body}</pre>

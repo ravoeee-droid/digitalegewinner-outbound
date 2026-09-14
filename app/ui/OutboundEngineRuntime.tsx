@@ -85,7 +85,7 @@ export default function OutboundEngineRuntime() {
         <header style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 24, flexWrap: "wrap", marginBottom: 26 }}>
           <div>
             <Link href="/" style={{ color: "#8f98a6", textDecoration: "none", fontSize: 13 }}>← Pflege Sales OS</Link>
-            <div style={{ marginTop: 18, color: "#d5ff59", fontSize: 12, fontWeight: 800, letterSpacing: ".12em" }}>DAILY OUTBOUND ENGINE</div>
+            <div style={{ marginTop: 18, color: "#34c759", fontSize: 12, fontWeight: 800, letterSpacing: ".12em" }}>DAILY OUTBOUND ENGINE</div>
             <h1 style={{ margin: "10px 0 8px", fontSize: "clamp(38px,6vw,76px)", letterSpacing: "-.055em", lineHeight: .95 }}>120 Calls. 100 Mails.<br />Eine Queue.</h1>
             <p style={{ margin: 0, maxWidth: 800, color: "#a9b1bd", lineHeight: 1.6, fontSize: 15 }}>
               A+-Pflegeleads werden einmal qualifiziert und danach kanalübergreifend priorisiert. Videos und LinkedIn bekommen nur die stärksten Leads, damit Rendering, API-Kosten und Aufmerksamkeit nicht verschwendet werden.
@@ -111,7 +111,7 @@ export default function OutboundEngineRuntime() {
                 </div>
                 <div style={{ marginTop: 14, fontSize: 36, fontWeight: 850, letterSpacing: "-.05em" }}>{state.ready}</div>
                 <div style={{ color: "#7f8998", fontSize: 11 }}>bereit · {state.done} erledigt</div>
-                <div style={{ marginTop: 12, height: 6, borderRadius: 999, overflow: "hidden", background: "rgba(255,255,255,.08)" }}><div style={{ height: "100%", width: `${percent}%`, background: "linear-gradient(90deg,#d5ff59,#5df0b8)" }} /></div>
+                <div style={{ marginTop: 12, height: 6, borderRadius: 999, overflow: "hidden", background: "rgba(255,255,255,.08)" }}><div style={{ height: "100%", width: `${percent}%`, background: "linear-gradient(90deg,#34c759,#5df0b8)" }} /></div>
                 <div style={{ marginTop: 9, color: "#8f98a6", fontSize: 11 }}>{meta[key].hint}</div>
               </button>
             );
@@ -133,12 +133,12 @@ export default function OutboundEngineRuntime() {
                 const r = reasons(p);
                 return (
                   <article key={task.id} style={{ display: "grid", gridTemplateColumns: "58px minmax(0,1fr) auto", gap: 14, padding: "16px", borderBottom: "1px solid rgba(255,255,255,.06)", alignItems: "start" }}>
-                    <div style={{ width: 48, height: 48, borderRadius: 14, display: "grid", placeItems: "center", background: "rgba(213,255,89,.09)", color: "#d5ff59", fontWeight: 900 }}>{task.rank}</div>
+                    <div style={{ width: 48, height: 48, borderRadius: 14, display: "grid", placeItems: "center", background: "rgba(213,255,89,.09)", color: "#34c759", fontWeight: 900 }}>{task.rank}</div>
                     <div>
                       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
                         <strong style={{ fontSize: 14 }}>{value(p, "company") || "Lead"}</strong>
                         <span style={{ padding: "4px 7px", borderRadius: 999, background: "rgba(255,255,255,.07)", color: "#aeb6c2", fontSize: 10 }}>{value(p, "tier") || "qualifiziert"}</span>
-                        <span style={{ color: "#d5ff59", fontSize: 11, fontWeight: 800 }}>{task.score}/100</span>
+                        <span style={{ color: "#34c759", fontSize: 11, fontWeight: 800 }}>{task.score}/100</span>
                       </div>
                       <div style={{ marginTop: 5, color: "#7f8998", fontSize: 11 }}>{value(p, "city") || "Deutschland"} {value(p, "jobCount") ? `· ${value(p, "jobCount")} offene Stelle(n)` : ""}</div>
                       {r.length > 0 && <div style={{ marginTop: 9, fontSize: 12, lineHeight: 1.5, color: "#b9c0ca" }}>{r.join(" · ")}</div>}
@@ -192,9 +192,9 @@ function StatusLine({ ok, label, neutral = false }: { ok: boolean; label: string
 }
 
 const panel: React.CSSProperties = { padding: 18, borderRadius: 20, border: "1px solid rgba(255,255,255,.1)", background: "rgba(255,255,255,.035)" };
-const eyebrow: React.CSSProperties = { color: "#d5ff59", fontSize: 10, fontWeight: 850, letterSpacing: ".12em" };
+const eyebrow: React.CSSProperties = { color: "#34c759", fontSize: 10, fontWeight: 850, letterSpacing: ".12em" };
 const panelTitle: React.CSSProperties = { margin: "8px 0", fontSize: 18, letterSpacing: "-.02em" };
 const panelText: React.CSSProperties = { margin: "0 0 14px", color: "#8f98a6", fontSize: 12, lineHeight: 1.55 };
 const miniButton: React.CSSProperties = { border: "1px solid rgba(255,255,255,.12)", background: "rgba(255,255,255,.06)", color: "#eef1f4", padding: "7px 10px", borderRadius: 10, cursor: "pointer", fontSize: 11, fontWeight: 700 };
-const linkPill: React.CSSProperties = { ...miniButton, display: "inline-flex", textDecoration: "none", color: "#d5ff59" };
-function buttonStyle(secondary: boolean): React.CSSProperties { return { border: secondary ? "1px solid rgba(255,255,255,.12)" : "1px solid rgba(213,255,89,.35)", background: secondary ? "rgba(255,255,255,.05)" : "rgba(213,255,89,.1)", color: secondary ? "#eef1f4" : "#d5ff59", padding: "10px 14px", borderRadius: 12, cursor: "pointer", fontSize: 12, fontWeight: 800 }; }
+const linkPill: React.CSSProperties = { ...miniButton, display: "inline-flex", textDecoration: "none", color: "#34c759" };
+function buttonStyle(secondary: boolean): React.CSSProperties { return { border: secondary ? "1px solid rgba(255,255,255,.12)" : "1px solid rgba(213,255,89,.35)", background: secondary ? "rgba(255,255,255,.05)" : "rgba(213,255,89,.1)", color: secondary ? "#eef1f4" : "#34c759", padding: "10px 14px", borderRadius: 12, cursor: "pointer", fontSize: 12, fontWeight: 800 }; }

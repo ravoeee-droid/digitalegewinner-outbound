@@ -8,7 +8,7 @@ min-width:240px;max-width:390px;flex:1;height:38px;border:1px solid rgba(255,255
 .filterBar>div{display:flex;gap:5px;flex-wrap:wrap}
 .filterBar>div>button{border:1px solid transparent;background:transparent;color:#6f7b89;border-radius:8px;padding:6px 9px;font-size:8px;font-weight:850;cursor:pointer}
 .filterBar>div>button b{display:inline-grid;place-items:center;min-width:16px;height:16px;margin-left:4px;padding:0 4px;border-radius:999px;background:#1b222b;color:#9ba6b2;font-size:7px}
-.filterBar>div>.filterActive{border-color:rgba(213,255,89,.18);background:rgba(213,255,89,.07);color:#dffb8b}
+.filterBar>div>.filterActive{border-color:rgba(52,199,89,.18);background:rgba(52,199,89,.07);color:#dffb8b}
 .filterBar>span{font-size:8px;color:#5e6a78;display:flex;align-items:center;gap:8px;text-align:right}
 .filterBar>span>button{border:0;background:transparent;color:#a7b0bc;text-decoration:underline;text-underline-offset:3px;font-size:8px;cursor:pointer}
 .dashboard{min-width:0}
@@ -17,9 +17,9 @@ min-width:240px;max-width:390px;flex:1;height:38px;border:1px solid rgba(255,255
 .metric span{font-size:8px;color:#727e8c;font-weight:750}
 .metric strong{font-size:29px;line-height:1;margin:8px 0 5px;letter-spacing:-.055em;color:#f4f6f8}
 .metric small{font-size:7px;color:#56616e}
-.metricAccent{border-color:rgba(213,255,89,.22);background:linear-gradient(145deg,rgba(213,255,89,.13),rgba(213,255,89,.035))}
-.metricAccent:after{content:"";position:absolute;right:-35px;top:-42px;width:110px;height:110px;border-radius:50%;background:#d5ff59;filter:blur(50px);opacity:.17}
-.metricAccent strong{color:#d5ff59}
+.metricAccent{border-color:rgba(52,199,89,.22);background:linear-gradient(145deg,rgba(52,199,89,.13),rgba(52,199,89,.035))}
+.metricAccent:after{content:"";position:absolute;right:-35px;top:-42px;width:110px;height:110px;border-radius:50%;background:#34c759;filter:blur(50px);opacity:.17}
+.metricAccent strong{color:#34c759}
 .dashboardGrid{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(320px,.55fr);gap:12px;margin-bottom:12px}
 .dashboardLower{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(330px,.9fr);gap:12px}
 .panel{border:1px solid rgba(255,255,255,.075);border-radius:17px;background:rgba(255,255,255,.021);padding:15px;min-width:0}
@@ -33,17 +33,17 @@ min-width:240px;max-width:390px;flex:1;height:38px;border:1px solid rgba(255,255
 .funnel>button>div:first-child{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:8px;color:#7d8996}
 .funnel>button>div:first-child b{font-size:9px;color:#b9c2cc}
 .funnelTrack{height:8px;border-radius:99px;background:#151c24;overflow:hidden}
-.funnelTrack i{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,#d5ff59,#79e9b3);opacity:.82}
+.funnelTrack i{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,#34c759,#79e9b3);opacity:.82}
 .rateGrid{display:grid;grid-template-columns:repeat(2,1fr);gap:7px}
 .rateCard{padding:11px;border:1px solid rgba(255,255,255,.065);border-radius:12px;background:#0f151d;display:flex;flex-direction:column;gap:4px}
 .rateCard span{font-size:7px;color:#697583}
 .rateCard strong{font-size:18px;letter-spacing:-.04em}
 .rateCard>div{height:3px;background:#1a222c;border-radius:99px;overflow:hidden;margin-top:5px}
-.rateCard i{display:block;height:100%;background:#d5ff59;border-radius:99px}
-.primaryCta{width:100%;margin-top:10px;border:1px solid rgba(213,255,89,.22);background:#d5ff59;color:#0b0e08;border-radius:10px;padding:11px 12px;display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:9px;font-weight:900;cursor:pointer}
+.rateCard i{display:block;height:100%;background:#34c759;border-radius:99px}
+.primaryCta{width:100%;margin-top:10px;border:1px solid rgba(52,199,89,.22);background:#34c759;color:#0b0e08;border-radius:10px;padding:11px 12px;display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:9px;font-weight:900;cursor:pointer}
 .primaryCta span{padding:4px 6px;border-radius:999px;background:rgba(0,0,0,.1);font-size:7px}
 .productMatrix{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
-.productMatrix button{--product:#d5ff59;border:1px solid color-mix(in srgb,var(--product) 16%,rgba(255,255,255,.06));background:linear-gradient(145deg,color-mix(in srgb,var(--product) 4%,#10161d),#0d131a);border-radius:12px;padding:11px;display:grid;grid-template-columns:10px 1fr auto;gap:3px 8px;text-align:left;color:#b9c3cd;cursor:pointer}
+.productMatrix button{--product:#34c759;border:1px solid color-mix(in srgb,var(--product) 16%,rgba(255,255,255,.06));background:linear-gradient(145deg,color-mix(in srgb,var(--product) 4%,#10161d),#0d131a);border-radius:12px;padding:11px;display:grid;grid-template-columns:10px 1fr auto;gap:3px 8px;text-align:left;color:#b9c3cd;cursor:pointer}
 .productMatrix button>i{width:7px;height:7px;border-radius:50%;background:var(--product);margin-top:3px}
 .productMatrix button>div{display:flex;flex-direction:column;gap:2px}
 .productMatrix button strong{font-size:9px;color:#dbe0e5}
@@ -75,11 +75,11 @@ min-width:240px;max-width:390px;flex:1;height:38px;border:1px solid rgba(255,255
 .followupAction>strong{font-size:8px;color:#8e99a6}
 .followupAction>div{display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end}
 .followupAction button{border:1px solid rgba(255,255,255,.075);background:#111820;color:#8793a0;border-radius:8px;padding:6px 8px;font-size:7px;font-weight:850;cursor:pointer}
-.followupAction button:first-child{color:#d5ff59;border-color:rgba(213,255,89,.18)}
+.followupAction button:first-child{color:#34c759;border-color:rgba(52,199,89,.18)}
 .drawerQuick{display:grid;grid-template-columns:1fr 1fr 1.35fr;gap:6px;margin:0 0 13px}
 .drawerQuick button{border:1px solid rgba(255,255,255,.08);background:#121922;color:#a8b2bd;border-radius:9px;padding:8px;font-size:8px;font-weight:850;cursor:pointer}
-.drawerQuick button:first-child{color:#d5ff59;border-color:rgba(213,255,89,.2)}
-.drawerQuick button:last-child{background:#d5ff59;color:#0b0e08;border-color:#d5ff59}
+.drawerQuick button:first-child{color:#34c759;border-color:rgba(52,199,89,.2)}
+.drawerQuick button:last-child{background:#34c759;color:#0b0e08;border-color:#34c759}
 .drawerQuick button:disabled{opacity:.35;cursor:not-allowed}
 .related,.timeline{margin-top:14px;padding-top:13px;border-top:1px solid rgba(255,255,255,.08)}
 .related>span,.timeline>span{display:block;font-size:7px;letter-spacing:.13em;color:#596675;font-weight:900;margin-bottom:8px}
@@ -89,7 +89,7 @@ min-width:240px;max-width:390px;flex:1;height:38px;border:1px solid rgba(255,255
 .related>button strong{font-size:8px;color:#c8cfd7}
 .related>button small{font-size:7px;color:#65717f}
 .related>button>b{font-size:8px;color:#7f8a97}
-.related>.relatedActive{border-color:rgba(213,255,89,.18);background:rgba(213,255,89,.035)}
+.related>.relatedActive{border-color:rgba(52,199,89,.18);background:rgba(52,199,89,.035)}
 .timeline>div{display:grid;grid-template-columns:12px 1fr;gap:8px;position:relative;padding:0 0 10px}
 .timeline>div:not(:last-of-type):before{content:"";position:absolute;left:4px;top:10px;bottom:-2px;width:1px;background:#202933}
 .timeline>div>i{width:9px;height:9px;border-radius:50%;border:2px solid #0b0f15;background:#65717e;box-shadow:0 0 0 1px #26303a;margin-top:2px;z-index:1}
@@ -105,7 +105,7 @@ min-width:240px;max-width:390px;flex:1;height:38px;border:1px solid rgba(255,255
 .searchWrap{order:2;max-width:none;min-width:180px}
 .mobileTabs{display:flex;order:4;width:100%;gap:4px;overflow-x:auto;padding-top:2px}
 .mobileTabs button{white-space:nowrap;border:0;background:transparent;color:#697583;border-radius:8px;padding:7px 9px;font-size:8px;font-weight:850;cursor:pointer}
-.mobileTabs .mobileTabActive{background:#151c24;color:#d5ff59}
+.mobileTabs .mobileTabActive{background:#151c24;color:#34c759}
 .filterBar{margin-top:-4px;align-items:flex-start}
 .dashboardLower{grid-template-columns:1fr}
 .followupRow{grid-template-columns:100px minmax(0,1fr)}

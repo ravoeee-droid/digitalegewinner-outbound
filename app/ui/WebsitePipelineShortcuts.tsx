@@ -96,7 +96,7 @@ export default function WebsitePipelineShortcuts() {
   return createPortal(
     <>
       <button type="button" onClick={() => clickPipeline("no-website")} style={{ ...baseStyle, borderColor: "rgba(213,255,89,.28)" }}>
-        <span style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, fontWeight: 900 }}><i style={{ width: 8, height: 8, borderRadius: 999, background: "#d5ff59", display: "inline-block" }} />Keine Website</span>
+        <span style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, fontWeight: 900 }}><i style={{ width: 8, height: 8, borderRadius: 999, background: "#34c759", display: "inline-block" }} />Keine Website</span>
         <small style={{ color: "rgba(255,255,255,.58)", fontSize: 10 }}>{noWebsite.count} verifiziert · direkter Website-Hebel</small>
         <b style={{ fontSize: 13 }}>{compactEuro(noWebsite.value)}</b>
       </button>

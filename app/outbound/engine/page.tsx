@@ -22,7 +22,7 @@ export default function ChannelEnginePage() {
           borderRadius: 999,
           border: "1px solid rgba(213,255,89,.32)",
           background: "rgba(13,18,10,.94)",
-          color: "#d5ff59",
+          color: "#34c759",
           textDecoration: "none",
           fontSize: 11,
           fontWeight: 900,
