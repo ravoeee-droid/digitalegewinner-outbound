@@ -19,7 +19,7 @@ export type DgAgentRisk = "safe" | "internal_write" | "external_action";
 type ToolSpec = {
   definition: DgAgentToolDefinition;
   risk: DgAgentRisk;
-  schema: { parse: (value: unknown) => any };
+  schema: { parse: (value: unknown) => Record<string, unknown> };
   run: (args: Record<string, unknown>, workspace: string) => Promise<unknown>;
 };
 
@@ -28,7 +28,7 @@ const tool = (
   description: string,
   parameters: Record<string, unknown>,
   risk: DgAgentRisk,
-  schema: { parse: (value: unknown) => any },
+  schema: { parse: (value: unknown) => Record<string, unknown> },
   run: ToolSpec["run"],
 ): ToolSpec => ({ definition: { type: "function", function: { name, description, parameters } }, risk, schema, run });
 
