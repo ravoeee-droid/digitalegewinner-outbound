@@ -559,6 +559,17 @@ async function deepClassification(row: Candidate, base: WebsiteSalesIntelligence
   };
 }
 
+function classificationUnchanged(row: Candidate, intel: WebsiteSalesIntelligence) {
+  const stored = asObject(row.metadata?.website_sales_intelligence);
+  if (!stored.checkedAt) return false;
+  return (
+    stored.category === intel.category &&
+    bool(stored.strongIntent) === intel.strongIntent &&
+    num(stored.score) === intel.score &&
+    stored.label === intel.label
+  );
+}
+
 function freshStrongExisting(row: Candidate) {
   const intel = asObject(row.metadata?.website_sales_intelligence);
   if (!bool(intel.strongIntent)) return null;
@@ -620,7 +631,7 @@ export async function refreshStoredWebsiteSalesIntelligence(workspace = "default
   for (const row of rows) {
     const preserved = freshStrongExisting(row);
     const intel = preserved || storedClassification(row);
-    if (!preserved) await persist(row, intel, workspace);
+    if (!preserved && !classificationUnchanged(row, intel)) await persist(row, intel, workspace);
     if (intel.strongIntent) strong += 1;
     categories[intel.category] = (categories[intel.category] || 0) + 1;
   }
