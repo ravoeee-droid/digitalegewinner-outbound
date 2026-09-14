@@ -328,7 +328,7 @@ export async function ensureRevenueOpportunitySchema() {
   schemaReady = true;
 }
 
-async function seedRows(workspace: string, missingOnly = false) {
+async function seedRows(workspace: string, missingOnly = false, limit = 1500) {
   return query<SeedLeadRow>(`
     select l.id lead_id,l.company_id,c.name company,c.city,c.industry,c.website,
            coalesce(ct.phone,c.phone,'') phone,coalesce(ct.email,'') email,l.notes,
@@ -349,8 +349,8 @@ async function seedRows(workspace: string, missingOnly = false) {
         where existing.workspace=l.workspace and existing.lead_id=l.id
       ))
     order by l.priority_score desc,l.updated_at desc
-    limit 1500
-  `, [workspace, missingOnly]);
+    limit $3
+  `, [workspace, missingOnly, limit]);
 }
 
 async function seedOne(row: SeedLeadRow, product: ProductKey, workspace: string, source = "signal") {
@@ -397,7 +397,10 @@ async function reconcileSignalOpportunities(workspace: string) {
 export async function seedRevenueOpportunities(workspace = "default", missingOnly = false) {
   await ensureRevenueOpportunitySchema();
   if (!missingOnly) await reconcileSignalOpportunities(workspace);
-  const rows = await seedRows(workspace, missingOnly);
+  // missingOnly runs on every dashboard view (via getRevenueSnapshot); keep it small so a
+  // large backlog of newly-imported leads can't turn a normal page load into a query storm.
+  // The explicit "refresh" POST action passes missingOnly=false and still processes up to 1500.
+  const rows = await seedRows(workspace, missingOnly, missingOnly ? 40 : 1500);
   const batchSize = 12;
   for (let index = 0; index < rows.length; index += batchSize) {
     const batch = rows.slice(index, index + batchSize);
