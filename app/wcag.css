@@ -1,12 +1,12 @@
-/* WCAG 2.2 AA accessibility layer for the Pflege Recruiting OS.
+/* WCAG 2.2 AA accessibility layer for the login screen and the CloudTalk phone widget.
    Loaded after the visual theme so accessibility wins without creating a second design system. */
 
 :root{
-  --a11y-focus:#8a5a00;
-  --a11y-focus-light:#ffe29a;
-  --a11y-text:#17181b;
-  --a11y-muted:#555a63;
-  --a11y-border:#8b919a;
+  --a11y-focus:#34c759;
+  --a11y-focus-light:rgba(52,199,89,.3);
+  --a11y-text:#eef4f0;
+  --a11y-muted:#8fa39c;
+  --a11y-border:#3d4a45;
 }
 
 html{font-size:16px;text-size-adjust:100%;-webkit-text-size-adjust:100%}
@@ -22,25 +22,18 @@ body{line-height:1.5}
   min-height:44px;
   display:flex;
   align-items:center;
-  border:3px solid #111;
+  border:2px solid var(--a11y-focus);
   border-radius:10px;
-  background:#fff;
-  color:#111;
+  background:#0a120e;
+  color:#eef4f0;
   font-size:16px;
   font-weight:850;
   text-decoration:none;
-  box-shadow:0 10px 30px rgba(0,0,0,.25);
+  box-shadow:0 10px 30px rgba(0,0,0,.4);
 }
-.wcag-skip-link:focus{transform:none;outline:3px solid #e5a900;outline-offset:3px}
-
-#outbound-workspace:focus{outline:none}
+.wcag-skip-link:focus{transform:none;outline:3px solid var(--a11y-focus);outline-offset:3px}
 
 /* Keyboard focus is always visible and does not rely on colour alone. */
-.launch-shell button:focus-visible,
-.launch-shell a:focus-visible,
-.launch-shell input:focus-visible,
-.launch-shell select:focus-visible,
-.launch-shell textarea:focus-visible,
 .cloudtalk-shell button:focus-visible,
 .cloudtalk-shell iframe:focus-visible,
 .login-a11y button:focus-visible,
@@ -48,223 +41,14 @@ body{line-height:1.5}
 .login-a11y a:focus-visible{
   outline:3px solid var(--a11y-focus);
   outline-offset:3px;
-  box-shadow:0 0 0 5px rgba(255,226,154,.72)!important;
+  box-shadow:0 0 0 5px var(--a11y-focus-light)!important;
 }
 
 /* Pointer targets: WCAG 2.2 target-size baseline. */
-.launch-shell button,
-.launch-shell a,
-.launch-shell input:not([type="checkbox"]):not([type="radio"]),
-.launch-shell select,
 .cloudtalk-shell button,
 .login-a11y button,
 .login-a11y input{
   min-height:44px;
-}
-
-/* Do not ship the simplified legacy Video view beside Studio V3. */
-.launch-sidebar nav button:nth-child(1){order:1}
-.launch-sidebar nav button:nth-child(2){order:2}
-.launch-sidebar nav button:nth-child(3){order:3}
-.launch-sidebar nav button:nth-child(4){order:4}
-.launch-sidebar nav button:nth-child(5){order:5}
-.launch-sidebar nav button:nth-child(6){display:none!important}
-.launch-sidebar nav button:nth-child(7){order:7}
-.launch-sidebar nav button:nth-child(8){order:8}
-.launch-sidebar nav button:nth-child(9){order:9}
-.launch-studio-nav{order:6}
-
-.launch-studio-nav{
-  position:relative;
-  width:100%;
-  min-height:44px;
-  display:flex;
-  align-items:center;
-  gap:10px;
-  padding:10px 11px;
-  border:1px solid transparent;
-  border-radius:13px;
-  color:#555a62;
-  background:transparent;
-  font-size:14px;
-  font-weight:750;
-  text-align:left;
-  text-decoration:none;
-}
-.launch-studio-nav:hover{
-  color:#17181b;
-  background:rgba(255,255,255,.77);
-  border-color:#fff;
-  box-shadow:0 8px 22px rgba(35,39,46,.06),inset 0 1px 0 #fff;
-}
-.launch-studio-nav>span:first-child{width:20px;text-align:center;color:#725318;font-size:15px}
-.launch-studio-nav>b{
-  margin-left:auto;
-  min-width:30px;
-  min-height:24px;
-  display:grid;
-  place-items:center;
-  padding:2px 7px;
-  border-radius:999px;
-  color:#513b0f;
-  background:#f7dfa1;
-  border:1px solid #d6b45e;
-  font-size:12px;
-}
-
-/* Readable text. The original premium layer used 7–10px labels in many places. */
-.launch-shell{font-size:16px;line-height:1.5;color:var(--a11y-text)}
-.launch-brand strong{font-size:16px!important}
-.launch-brand small,
-.launch-topbar small,
-.launch-kicker,
-.launch-sidebar-foot strong,
-.launch-sidebar-foot small,
-.launch-card-head p,
-.launch-checks strong,
-.launch-checks small,
-.launch-metrics span,
-.launch-metrics small,
-.launch-next p,
-.launch-next small,
-.launch-contact span,
-.launch-script>span,
-.launch-script small,
-.launch-field>span,
-.launch-table th,
-.launch-table td,
-.launch-table td small,
-.launch-found small,
-.launch-campaign p,
-.launch-sequence small,
-.launch-mailboxes small,
-.launch-inbox small,
-.launch-video-grid small,
-.launch-kanban small,
-.launch-activity small,
-.launch-form label,
-.launch-integrations small,
-.launch-pill,
-.launch-live{
-  font-size:12px!important;
-  line-height:1.45!important;
-}
-.launch-sidebar nav button{font-size:14px!important;min-height:44px}
-.launch-topbar h1{font-size:26px!important}
-.launch-card-head h3{font-size:18px!important}
-.launch-hero p,.launch-next>div:nth-child(2)>small,.launch-script>p,.launch-campaign p,.launch-card p{font-size:15px;line-height:1.6}
-.launch-script small{font-size:14px!important}
-.launch-field>span,.launch-form label{font-weight:800;color:#4d525a!important}
-
-/* Contrast: keep the glass look but remove low-contrast grey-on-glass text. */
-.launch-shell{--launch-muted:#555a63;--launch-gold:#7a5918}
-.launch-brand small,
-.launch-card-head p,
-.launch-hero p,
-.launch-metrics span,
-.launch-metrics small,
-.launch-next p,
-.launch-next small,
-.launch-script small,
-.launch-field>span,
-.launch-table th,
-.launch-table td small,
-.launch-campaign p,
-.launch-mailboxes small,
-.launch-inbox small,
-.launch-video-grid small,
-.launch-kanban p,
-.launch-activity small,
-.launch-checks small,
-.launch-sidebar-foot small{color:#555a63!important}
-.launch-kicker,.launch-topbar small{color:#6f4d0f!important}
-.launch-live{color:#165c35!important;background:#e8f7ed!important;border-color:#82c99d!important}
-
-/* Inputs need readable text and non-colour-only focus states. */
-.launch-field input,
-.launch-field textarea,
-.launch-form input,
-.launch-form select,
-.launch-search input,
-.launch-integrations input,
-.launch-table select,
-.launch-kanban select{
-  font-size:16px!important;
-  color:#17181b!important;
-  background:rgba(255,255,255,.94)!important;
-  border:1px solid #777e88!important;
-  padding:11px 12px!important;
-}
-.launch-field textarea{min-height:110px}
-.launch-field input::placeholder,
-.launch-field textarea::placeholder,
-.launch-form input::placeholder,
-.launch-search input::placeholder,
-.launch-integrations input::placeholder{color:#666c75;opacity:1}
-
-/* Buttons: readable labels and clear disabled states. */
-.launch-primary,.launch-secondary,.launch-call,
-.launch-card button:not(.launch-primary):not(.launch-secondary):not(.launch-call),
-.launch-outcomes button,
-.launch-queue button,
-.launch-row-actions button,
-.launch-oauth button,
-.launch-integrations button{
-  font-size:14px!important;
-  font-weight:800!important;
-}
-.launch-shell button:disabled{opacity:.55;cursor:not-allowed;filter:grayscale(.2)}
-.launch-shell button:hover:not(:disabled){text-decoration:none}
-
-/* Selected/active states use shape + weight + indicator, not colour alone. */
-.launch-sidebar nav button.active{
-  font-weight:900!important;
-  border:2px solid #7c642c!important;
-}
-.launch-sidebar nav button.active:after{
-  content:"Aktiv";
-  margin-left:auto;
-  font-size:11px;
-  padding:2px 6px;
-  border-radius:999px;
-  background:#1b1c1f;
-  color:#fff;
-}
-.launch-queue button.active{
-  border:2px solid #735416!important;
-  box-shadow:0 0 0 3px rgba(226,194,116,.35)!important;
-}
-
-/* Statuses have symbols plus text. */
-.launch-checks .ok,.launch-checks .warn,
-.launch-mailboxes .ok,.launch-mailboxes .warn,
-.launch-integrations .ok,.launch-integrations .warn{
-  min-width:32px!important;
-  min-height:32px!important;
-  border:1px solid currentColor!important;
-  font-size:14px!important;
-  font-weight:950!important;
-}
-
-/* Table usability and zoom resilience. */
-.launch-table{overflow:auto;max-width:100%}
-.launch-table table{min-width:860px}
-.launch-table td{font-size:14px!important;line-height:1.45}
-.launch-table td strong{font-size:14px!important}
-.launch-table select{min-width:130px}
-
-/* Modal accessibility: stronger backdrop and readable close control. */
-.launch-modal{background:rgba(9,11,15,.72)!important}
-.launch-modal>section{border:2px solid #686f79!important}
-.launch-modal header button{min-width:44px;min-height:44px;font-size:22px!important}
-.launch-audit-copy p,.launch-priorities small{font-size:14px!important;line-height:1.6!important}
-
-/* Toast/status message stays readable and visible. */
-.launch-toast{
-  font-size:14px!important;
-  line-height:1.45;
-  max-width:min(520px,calc(100vw - 28px));
-  border:1px solid rgba(255,255,255,.28)!important;
 }
 
 /* CloudTalk controls inherit the same accessible interaction language. */
@@ -287,31 +71,12 @@ body{line-height:1.5}
   border:0!important;
 }
 
-@media(max-width:760px){
-  .launch-sidebar nav{align-items:stretch}
-  .launch-sidebar nav button,.launch-studio-nav{min-width:48px;min-height:48px;justify-content:center;padding:10px}
-  .launch-studio-nav>span:nth-child(2),.launch-studio-nav>b{display:none}
-  .launch-studio-nav>span:first-child{font-size:18px;width:auto}
-  .launch-sidebar nav button.active:after{display:none}
-  .launch-topbar h1{font-size:22px!important}
-}
-
 @media(prefers-reduced-motion:reduce){
   html{scroll-behavior:auto!important}
-  .launch-shell *,
-  .launch-shell *::before,
-  .launch-shell *::after,
-  .cloudtalk-shell *,
-  .cloudtalk-shell *::before,
-  .cloudtalk-shell *::after{
+  *,*::before,*::after{
     animation-duration:.001ms!important;
     animation-iteration-count:1!important;
     transition-duration:.001ms!important;
     scroll-behavior:auto!important;
   }
-}
-
-@media(forced-colors:active){
-  .launch-sidebar nav button.active,.launch-queue button.active,.launch-studio-nav:focus-visible{outline:3px solid Highlight!important}
-  .launch-live,.launch-checks .ok,.launch-checks .warn{forced-color-adjust:auto}
 }

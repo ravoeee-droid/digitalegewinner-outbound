@@ -1,11 +1,11 @@
-.login-a11y{font-size:16px;line-height:1.5;color:#17181b}
+.login-a11y{font-size:16px;line-height:1.5;color:#eef4f0}
 .login-a11y>form{width:min(480px,100%);padding:34px!important}
 .login-a11y h1{font-size:36px!important;line-height:1.1!important}
-.login-a11y>form>p:not(.login-error){font-size:16px!important;line-height:1.65!important;color:#555a63!important}
-.login-a11y .launch-kicker{font-size:12px!important;color:#6e4c0f!important;letter-spacing:.1em!important}
-.login-a11y label{font-size:15px!important;line-height:1.4!important;color:#454a52!important;font-weight:800!important}
-.login-a11y input{font-size:16px!important;min-height:48px!important;border:1px solid #737a84!important;background:#fff!important;color:#17181b!important;padding:12px 14px!important}
+.login-a11y>form>p:not(.login-error){font-size:16px!important;line-height:1.65!important;color:#8fa39c!important}
+.login-a11y .launch-kicker{font-size:12px!important;color:#34c759!important;letter-spacing:.1em!important}
+.login-a11y label{font-size:15px!important;line-height:1.4!important;color:#8fa39c!important;font-weight:800!important}
+.login-a11y input{font-size:16px!important;min-height:48px!important;border:1px solid #3d4a45!important;background:rgba(255,255,255,.04)!important;color:#eef4f0!important;padding:12px 14px!important}
 .login-a11y button{font-size:16px!important;min-height:48px!important}
-.login-a11y .login-error{font-size:15px!important;line-height:1.5!important;color:#8e221d!important;background:#fff0ef!important;border:1px solid #c96d66!important;border-radius:10px;padding:10px 12px}
-.login-a11y .login-foot{font-size:13px!important;color:#555a63!important}
+.login-a11y .login-error{font-size:15px!important;line-height:1.5!important;color:#ffb4ac!important;background:rgba(255,69,58,.12)!important;border:1px solid rgba(255,69,58,.4)!important;border-radius:10px;padding:10px 12px}
+.login-a11y .login-foot{font-size:13px!important;color:#8fa39c!important}
 @media(max-width:540px){.login-a11y>form{padding:26px 20px!important}.login-a11y h1{font-size:31px!important}}
