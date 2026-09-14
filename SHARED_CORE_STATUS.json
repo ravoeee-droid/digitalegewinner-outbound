@@ -1,7 +1,7 @@
 {
   "contractVersion": "1.0.0",
   "instance": "DG-MAIN",
-  "updatedAt": "2026-08-27",
+  "updatedAt": "2026-09-14",
   "policy": "same-task-adapt-both-directions",
   "status": "parity-realignment-in-progress",
   "sharedSurfaces": {
@@ -12,7 +12,7 @@
     "crmWorkflowCockpitV2": "needs-adaptation-from-peer",
     "campaignControlPlane": "needs-parity-review",
     "campaignRunTracking": "needs-parity-review",
-    "mailboxStatusWorkflow": "needs-parity-review",
+    "mailboxStatusWorkflow": "peer-mail-cockpit-adapted-with-dg-netcup-imap-smtp",
     "callerQueue": "local-implementation-exists-review-parity",
     "leadDetailWorkspace": "local-implementation-exists-review-parity",
     "salesBrief": "needs-parity-review",
