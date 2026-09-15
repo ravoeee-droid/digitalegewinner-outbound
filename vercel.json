@@ -4,6 +4,14 @@
     {
       "path": "/api/cron/lead-factory",
       "schedule": "50 0 * * *"
+    },
+    {
+      "path": "/api/cron/send",
+      "schedule": "0 7 * * *"
+    },
+    {
+      "path": "/api/cron/replies",
+      "schedule": "0 15 * * *"
     }
   ]
 }

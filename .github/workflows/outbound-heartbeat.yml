@@ -1,0 +1,33 @@
+name: Outbound heartbeat
+
+# Vercel's Hobby plan only fires each cron job once a day, which is enough
+# for the lead factory but far too slow for actually sending queued emails
+# and checking replies. This workflow calls the same endpoints on a real
+# intraday cadence so outbound actually goes out during business hours.
+#
+# Requires a repository secret APP_CRON_SECRET with the exact same value
+# as the CRON_SECRET environment variable configured in Vercel.
+
+on:
+  schedule:
+    # Every 30 minutes, Mon-Fri, 06:00-19:00 UTC (roughly DE business hours)
+    - cron: "*/30 6-19 * * 1-5"
+  workflow_dispatch:
+
+jobs:
+  send-and-check-replies:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send queued outbound emails
+        run: |
+          curl -sS -f -X POST "https://app.digitalegewinner.de/api/cron/send" \
+            -H "authorization: Bearer ${{ secrets.APP_CRON_SECRET }}" \
+            -o /tmp/send.json -w "\nHTTP %{http_code}\n"
+          cat /tmp/send.json
+
+      - name: Check inbox replies
+        run: |
+          curl -sS -f -X POST "https://app.digitalegewinner.de/api/cron/replies" \
+            -H "authorization: Bearer ${{ secrets.APP_CRON_SECRET }}" \
+            -o /tmp/replies.json -w "\nHTTP %{http_code}\n"
+          cat /tmp/replies.json
