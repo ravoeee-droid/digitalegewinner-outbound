@@ -19,27 +19,33 @@ type OutreachRow = {
 };
 
 export default async function OutreachPage() {
-  const rows = await query<OutreachRow>(`
-    select
-      q.id,
-      q.rank,
-      coalesce(q.lead->>'name','') company,
-      coalesce(q.lead->>'city','') city,
-      q.email,
-      q.subject,
-      q.body,
-      q.status,
-      coalesce((q.lead->>'score')::integer,0) score,
-      coalesce(q.lead->>'category','') category,
-      coalesce(q.lead->>'contactPerson','') contact,
-      coalesce((q.lead->'signals'->>'jobCount')::integer,0) job_count,
-      coalesce(q.lead->'signals'->'websiteAudit'->>'finding','') finding
-    from public.pflege_email_outreach q
-    where q.lead_date=(now() at time zone 'Europe/Berlin')::date
-      and q.status<>'historical'
-    order by q.rank asc, q.created_at asc
-    limit 100
-  `);
+  let rows: OutreachRow[] = [];
+  let error = "";
+  try {
+    rows = await query<OutreachRow>(`
+      select
+        q.id,
+        q.rank,
+        coalesce(q.lead->>'name','') company,
+        coalesce(q.lead->>'city','') city,
+        q.email,
+        q.subject,
+        q.body,
+        q.status,
+        coalesce((q.lead->>'score')::integer,0) score,
+        coalesce(q.lead->>'category','') category,
+        coalesce(q.lead->>'contactPerson','') contact,
+        coalesce((q.lead->'signals'->>'jobCount')::integer,0) job_count,
+        coalesce(q.lead->'signals'->'websiteAudit'->>'finding','') finding
+      from public.pflege_email_outreach q
+      where q.lead_date=(now() at time zone 'Europe/Berlin')::date
+        and q.status<>'historical'
+      order by q.rank asc, q.created_at asc
+      limit 100
+    `);
+  } catch (err) {
+    error = err instanceof Error ? err.message : "Queue konnte nicht geladen werden.";
+  }
 
   const ready = rows.length;
   const progress = Math.min(100, ready);
@@ -49,8 +55,7 @@ export default async function OutreachPage() {
       <div style={{ maxWidth: 1500, margin: "0 auto" }}>
         <header style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 20, flexWrap: "wrap", marginBottom: 28 }}>
           <div>
-            <a href="/" style={{ color: "#a9b1bd", textDecoration: "none", fontSize: 13 }}>← Sales OS</a>
-            <div style={{ marginTop: 18, display: "flex", alignItems: "center", gap: 10 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
               <span style={{ padding: "6px 10px", borderRadius: 999, background: "rgba(255,255,255,.08)", border: "1px solid rgba(255,255,255,.1)", fontSize: 12, letterSpacing: ".08em" }}>PFLEGE OUTBOUND</span>
               <span style={{ fontSize: 12, color: "#8f98a6" }}>100 neue 1A Leads / Tag</span>
             </div>
@@ -72,6 +77,12 @@ export default async function OutreachPage() {
             </div>
           </div>
         </header>
+
+        {error && (
+          <div style={{ marginBottom: 20, padding: "12px 16px", borderRadius: 12, background: "#2a1216", border: "1px solid rgba(255,125,141,.35)", color: "#ff97a3", fontSize: 13 }}>
+            {error}
+          </div>
+        )}
 
         <section style={{ borderRadius: 22, overflow: "hidden", border: "1px solid rgba(255,255,255,.1)", background: "rgba(255,255,255,.035)" }}>
           <div style={{ overflowX: "auto" }}>

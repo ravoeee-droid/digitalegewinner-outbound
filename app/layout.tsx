@@ -4,6 +4,7 @@ import "./launch.css";
 import "./launch-overrides.css";
 import "./wcag.css";
 import "./wcag-login.css";
+import GlobalNav from "./ui/GlobalNav";
 
 export const metadata: Metadata = {
   title: "Pflege Recruiting OS · Digitale Gewinner",
@@ -13,7 +14,10 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="de">
-      <body>{children}</body>
+      <body>
+        <GlobalNav />
+        {children}
+      </body>
     </html>
   );
 }
