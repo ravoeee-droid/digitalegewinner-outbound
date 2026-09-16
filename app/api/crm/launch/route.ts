@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { query, readState, writeState } from "@/lib/db";
 import { getCallSummary } from "@/lib/telephony";
+import { ensureSalesOsSchema } from "@/lib/sales-os";
 
 export const runtime = "nodejs";
 
@@ -181,6 +182,7 @@ function outcomeUpdates(outcome: string, callbackAt: string) {
 }
 
 async function loadPayload(workspace: string) {
+  await ensureSalesOsSchema();
   const leads = await loadLeads(workspace);
   await mirrorToLegacy(leads);
 
@@ -260,6 +262,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
+    await ensureSalesOsSchema();
     const input = createSchema.parse(await request.json());
     const companyId = crypto.randomUUID();
     const contactId = crypto.randomUUID();
@@ -296,6 +299,7 @@ export async function POST(request: Request) {
 
 export async function PATCH(request: Request) {
   try {
+    await ensureSalesOsSchema();
     const input = patchSchema.parse(await request.json());
     const [existing] = await query<{ company_id: string; notes: string; stage: string; probability: number; phone_status: string }>(
       "select company_id,notes,stage,probability,phone_status from sales_leads where id=$1 and workspace='default' and status='active' limit 1",
@@ -365,6 +369,7 @@ export async function PATCH(request: Request) {
 
 export async function DELETE(request: Request) {
   try {
+    await ensureSalesOsSchema();
     const input = deleteSchema.parse(await request.json());
     const [existing] = await query<{ company_id: string }>("select company_id from sales_leads where id=$1 and workspace='default' and status='active' limit 1", [input.leadId]);
     if (!existing) return Response.json({ error: "Lead nicht gefunden." }, { status: 404 });

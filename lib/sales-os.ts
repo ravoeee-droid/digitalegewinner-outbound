@@ -161,6 +161,16 @@ export async function ensureSalesOsSchema() {
     create unique index if not exists sales_leads_company_idx on sales_leads(workspace, company_id) where status='active';
     create index if not exists sales_leads_priority_idx on sales_leads(workspace, priority_score desc, updated_at desc);
 
+    alter table sales_leads add column if not exists next_action text not null default '';
+    alter table sales_leads add column if not exists next_action_at timestamptz;
+    alter table sales_leads add column if not exists do_not_contact boolean not null default false;
+    alter table sales_leads add column if not exists probability integer not null default 0;
+    alter table sales_leads add column if not exists expected_close_date date;
+    alter table sales_leads add column if not exists lost_reason text not null default '';
+    alter table sales_leads add column if not exists last_contact_at timestamptz;
+    alter table sales_leads add column if not exists last_outcome text not null default '';
+    alter table sales_leads add column if not exists phone_status text not null default 'ready';
+
     create table if not exists sales_activities (
       id bigserial primary key,
       workspace text not null,
