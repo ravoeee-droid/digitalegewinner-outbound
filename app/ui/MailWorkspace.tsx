@@ -72,7 +72,7 @@ export default function MailWorkspace() {
     if (!quiet) setLoading(true);
     setError("");
     try {
-      const response = await fetch(`/api/mail?mailboxId=${encodeURIComponent(mailboxId)}&limit=40`, { cache: "no-store" });
+      const response = await fetch(`/api/mail?mailboxId=${encodeURIComponent(mailboxId)}&limit=20`, { cache: "no-store" });
       const json = await response.json() as { messages?: Message[]; error?: string };
       if (!response.ok) throw new Error(json.error || "Postfach konnte nicht geladen werden.");
       const next = json.messages || [];

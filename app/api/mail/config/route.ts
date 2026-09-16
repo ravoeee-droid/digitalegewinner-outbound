@@ -6,6 +6,7 @@ import { setSecret } from "@/lib/secrets";
 import { testImapConnection, type ImapMailboxCredential } from "@/lib/imap-client";
 
 export const runtime = "nodejs";
+export const maxDuration = 30;
 
 const setupSchema = z.object({
   id: z.string().trim().min(1).max(80).regex(/^[a-z0-9_-]+$/i).optional(),

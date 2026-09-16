@@ -4,6 +4,7 @@ import { listImapMessages, type ImapMailboxCredential } from "@/lib/imap-client"
 import { sendMail } from "@/lib/mailer";
 
 export const runtime = "nodejs";
+export const maxDuration = 60;
 
 const sendSchema = z.object({
   mailboxId: z.string().trim().min(1).max(100),
