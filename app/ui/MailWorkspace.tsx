@@ -31,6 +31,12 @@ type Message = {
 
 type ComposeState = { open: boolean; to: string; subject: string };
 
+type WarmupStatus = {
+  active: boolean;
+  eligibleMailboxes: number;
+  mailboxes: Array<{ id: string; email: string; warmupDay: number; dailyTarget: number; sentToday: number; totalSent: number; totalSeen: number }>;
+};
+
 const emptyCompose: ComposeState = { open: false, to: "", subject: "" };
 
 function formatDate(value: string) {
@@ -62,6 +68,7 @@ export default function MailWorkspace() {
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState("");
   const [folder, setFolder] = useState<"inbox" | "sent">("inbox");
+  const [warmup, setWarmup] = useState<WarmupStatus | null>(null);
 
   const notify = (message: string) => {
     setToast(message);
@@ -105,9 +112,20 @@ export default function MailWorkspace() {
         : (items.find((item) => item.configured) || items[0]).id;
       setActiveId(nextId);
       await loadInbox(nextId);
+      void loadWarmup();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Mailboxen konnten nicht geladen werden.");
       setLoading(false);
+    }
+  }
+
+  async function loadWarmup() {
+    try {
+      const response = await fetch("/api/mail/warmup", { cache: "no-store" });
+      if (!response.ok) return;
+      setWarmup(await response.json() as WarmupStatus);
+    } catch {
+      // Warmup status is a nice-to-have, never block the inbox on it.
     }
   }
 
@@ -240,6 +258,19 @@ export default function MailWorkspace() {
     </header>
 
     {error && <div className={styles.error}><strong>Mail-Verbindung</strong><span>{error}</span><button onClick={() => setSetupOpen(true)}>Einstellungen öffnen</button></div>}
+
+    {warmup && (warmup.active
+      ? <div className={styles.warmup}>
+          <strong>🔥 Warmup aktiv</strong>
+          <div className={styles.warmupRow}>
+            {warmup.mailboxes.map((mailbox) => (
+              <span key={mailbox.id}>{mailbox.email} <b>Tag {mailbox.warmupDay}</b> · {mailbox.sentToday}/{mailbox.dailyTarget} heute · {mailbox.totalSeen}/{mailbox.totalSent} gesehen</span>
+            ))}
+          </div>
+        </div>
+      : warmup.eligibleMailboxes === 1
+        ? <div className={styles.warmupHint}>🔥 Warmup startet automatisch, sobald ein zweites Postfach verbunden ist — dann laufen sie sich gegenseitig warm.</div>
+        : null)}
 
     <section className={styles.mailShell}>
       <aside className={styles.inboxPane}>

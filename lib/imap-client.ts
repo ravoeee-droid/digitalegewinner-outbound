@@ -252,9 +252,19 @@ class ImapConnection {
     return result;
   }
 
-  async login() {
+  async login(writable = false) {
     await this.command(`LOGIN ${quote(this.user())} ${quote(this.password())}`);
-    await this.command('EXAMINE "INBOX"');
+    await this.command(writable ? 'SELECT "INBOX"' : 'EXAMINE "INBOX"');
+  }
+
+  async findUidBySubjectToken(token: string) {
+    const search = await this.command(`UID SEARCH HEADER SUBJECT ${quote(token)}`);
+    const uids = searchUids(search);
+    return uids.length ? Math.max(...uids) : null;
+  }
+
+  async markSeen(uid: number) {
+    await this.command(`UID STORE ${uid} +FLAGS (\\Seen)`);
   }
 
   async logout() {
@@ -287,6 +297,19 @@ export async function testImapConnection(credential: ImapMailboxCredential) {
     await connection.login();
     await connection.command("NOOP");
     return true;
+  } finally {
+    await connection.logout();
+  }
+}
+
+export async function markSeenBySubjectToken(credential: ImapMailboxCredential, token: string) {
+  const connection = new ImapConnection(credential);
+  try {
+    await connection.connect();
+    await connection.login(true);
+    const uid = await connection.findUidBySubjectToken(token);
+    if (uid) await connection.markSeen(uid);
+    return Boolean(uid);
   } finally {
     await connection.logout();
   }
