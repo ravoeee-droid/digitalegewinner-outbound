@@ -1,7 +1,7 @@
 {
   "contractVersion": "1.0.0",
   "instance": "DG-MAIN",
-  "updatedAt": "2026-09-14",
+  "updatedAt": "2026-09-16",
   "policy": "same-task-adapt-both-directions",
   "status": "parity-realignment-in-progress",
   "sharedSurfaces": {
@@ -17,7 +17,8 @@
     "leadDetailWorkspace": "local-implementation-exists-review-parity",
     "salesBrief": "needs-parity-review",
     "applicationFrame": "single-primary-workspace-no-parallel-pro-ui",
-    "studioGenericV3": "peer-webmotion-v3-blocked-no-equivalent-browser-render-seam"
+    "studioGenericV3": "peer-webmotion-v3-blocked-no-equivalent-browser-render-seam",
+    "websiteBuildStreamVercelLink": "implemented-in-dg-peer-has-no-website-build-stream"
   },
   "blockers": [
     {
@@ -25,6 +26,12 @@
       "surface": "studioGenericV3",
       "peer": "CLIENT-WALKENHORST",
       "detail": "CLIENT-WALKENHORST migrated its browser export core from realtime MediaRecorder/captureStream to deterministic WebMotion/WebCodecs. DG-MAIN currently has no lib/studio-v3-browser-render-core.ts or equivalent browser render seam to adapt safely without creating a parallel Studio architecture. No Walkenhorst runtime data, credentials, branding or customer logic were copied."
+    },
+    {
+      "id": "website-build-stream-vercel-link-2026-09-16",
+      "surface": "websiteBuildStreamVercelLink",
+      "peer": "CLIENT-WALKENHORST",
+      "detail": "DG-MAIN now exposes and requires the Vercel preview URL in its Website Build Stream. CLIENT-WALKENHORST has no Website Build Stream, website_projects model, or equivalent route to adapt without creating a new unrequested product surface."
     }
   ],
   "rules": [

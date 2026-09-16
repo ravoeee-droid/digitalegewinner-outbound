@@ -55,6 +55,27 @@ export async function ensureWebsiteProjectsSchema() {
     alter table website_projects add column if not exists opportunity_id text;
     create index if not exists website_projects_revenue_workspace_idx on website_projects(workspace,status,progress desc,updated_at desc);
     create index if not exists website_projects_sales_lead_idx on website_projects(workspace,sales_lead_id) where sales_lead_id is not null;
+
+    update website_projects
+    set preview_url = case
+      when lower(repo_full_name) like '%ambulante-pflege-herzblatt%' or lower(company) like '%herzblatt%'
+        then 'https://ambulante-pflege-herzblatt.vercel.app'
+      when lower(repo_full_name) like '%seniorenheim-auetal%' or lower(company) like '%auetal%'
+        then 'https://seniorenheim-auetal.vercel.app'
+      when lower(repo_full_name) like '%schwester-annettes-pflegedienst%' or lower(company) like '%annette%'
+        then 'https://schwester-annettes-pflegedienst.vercel.app'
+      when lower(repo_full_name) like '%pflegehaus-k-gler%' or lower(company) like '%kögler%' or lower(company) like '%koegler%'
+        then 'https://pflegehaus-k-gler.vercel.app'
+      else preview_url
+    end,
+    last_synced_at = now(),
+    updated_at = now()
+    where trim(preview_url) = '' and (
+      lower(repo_full_name) like '%ambulante-pflege-herzblatt%' or lower(company) like '%herzblatt%' or
+      lower(repo_full_name) like '%seniorenheim-auetal%' or lower(company) like '%auetal%' or
+      lower(repo_full_name) like '%schwester-annettes-pflegedienst%' or lower(company) like '%annette%' or
+      lower(repo_full_name) like '%pflegehaus-k-gler%' or lower(company) like '%kögler%' or lower(company) like '%koegler%'
+    );
   `);
   schemaReady = true;
 }
@@ -114,6 +135,9 @@ export async function advanceWebsiteProject(id: string, workspace = "default") {
   if (!current) throw new Error("Website-Projekt nicht gefunden.");
   const phase = phaseOf(current.phase);
   const next = nextPhase(phase);
+  if ((next === "preview" || next === "sent") && !current.preview_url.trim()) {
+    throw new Error("Vercel-Link fehlt. Bitte zuerst im CRM hinterlegen.");
+  }
   const gates = { ...(current.gates || {}) } as Record<string, unknown>;
   if (phase !== "sales") gates[phase] = true;
   if (next === "sent") { gates.preview = true; gates.sent = true; }
