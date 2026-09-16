@@ -300,6 +300,7 @@ export default function DomainMailCenter() {
                         <label>Provider<select name="provider"><option>SMTP</option><option>Google</option><option>Microsoft</option><option>netcup</option></select></label>
                         <button disabled={busy === "add-mailbox"}>{busy === "add-mailbox" ? "Speichert…" : "+ Mailbox anlegen"}</button>
                       </form>
+                      <p className={styles.hint}>Legt nur Anzeigename, Limit und Health-Tracking an. Für echten Versand IMAP/SMTP-Zugangsdaten unter <a href="/mail">/mail</a> verbinden - erst dort verbundene Mailboxen können Kampagnen tatsächlich versenden.</p>
                       <div className={styles.mailboxList}>{mailboxes.map((mailbox) => <article key={mailbox.id}><span>✉</span><div><strong>{mailbox.email}</strong><small>{mailbox.provider} · {mailbox.dailyLimit}/Tag · Health {mailbox.health}%</small></div></article>)}</div>
                     </section>
 

@@ -403,7 +403,7 @@ export default function PflegeProOS() {
   }
   async function saveStore(next: Store) { const response = await fetch("/api/state", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(next) }); if (!response.ok) throw new Error("State konnte nicht gespeichert werden."); setStore(next); }
   async function launchCampaign(campaign: Campaign) {
-    if (!activeMailboxes.length) return notify("Vor dem E-Mail-Start eine aktive Mailbox hinterlegen.");
+    if (!activeMailboxes.length) return notify("Vor dem E-Mail-Start eine Mailbox unter /mail verbinden (IMAP/SMTP).");
     const leads = data.leads.filter((lead) => lead.email && !lead.do_not_contact && !["Gewonnen", "Verloren"].includes(lead.stage)).map((lead) => ({ id: lead.id, company: lead.company, contact: lead.contact, email: lead.email, phone: lead.phone, website: lead.website, city: lead.city, industry: lead.industry, stage: lead.stage, dealValue: lead.deal_value, notes: lead.notes, intentScore: lead.intent_score }));
     if (!leads.length) return notify("Keine versandfähigen Leads.");
     setBusy(campaign.id);
