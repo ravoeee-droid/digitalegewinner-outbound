@@ -40,7 +40,8 @@
 #pflege-sales-os input,#pflege-sales-os textarea,#pflege-sales-os select{color-scheme:dark}
 #pflege-sales-os [class*="searchBox"] input,#pflege-sales-os [class*="crmToolbar"] select,#pflege-sales-os [class*="bulkBar"] select,#pflege-sales-os [class*="inlineSelect"],#pflege-sales-os [class*="dealForm"] input,#pflege-sales-os [class*="dealForm"] select,#pflege-sales-os [class*="dealForm"] textarea,#pflege-sales-os [class*="callForm"] textarea,#pflege-sales-os [class*="callForm"] input,#pflege-sales-os [class*="modal"] input,#pflege-sales-os [class*="modal"] textarea{border-color:rgba(255,255,255,.09)!important;background:#090c0e!important;color:#dce3e6!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.012)!important}
 #pflege-sales-os [class*="bulkBar"]{border-color:rgba(52,199,89,.16)!important;background:rgba(52,199,89,.035)!important;color:#c9d1d5!important}
-#pflege-sales-os [class*="tableWrap"]{border-color:var(--dg-line)!important;background:transparent!important}
+#pflege-sales-os [class*="tableWrap"]{border-color:var(--dg-line)!important;background:transparent!important;position:relative!important}
+#pflege-sales-os [class*="tableWrap"]::after{content:"";position:absolute;top:0;right:0;bottom:0;width:34px;background:linear-gradient(to right,transparent,rgba(8,10,12,.92));pointer-events:none}
 #pflege-sales-os table{background:transparent!important;color:#d8dfe2!important}
 #pflege-sales-os table th{border-bottom-color:var(--dg-line)!important;background:rgba(9,12,14,.96)!important;color:#778289!important}
 #pflege-sales-os table td{border-bottom-color:rgba(255,255,255,.055)!important;color:#9ca7ad!important}
