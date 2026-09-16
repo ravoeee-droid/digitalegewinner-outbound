@@ -1,5 +1,6 @@
 import { query, readState } from "@/lib/db";
 import { z } from "zod";
+import { loadMailboxCredentials } from "@/lib/mailbox-credentials";
 
 export const runtime = "nodejs";
 
@@ -10,7 +11,7 @@ const schema = z.object({
 });
 
 type Lead = { id:string; company:string; contact?:string; email?:string; stage?:string };
-type Mailbox = { id:string; enabled:boolean; dailyLimit:number };
+type Mailbox = { id:string; email?:string; enabled:boolean; dailyLimit:number };
 type State = {
   leads?: Lead[];
   mailboxes?: Mailbox[];
@@ -41,7 +42,17 @@ export async function POST(request:Request) {
     );
     if (suppressed.length) return Response.json({ error:"Empfänger ist auf der Suppression-Liste." }, { status:409 });
 
-    const active = (state.mailboxes || []).filter((mailbox) => mailbox.enabled && Number(mailbox.dailyLimit || 0) > 0);
+    // Real, sendable mailboxes are the ones with verified IMAP/SMTP credentials (see the
+    // campaign-launch fix) - state.mailboxes is just a display label with no send capability.
+    const credentials = await loadMailboxCredentials();
+    const byEmail = new Map((state.mailboxes || []).map((mailbox) => [mailbox.email?.toLowerCase(), mailbox]));
+    const active = credentials
+      .filter((c) => c.provider === "smtp")
+      .map((c) => {
+        const known = byEmail.get(c.email?.toLowerCase());
+        return { id: c.id, enabled: known?.enabled ?? true, dailyLimit: Number(known?.dailyLimit || 5) };
+      })
+      .filter((mailbox) => mailbox.enabled && mailbox.dailyLimit > 0);
     if (!active.length) return Response.json({ error:"Keine aktive Mailbox für das Follow-up." }, { status:409 });
 
     const sentTodayRows = await query<{ mailbox_id:string; count:string }>(
