@@ -176,11 +176,17 @@ const TOOLS: ToolSpec[] = [
     z.object({ lead_id: z.string().min(3).max(200), stage: z.string().max(80).optional(), owner: z.string().max(120).optional(), notes: z.string().max(5000).optional() }).strict(),
     async (raw, workspace) => {
       const args = raw as { lead_id: string; stage?: string; owner?: string; notes?: string };
-      const rows = await query<{ id: string }>(
+      const rows = await query<{ id: string; stage: string }>(
         `update sales_leads set stage=coalesce($3,stage),owner=coalesce($4,owner),notes=coalesce($5,notes),updated_at=now()
-         where id=$1 and workspace=$2 returning id`,
+         where id=$1 and workspace=$2 returning id,stage`,
         [args.lead_id, workspace, args.stage ?? null, args.owner ?? null, args.notes ?? null],
       );
+      // Mirrors the same stop-outbound-on-close logic as the CRM's PATCH handler
+      // (app/api/crm/launch/route.ts) - without this, DG Core closing a lead here
+      // would leave already-queued outbound sequence steps to go out anyway.
+      if (rows[0] && (rows[0].stage === "Gewonnen" || rows[0].stage === "Verloren")) {
+        await query("update er_outbox set status='stopped' where workspace=$2 and lead_id=$1 and status='queued'", [args.lead_id, workspace]);
+      }
       return { updated: Boolean(rows[0]), leadId: args.lead_id };
     },
   ),
