@@ -188,6 +188,7 @@ export default function PflegeProOS() {
   const [leadQuery, setLeadQuery] = useState("Pflegedienst Baden-Württemberg");
   const [createOpen, setCreateOpen] = useState(false);
   const [campaignGenOpen, setCampaignGenOpen] = useState(false);
+  const [mailConfig, setMailConfig] = useState<Array<{ id: string; email: string; configured: boolean }>>([]);
   const [mobileNav, setMobileNav] = useState(false);
   const [busy, setBusy] = useState("");
   const [toast, setToast] = useState("");
@@ -215,6 +216,13 @@ export default function PflegeProOS() {
     if (!response.ok) throw new Error(json.error || "Inbox konnte nicht geladen werden.");
     setInbox(json.items || []);
   }
+  async function loadMailConfig() {
+    try {
+      const response = await fetch("/api/mail/config", { cache: "no-store" });
+      const json = await response.json() as { items?: Array<{ id: string; email: string; configured: boolean }> };
+      if (response.ok) setMailConfig(json.items || []);
+    } catch { /* best-effort: campaigns view just shows 0 sendable mailboxes */ }
+  }
   async function loadDetail(leadId: string) {
     setDetailLoading(true);
     try {
@@ -225,7 +233,7 @@ export default function PflegeProOS() {
     } catch (e) { notify(e instanceof Error ? e.message : "Research konnte nicht geladen werden."); setDetail(null); }
     finally { setDetailLoading(false); }
   }
-  async function refresh() { setBusy("refresh"); setError(""); try { await Promise.all([loadCrm(), loadState()]); } catch (e) { setError(e instanceof Error ? e.message : "Systemfehler"); } finally { setBusy(""); } }
+  async function refresh() { setBusy("refresh"); setError(""); try { await Promise.all([loadCrm(), loadState(), loadMailConfig()]); } catch (e) { setError(e instanceof Error ? e.message : "Systemfehler"); } finally { setBusy(""); } }
 
   useEffect(() => { void refresh(); }, []);
   useEffect(() => { if (view === "inbox") void loadInbox().catch((e: unknown) => notify(e instanceof Error ? e.message : "Inbox Fehler")); }, [view]);
@@ -261,7 +269,18 @@ export default function PflegeProOS() {
   const selectedCalls = useMemo(() => callLead ? data.calls.history.filter((call) => call.lead_ref === callLead.id).slice(0, 7) : [], [data.calls.history, callLead]);
   const dueLeads = useMemo(() => data.leads.filter((lead) => due(lead) && !["Gewonnen", "Verloren"].includes(lead.stage)).sort((a, b) => new Date(a.next_action_at || 0).getTime() - new Date(b.next_action_at || 0).getTime()), [data.leads]);
   const opportunities = useMemo(() => data.leads.filter((lead) => !["Gewonnen", "Verloren"].includes(lead.stage)).sort((a, b) => b.priority_score - a.priority_score), [data.leads]);
-  const activeMailboxes = useMemo(() => store.mailboxes.filter((mailbox) => mailbox.enabled), [store.mailboxes]);
+  // store.mailboxes (managed by the Domains & Mail UI) only ever holds a display label and
+  // send limit - it has no IMAP/SMTP credentials. Real, sendable mailboxes are the ones
+  // configured via /mail (mailConfig, backed by the mailbox_credentials_json secret). Join
+  // them by email so campaigns only ever target mailboxes the send-cron can actually use.
+  const sendableMailboxes = useMemo(() => {
+    const byEmail = new Map(store.mailboxes.map((mailbox) => [mailbox.email.toLowerCase(), mailbox]));
+    return mailConfig.filter((entry) => entry.configured).map((entry) => {
+      const known = byEmail.get(entry.email.toLowerCase());
+      return { id: entry.id, enabled: known?.enabled ?? true, dailyLimit: known?.dailyLimit || 5 };
+    });
+  }, [mailConfig, store.mailboxes]);
+  const activeMailboxes = useMemo(() => sendableMailboxes.filter((mailbox) => mailbox.enabled), [sendableMailboxes]);
   const activePipeline = useMemo(() => data.leads.filter((lead) => lead.stage !== "Verloren"), [data.leads]);
   const enrichmentCoverage = useMemo(() => data.leads.length ? Math.round(data.leads.filter(isEnriched).length / data.leads.length * 100) : 0, [data.leads]);
   const strongResearch = useMemo(() => data.leads.filter((lead) => researchQuality(lead) >= 70).length, [data.leads]);
@@ -389,7 +408,7 @@ export default function PflegeProOS() {
     if (!leads.length) return notify("Keine versandfähigen Leads.");
     setBusy(campaign.id);
     try {
-      const response = await fetch("/api/campaigns/launch", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ campaign, leads, mailboxes: store.mailboxes, senderName: store.settings.senderName }) });
+      const response = await fetch("/api/campaigns/launch", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ campaign, leads, mailboxes: sendableMailboxes, senderName: store.settings.senderName }) });
       const json = await response.json() as { queued?: number; skipped?: number; error?: string };
       if (!response.ok) throw new Error(json.error || "Kampagnenstart fehlgeschlagen.");
       await saveStore({ ...store, campaigns: store.campaigns.map((item) => item.id === campaign.id ? { ...item, status: "Aktiv" as const } : item) });
@@ -471,7 +490,7 @@ export default function PflegeProOS() {
 
         {view === "analytics" && <><div className={styles.pageHead}><div><span>REVENUE ANALYTICS</span><h2>Nur die Zahlen, die Entscheidungen ändern.</h2><p>Connect Rate, Meetings, Pipeline, Research Coverage und Funnel.</p></div></div><MetricStrip /><div className={styles.twoPanels}><section className={styles.panel}><div className={styles.panelHead}><div><span>FUNNEL</span><h3>Sales conversion</h3></div></div><Funnel /></section><section className={styles.panel}><div className={styles.panelHead}><div><span>RECENT EVENTS</span><h3>Activity</h3></div></div><ActivityList items={data.activities.slice(0, 18)} /></section></div></>}
 
-        {view === "system" && <><div className={styles.pageHead}><div><span>INTEGRATIONS</span><h2>Operative Infrastruktur.</h2><p>Telefonie, Domains/Mailboxen, Studio und Research-Stack am selben CRM.</p></div></div><section className={styles.panel}><div className={styles.integrationRows}><div><span>CloudTalk</span><strong>Phone + Click-to-Dial + Call events</strong><small>{data.calls.today} calls today</small><button type="button" onClick={() => window.dispatchEvent(new Event("cloudtalk:open"))}>Open</button></div><div><span>Domains & Mail</span><strong>{store.mailboxes.length} mailboxes · {activeMailboxes.length} active</strong><small>DNS health, sender inventory, deliverability</small><button type="button" onClick={() => window.dispatchEvent(new Event("domainmail:open"))}>Open</button></div><div><span>Studio V3</span><strong>Personalized video + landing page workspace</strong><small>Lead-scoped creative production</small><a href="/studio">Open ↗</a></div><div><span>Research</span><strong>{enrichmentCoverage}% coverage</strong><small>Places + website + contacts + social + career + ATS + audit + AI brief</small><button type="button" onClick={() => selectView("intelligence")}>Open</button></div></div></section></>}
+        {view === "system" && <><div className={styles.pageHead}><div><span>INTEGRATIONS</span><h2>Operative Infrastruktur.</h2><p>Telefonie, Domains/Mailboxen, Studio und Research-Stack am selben CRM.</p></div></div><section className={styles.panel}><div className={styles.integrationRows}><div><span>CloudTalk</span><strong>Phone + Click-to-Dial + Call events</strong><small>{data.calls.today} calls today</small><button type="button" onClick={() => window.dispatchEvent(new Event("cloudtalk:open"))}>Open</button></div><div><span>Domains & Mail</span><strong>{sendableMailboxes.length} sendefähig · {activeMailboxes.length} aktiv</strong><small>DNS health, sender inventory, deliverability</small><button type="button" onClick={() => window.dispatchEvent(new Event("domainmail:open"))}>Open</button></div><div><span>Studio V3</span><strong>Personalized video + landing page workspace</strong><small>Lead-scoped creative production</small><a href="/studio">Open ↗</a></div><div><span>Research</span><strong>{enrichmentCoverage}% coverage</strong><small>Places + website + contacts + social + career + ATS + audit + AI brief</small><button type="button" onClick={() => selectView("intelligence")}>Open</button></div></div></section></>}
       </main>
     </section></div>
 
