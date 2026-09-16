@@ -45,7 +45,7 @@ export default function DGCoreHologram({ state, note, className = "" }: Props) {
 
       <div className={styles.operatorFrame}>
         <div className={styles.headHalo}/>
-        <Image src="/dg-ai-operator-v5.webp" alt="DG Core holografischer KI Operator" width={520} height={990} priority className={styles.operator}/>
+        <Image src="/dg-ai-operator-v5.webp" alt="DG Core holografischer KI Operator" width={520} height={990} priority unoptimized className={styles.operator}/>
         <div className={styles.holoNoise}/>
         <div className={styles.bodyScan}/>
       </div>
