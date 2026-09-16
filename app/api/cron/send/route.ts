@@ -7,7 +7,7 @@ export const maxDuration = 60;
 
 type OutboxRow = { id:string; lead_id:string; campaign_id:string|null; mailbox_id:string; recipient:string; subject:string; body:string; attempts:number };
 type Credential = StoredMailboxCredential;
-type State = { mailboxes?: Array<{id:string;enabled:boolean;dailyLimit:number}>; campaigns?: Array<{id:string;status?:string;dailyLimit?:number}> };
+type State = { mailboxes?: Array<{id:string;email?:string;enabled:boolean;dailyLimit:number}>; campaigns?: Array<{id:string;status?:string;dailyLimit?:number}> };
 
 function authorized(request: Request) {
   const expected = process.env.CRON_SECRET;
@@ -21,7 +21,16 @@ async function run(request: Request) {
   catch { return Response.json({ error:"Mailbox Credentials JSON ist ungültig." }, { status:503 }); }
   const credMap = new Map(credentials.map((c) => [c.id,c]));
   const state = (await readState().catch(() => null))?.payload as State | undefined;
-  const mailboxLimits = new Map((state?.mailboxes || []).filter((m) => m.enabled).map((m) => [m.id, Math.max(1, Math.min(100, Number(m.dailyLimit || 30)))]));
+  // state.mailboxes only carries the daily-limit/enabled toggle set via the "Domains & Mail" UI
+  // (a display label, not a credential) - it must be keyed by the real credential id (credMap's
+  // keys, what er_outbox.mailbox_id actually holds), joined by email, not by state.mailboxes' own id.
+  const mailboxSettingsByEmail = new Map((state?.mailboxes || []).map((m) => [m.email?.toLowerCase(), m]));
+  const mailboxLimits = new Map(
+    credentials
+      .map((c) => ({ id: c.id, known: mailboxSettingsByEmail.get(c.email?.toLowerCase()) }))
+      .filter(({ known }) => known?.enabled ?? true)
+      .map(({ id, known }) => [id, Math.max(1, Math.min(100, Number(known?.dailyLimit || 5)))] as const),
+  );
   const campaignLimits = new Map((state?.campaigns || []).map((c) => [c.id, Math.max(1, Math.min(500, Number(c.dailyLimit || 150)))]));
 
   await query("update er_outbox set status='queued',scheduled_at=now()+interval '5 minutes',error='Stale send claim recovered' where workspace='default' and status='sending' and scheduled_at<now()-interval '15 minutes'");
