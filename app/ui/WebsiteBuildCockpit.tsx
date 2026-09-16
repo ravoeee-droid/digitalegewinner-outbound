@@ -31,6 +31,7 @@ export default function WebsiteBuildCockpit() {
   const [error, setError] = useState("");
   const [toast, setToast] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
+  const [vercelDrafts, setVercelDrafts] = useState<Record<string, string>>({});
 
   const load = useCallback(async () => {
     try {
@@ -67,7 +68,7 @@ export default function WebsiteBuildCockpit() {
     event.preventDefault(); const formElement = event.currentTarget; const form = new FormData(formElement); const company = String(form.get("company") || "").trim(); if (!company) return;
     setBusy("create"); setError("");
     try {
-      const response = await fetch("/api/website-projects", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ company, websiteUrl: String(form.get("websiteUrl") || "").trim(), repoFullName: String(form.get("repoFullName") || "").trim(), phase: "briefing" }) });
+      const response = await fetch("/api/website-projects", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ company, websiteUrl: String(form.get("websiteUrl") || "").trim(), repoFullName: String(form.get("repoFullName") || "").trim(), previewUrl: String(form.get("previewUrl") || "").trim(), phase: "briefing" }) });
       const json = await response.json() as ApiResponse;
       if (!response.ok) throw new Error(json.error || "Projekt konnte nicht angelegt werden.");
       setProjects(json.projects || []); setCreateOpen(false); setToast(`${company} im Build Stream`); formElement.reset();
@@ -94,6 +95,7 @@ export default function WebsiteBuildCockpit() {
           <div><label htmlFor="build-company">Unternehmen</label><input id="build-company" name="company" required autoFocus placeholder="z. B. Pflegeheim Musterhof" /></div>
           <div><label htmlFor="build-site">Aktuelle Website</label><input id="build-site" name="websiteUrl" placeholder="https://…" /></div>
           <div><label htmlFor="build-repo">GitHub Repo</label><input id="build-repo" name="repoFullName" placeholder="owner/repo" /></div>
+          <div><label htmlFor="build-vercel">Vercel-Link</label><input id="build-vercel" name="previewUrl" placeholder="projekt.vercel.app" /></div>
           <button disabled={busy === "create"}>{busy === "create" ? "ANLEGEN …" : "IN BUILD STREAM"}</button>
         </form>}
 
@@ -112,6 +114,8 @@ export default function WebsiteBuildCockpit() {
         <section className={styles.projectGrid}>
           {visible.map((project) => {
             const progress = clamp(project.progress); const phase = LABELS[project.phase] || project.phase; const isBusy = busy === project.id; const isFinished = project.phase === "sent" || progress >= 100;
+            const vercelDraft = vercelDrafts[project.id] ?? project.preview_url ?? "";
+            const needsVercel = (project.phase === "qa" || project.phase === "preview") && !project.preview_url;
             return <article key={project.id} id={`project-${project.id}`} className={`${styles.card} ${project.blocker ? styles.blockedCard : ""}`}>
               <div className={styles.cardTop}>
                 <div><span className={styles.phase}>{phase.toUpperCase()}</span><h2>{project.company}</h2><p>{project.next_action || "Nächsten Produktionsschritt festlegen"}</p></div>
@@ -129,11 +133,17 @@ export default function WebsiteBuildCockpit() {
               <div className={styles.projectLinks}>
                 {project.website_url && <a href={normalizeUrl(project.website_url)} target="_blank" rel="noreferrer">IST-ZUSTAND ↗</a>}
                 {project.repo_full_name && <a href={`https://github.com/${project.repo_full_name}`} target="_blank" rel="noreferrer">GITHUB ↗</a>}
-                {project.preview_url && <a className={styles.previewLink} href={normalizeUrl(project.preview_url)} target="_blank" rel="noreferrer">PREVIEW ↗</a>}
+                {project.preview_url && <a className={styles.previewLink} href={normalizeUrl(project.preview_url)} target="_blank" rel="noreferrer">VERCEL ↗</a>}
+                {!project.preview_url && <span className={styles.missingLink}>VERCEL FEHLT</span>}
                 {!project.website_url && !project.repo_full_name && !project.preview_url && <span className={styles.noLinks}>Noch keine Links hinterlegt</span>}
               </div>
+              <div className={styles.vercelEditor}>
+                <label htmlFor={`vercel-${project.id}`}>Vercel-Link</label>
+                <input id={`vercel-${project.id}`} value={vercelDraft} onChange={(event) => setVercelDrafts((current) => ({ ...current, [project.id]: event.target.value }))} placeholder="projekt.vercel.app" inputMode="url" />
+                <button disabled={isBusy || vercelDraft.trim() === project.preview_url} onClick={() => void mutate(project.id, { previewUrl: vercelDraft.trim() }, `${project.company}: Vercel-Link gespeichert`)}>SPEICHERN</button>
+              </div>
               <div className={styles.cardActions}>
-                <button className={styles.primaryAction} disabled={isBusy || isFinished || Boolean(project.blocker)} onClick={() => void mutate(project.id, { action: "advance" }, `${project.company} → nächster Gate`)}>{isFinished ? "✓ GESENDET" : project.blocker ? "BLOCKER LÖSEN" : isBusy ? "SYNC …" : "NÄCHSTEN GATE SCHLIESSEN"}</button>
+                <button className={styles.primaryAction} disabled={isBusy || isFinished || Boolean(project.blocker) || needsVercel} onClick={() => void mutate(project.id, { action: "advance" }, `${project.company} → nächster Gate`)}>{isFinished ? "✓ GESENDET" : project.blocker ? "BLOCKER LÖSEN" : needsVercel ? "VERCEL-LINK FEHLT" : isBusy ? "SYNC …" : "NÄCHSTEN GATE SCHLIESSEN"}</button>
                 <button className={styles.secondaryAction} disabled={isBusy || isFinished} onClick={() => void mutate(project.id, { action: project.status === "paused" ? "resume" : "pause" }, project.status === "paused" ? "Projekt reaktiviert" : "Projekt pausiert")}>{project.status === "paused" ? "REAKTIVIEREN" : "PAUSE"}</button>
               </div>
               <footer className={styles.cardFooter}><span>{project.sales_lead_id ? "CRM VERKNÜPFT" : project.source === "manual" ? "MANUELL" : project.source.toUpperCase()}</span><span>Sync {age(project.last_synced_at || project.updated_at)}</span></footer>

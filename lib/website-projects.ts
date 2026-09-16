@@ -114,6 +114,9 @@ export async function advanceWebsiteProject(id: string, workspace = "default") {
   if (!current) throw new Error("Website-Projekt nicht gefunden.");
   const phase = phaseOf(current.phase);
   const next = nextPhase(phase);
+  if ((next === "preview" || next === "sent") && !current.preview_url.trim()) {
+    throw new Error("Vercel-Link fehlt. Bitte zuerst im CRM hinterlegen.");
+  }
   const gates = { ...(current.gates || {}) } as Record<string, unknown>;
   if (phase !== "sales") gates[phase] = true;
   if (next === "sent") { gates.preview = true; gates.sent = true; }
