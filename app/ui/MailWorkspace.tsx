@@ -98,7 +98,9 @@ export default function MailWorkspace() {
         setLoading(false);
         return;
       }
-      const nextId = activeId && items.some((item) => item.id === activeId) ? activeId : items[0].id;
+      const nextId = activeId && items.some((item) => item.id === activeId)
+        ? activeId
+        : (items.find((item) => item.configured) || items[0]).id;
       setActiveId(nextId);
       await loadInbox(nextId);
     } catch (cause) {
@@ -224,7 +226,7 @@ export default function MailWorkspace() {
         </div>
         <div className={styles.headerActions}>
           {activeMailbox && <select aria-label="Postfach auswählen" value={activeId} onChange={(event) => void changeMailbox(event.target.value)}>
-            {mailboxes.map((mailbox) => <option key={mailbox.id} value={mailbox.id}>{mailbox.email}</option>)}
+            {mailboxes.map((mailbox) => <option key={mailbox.id} value={mailbox.id}>{mailbox.configured ? "" : "⚠ "}{mailbox.email}{mailbox.configured ? "" : " (nicht verbunden)"}</option>)}
           </select>}
           <button className={styles.secondary} onClick={() => setSetupOpen(true)}>⚙ Postfach</button>
           <button className={styles.primary} disabled={!activeMailbox} onClick={() => setCompose({ open: true, to: "", subject: "" })}>＋ Neue E-Mail</button>
