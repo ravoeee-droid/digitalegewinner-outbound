@@ -165,7 +165,10 @@
 .rowActions{display:flex;gap:4px}
 .rowActions button{width:27px;height:27px;border:1px solid rgba(25,31,46,.085);border-radius:7px;background:rgba(255,255,255,.9);box-shadow:inset 0 1px 0 rgba(255,255,255,.95);color:#5d6672;font-size:9px;transition:transform .12s ease,background .12s ease,border-color .12s ease,box-shadow .12s ease}
 .rowActions button:hover{transform:translateY(-1px);border-color:rgba(10,132,255,.18);background:#fff;color:#1f64a8;box-shadow:0 5px 14px rgba(18,24,36,.06)}
-.empty{padding:20px;color:#979ea8;text-align:center;font-size:9.5px}
+.empty{padding:28px 20px;color:#979ea8;text-align:center;font-size:9.5px;display:flex;flex-direction:column;align-items:center;gap:6px}
+.empty span{width:30px;height:30px;border-radius:9px;display:grid;place-items:center;background:rgba(52,199,89,.12);color:#34c759;font-size:14px;margin-bottom:2px}
+.empty b{color:#c7cdd6;font-size:11.5px;font-weight:800}
+.empty small{max-width:280px;line-height:1.5;color:#7d848f}
 .compactList button{width:100%;min-height:46px;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 11px;border:0;border-bottom:1px solid rgba(27,34,48,.055);background:rgba(255,255,255,.52);text-align:left;transition:background .12s ease}
 .compactList button:last-child{border-bottom:0}
 .compactList button:hover{background:rgba(10,132,255,.035)}
