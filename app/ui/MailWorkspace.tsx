@@ -61,18 +61,20 @@ export default function MailWorkspace() {
   const [sending, setSending] = useState(false);
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState("");
+  const [folder, setFolder] = useState<"inbox" | "sent">("inbox");
 
   const notify = (message: string) => {
     setToast(message);
     window.setTimeout(() => setToast(""), 3200);
   };
 
-  async function loadInbox(mailboxId: string, quiet = false) {
+  async function loadInbox(mailboxId: string, quiet = false, nextFolder?: "inbox" | "sent") {
     if (!mailboxId) return;
+    const useFolder = nextFolder || folder;
     if (!quiet) setLoading(true);
     setError("");
     try {
-      const response = await fetch(`/api/mail?mailboxId=${encodeURIComponent(mailboxId)}&limit=20`, { cache: "no-store" });
+      const response = await fetch(`/api/mail?mailboxId=${encodeURIComponent(mailboxId)}&limit=20&folder=${useFolder}`, { cache: "no-store" });
       const json = await response.json() as { messages?: Message[]; error?: string };
       if (!response.ok) throw new Error(json.error || "Postfach konnte nicht geladen werden.");
       const next = json.messages || [];
@@ -194,6 +196,9 @@ export default function MailWorkspace() {
       form.reset();
       setCompose(emptyCompose);
       notify("E-Mail wurde versendet.");
+      setFolder("sent");
+      setSelectedUid(null);
+      await loadInbox(activeMailbox.id, false, "sent");
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "E-Mail konnte nicht gesendet werden.");
     } finally {
@@ -239,8 +244,12 @@ export default function MailWorkspace() {
     <section className={styles.mailShell}>
       <aside className={styles.inboxPane}>
         <div className={styles.inboxHead}>
-          <div><span>POSTEINGANG</span><strong>{activeMailbox?.email || "Noch nicht verbunden"}</strong></div>
-          <div className={styles.inboxTools}><span>{unreadCount} ungelesen</span><button disabled={!activeId || loading} onClick={() => void loadInbox(activeId)} aria-label="Posteingang aktualisieren">↻</button></div>
+          <div><span>{folder === "sent" ? "GESENDET" : "POSTEINGANG"}</span><strong>{activeMailbox?.email || "Noch nicht verbunden"}</strong></div>
+          <div className={styles.inboxTools}>{folder === "inbox" && <span>{unreadCount} ungelesen</span>}<button disabled={!activeId || loading} onClick={() => void loadInbox(activeId)} aria-label="Aktualisieren">↻</button></div>
+        </div>
+        <div className={styles.folderTabs}>
+          <button type="button" className={folder === "inbox" ? styles.folderActive : undefined} onClick={() => { setFolder("inbox"); setSelectedUid(null); void loadInbox(activeId, false, "inbox"); }}>Posteingang</button>
+          <button type="button" className={folder === "sent" ? styles.folderActive : undefined} onClick={() => { setFolder("sent"); setSelectedUid(null); void loadInbox(activeId, false, "sent"); }}>Gesendet</button>
         </div>
 
         {!activeMailbox && !loading ? <div className={styles.empty}>
@@ -252,7 +261,7 @@ export default function MailWorkspace() {
           {messages.map((message) => <button key={message.uid} onClick={() => setSelectedUid(message.uid)} className={`${styles.messageRow} ${selectedUid === message.uid ? styles.selected : ""} ${message.unread ? styles.unread : ""}`}>
             <span className={styles.unreadDot}>{message.unread ? "●" : ""}</span>
             <div className={styles.messageCopy}>
-              <div><strong>{senderLabel(message)}</strong><time>{formatDate(message.date)}</time></div>
+              <div><strong>{folder === "sent" ? `An: ${message.to}` : senderLabel(message)}</strong><time>{formatDate(message.date)}</time></div>
               <b>{message.subject || "(ohne Betreff)"}</b>
               <p>{message.bodyText.replace(/\s+/g, " ").slice(0, 120)}</p>
             </div>
@@ -267,12 +276,14 @@ export default function MailWorkspace() {
               <span>{selected.unread ? "NEU" : "NACHRICHT"}</span>
               <h2>{selected.subject || "(ohne Betreff)"}</h2>
               <div className={styles.senderLine}>
-                <div className={styles.avatar}>{(selected.fromName || selected.from || "?").slice(0, 1).toUpperCase()}</div>
-                <div><strong>{senderLabel(selected)}</strong><small>{selected.from} · an {selected.to || activeMailbox?.email}</small></div>
+                <div className={styles.avatar}>{folder === "sent" ? "→" : (selected.fromName || selected.from || "?").slice(0, 1).toUpperCase()}</div>
+                {folder === "sent"
+                  ? <div><strong>An: {selected.to}</strong><small>von {activeMailbox?.email}</small></div>
+                  : <div><strong>{senderLabel(selected)}</strong><small>{selected.from} · an {selected.to || activeMailbox?.email}</small></div>}
                 <time>{selected.date ? new Intl.DateTimeFormat("de-DE", { dateStyle: "medium", timeStyle: "short" }).format(new Date(selected.date)) : ""}</time>
               </div>
             </div>
-            <button className={styles.reply} onClick={() => reply(selected)}>↩ Antworten</button>
+            {folder === "inbox" && <button className={styles.reply} onClick={() => reply(selected)}>↩ Antworten</button>}
           </div>
           <div className={styles.body}>{selected.bodyText}</div>
           <div className={styles.replyBar}><button className={styles.primary} onClick={() => reply(selected)}>↩ Antworten</button><span>Antwort wird über {activeMailbox?.email} gesendet</span></div>
