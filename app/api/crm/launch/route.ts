@@ -338,6 +338,13 @@ export async function PATCH(request: Request) {
     );
     if (!rows.length) return Response.json({ error: "Lead konnte nicht aktualisiert werden." }, { status: 409 });
 
+    // Stage moved to closed, or the lead got marked do-not-contact: kill any
+    // outbound sequence steps still queued for it right away instead of
+    // waiting for the send cron to notice on its next run.
+    if (nextStage === "Gewonnen" || nextStage === "Verloren" || doNotContact === true) {
+      await query("update er_outbox set status='stopped' where workspace='default' and lead_id=$1 and status='queued'", [input.leadId]);
+    }
+
     if (phoneStatus === "invalid" || input.outcome === "Falsche Nummer") {
       await query(
         `update sales_companies set metadata=metadata || $2::jsonb,updated_at=now() where id=$1`,

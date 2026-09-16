@@ -12,6 +12,9 @@ async function recordReply(messageId:string,from:string,subject:string,mailboxId
  const existing=await query<{id:number}>("select id from er_events where workspace='default' and type='reply' and meta->>'providerMessageId'=$1 limit 1",[messageId]);if(existing.length)return false;
  const row=await readState();const state=row?.payload as State|undefined;const lead=state?.leads?.find(l=>String(l.email||"").toLowerCase()===from);if(!lead)return false;const leadId=String(lead.id);
  await query("insert into er_events(workspace,lead_id,type,meta) values('default',$1,'reply',$2::jsonb)",[leadId,JSON.stringify({providerMessageId:messageId,from,subject,mailboxId})]);await query("update er_outbox set status='stopped' where workspace='default' and lead_id=$1 and status='queued'",[leadId]);
+ // Update the real CRM row directly - the legacy JSON mirror below gets overwritten by
+ // sales_leads on every /api/crm/launch load, so writing only there silently loses this.
+ await query("update sales_leads set intent_score=least(100,intent_score+30),stage=case when stage in ('Neu','Kontaktiert') then 'Engaged' else stage end,last_contact_at=now(),updated_at=now() where id=$1 and workspace='default'",[leadId]);
  if(state?.leads){const leads=state.leads.map(l=>String(l.id)===leadId?{...l,intentScore:Math.min(100,Number(l.intentScore||0)+30),stage:String(l.stage)==="Neu"||String(l.stage)==="Kontaktiert"?"Engaged":l.stage}:l);await writeState({...state,leads})}
  return true;
 }

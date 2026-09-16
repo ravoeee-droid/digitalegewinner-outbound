@@ -39,6 +39,7 @@ async function run(request: Request) {
     `with claim as (
        select o.id
        from er_outbox o
+       left join sales_leads sl on sl.id=o.lead_id and sl.workspace='default'
        where o.workspace='default' and o.status='queued' and o.scheduled_at<=now()
          and not exists(select 1 from er_suppressions s where s.workspace=o.workspace and lower(s.email)=lower(o.recipient))
          and not exists(
@@ -50,8 +51,9 @@ async function run(request: Request) {
                or (e.type='appointment_attended' and coalesce(o.campaign_id,'') like 'noshow:%')
              )
          )
+         and (sl.id is null or (sl.stage not in ('Gewonnen','Verloren') and not sl.do_not_contact))
        order by o.scheduled_at asc
-       for update skip locked
+       for update of o skip locked
        limit 100
      )
      update er_outbox o
