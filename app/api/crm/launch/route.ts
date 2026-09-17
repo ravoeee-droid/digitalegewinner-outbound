@@ -241,11 +241,42 @@ async function loadPayload(workspace: string) {
   const state = (stateRow?.payload || {}) as LegacyState;
   const campaigns = Array.isArray(state.campaigns) ? state.campaigns : [];
   const mailboxes = Array.isArray(state.mailboxes) ? state.mailboxes : [];
+
+  // store.campaigns (the legacy JSON mirror) only ever gets a campaign's sent/replies/
+  // positive/appointments counters set to 0 at creation - nothing increments them
+  // afterward, so the Campaigns table showed permanent zeros. Compute the real numbers
+  // from er_outbox/er_events on every load instead of trying to keep another counter in sync.
+  const campaignStatsRows = await query<{ campaign_id: string; sent: number; replies: number; positive: number; appointments: number }>(
+    `with outbox_leads as (
+       select distinct campaign_id, lead_id from er_outbox where workspace=$1 and campaign_id is not null
+     ),
+     sent_counts as (
+       select campaign_id, count(*)::int as sent from er_outbox
+       where workspace=$1 and campaign_id is not null and status='sent' group by campaign_id
+     ),
+     event_counts as (
+       select ol.campaign_id,
+         count(distinct e.lead_id) filter (where e.type in ('reply','positive_reply'))::int as replies,
+         count(distinct e.lead_id) filter (where e.type='positive_reply')::int as positive,
+         count(distinct e.lead_id) filter (where e.type='appointment')::int as appointments
+       from outbox_leads ol
+       join er_events e on e.workspace=$1 and e.lead_id=ol.lead_id
+       group by ol.campaign_id
+     )
+     select coalesce(s.campaign_id,ec.campaign_id) as campaign_id,
+       coalesce(s.sent,0) as sent, coalesce(ec.replies,0) as replies,
+       coalesce(ec.positive,0) as positive, coalesce(ec.appointments,0) as appointments
+     from sent_counts s full outer join event_counts ec on ec.campaign_id=s.campaign_id`,
+    [workspace],
+  );
+  const campaignStats = Object.fromEntries(campaignStatsRows.map((row) => [row.campaign_id, { sent: row.sent, replies: row.replies, positive: row.positive, appointments: row.appointments }]));
+
   return {
     stats: stats || { companies: 0, leads: 0, hot: 0, appointments: 0, won: 0, pipeline: 0, weighted_pipeline: 0, due_actions: 0 },
     leads,
     activities,
     calls,
+    campaignStats,
     system: { campaigns: campaigns.length, mailboxes: mailboxes.length, activeMailboxes: mailboxes.filter((mailbox) => Boolean((mailbox as Record<string, unknown>).enabled)).length },
   };
 }
