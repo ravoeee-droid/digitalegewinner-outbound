@@ -1,6 +1,6 @@
 "use client";
 
-import { DragEvent, FormEvent, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
+import { ChangeEvent, DragEvent, FormEvent, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import styles from "./pflege-pro-os.module.css";
 
 type Stage = "Neu" | "Research" | "Bereit" | "Kontaktiert" | "Engaged" | "Qualifiziert" | "Termin" | "Angebot" | "Verhandlung" | "Gewonnen" | "Verloren" | "Wiedervorlage";
@@ -194,6 +194,7 @@ export default function PflegeProOS() {
   const [toast, setToast] = useState("");
   const [error, setError] = useState("");
   const searchRef = useRef<HTMLInputElement | null>(null);
+  const pitchVideoInputRef = useRef<HTMLInputElement | null>(null);
 
   function notify(message: string) { setToast(message); window.setTimeout(() => setToast(""), 3200); }
   async function loadCrm() {
@@ -417,6 +418,19 @@ export default function PflegeProOS() {
     } catch (e) { notify(e instanceof Error ? e.message : "Einstellungen konnten nicht gespeichert werden."); }
     finally { setBusy(""); }
   }
+  async function uploadPitchVideo(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.currentTarget.files?.[0]; event.currentTarget.value = ""; if (!file) return;
+    setBusy("upload-video");
+    try {
+      const body = new FormData(); body.append("file", file);
+      const response = await fetch("/api/studio/upload-video", { method: "POST", body });
+      const json = await response.json() as { url?: string; error?: string };
+      if (!response.ok || !json.url) throw new Error(json.error || "Upload fehlgeschlagen.");
+      if (pitchVideoInputRef.current) pitchVideoInputRef.current.value = json.url;
+      notify("Video hochgeladen. Jetzt unten \"Speichern\" klicken, um es zu übernehmen.");
+    } catch (e) { notify(e instanceof Error ? e.message : "Upload fehlgeschlagen."); }
+    finally { setBusy(""); }
+  }
   async function launchCampaign(campaign: Campaign) {
     if (!activeMailboxes.length) return notify("Vor dem E-Mail-Start eine Mailbox unter /mail verbinden (IMAP/SMTP).");
     const leads = data.leads.filter((lead) => lead.email && !lead.do_not_contact && !["Gewonnen", "Verloren"].includes(lead.stage)).map((lead) => ({ id: lead.id, company: lead.company, contact: lead.contact, email: lead.email, phone: lead.phone, website: lead.website, city: lead.city, industry: lead.industry, stage: lead.stage, dealValue: lead.deal_value, notes: lead.notes, intentScore: lead.intent_score }));
@@ -505,7 +519,7 @@ export default function PflegeProOS() {
 
         {view === "analytics" && <><div className={styles.pageHead}><div><span>REVENUE ANALYTICS</span><h2>Nur die Zahlen, die Entscheidungen ändern.</h2><p>Connect Rate, Meetings, Pipeline, Research Coverage und Funnel.</p></div></div><MetricStrip /><div className={styles.twoPanels}><section className={styles.panel}><div className={styles.panelHead}><div><span>FUNNEL</span><h3>Sales conversion</h3></div></div><Funnel /></section><section className={styles.panel}><div className={styles.panelHead}><div><span>RECENT EVENTS</span><h3>Activity</h3></div></div><ActivityList items={data.activities.slice(0, 18)} /></section></div></>}
 
-        {view === "system" && <><div className={styles.pageHead}><div><span>INTEGRATIONS</span><h2>Operative Infrastruktur.</h2><p>Telefonie, Domains/Mailboxen, Studio und Research-Stack am selben CRM.</p></div></div><section className={styles.panel}><div className={styles.integrationRows}><div><span>CloudTalk</span><strong>Phone + Click-to-Dial + Call events</strong><small>{data.calls.today} calls today</small><button type="button" onClick={() => window.dispatchEvent(new Event("cloudtalk:open"))}>Open</button></div><div><span>Domains & Mail</span><strong>{sendableMailboxes.length} sendefähig · {activeMailboxes.length} aktiv</strong><small>DNS health, sender inventory, deliverability</small><button type="button" onClick={() => window.dispatchEvent(new Event("domainmail:open"))}>Open</button></div><div><span>Studio V3</span><strong>Personalized video + landing page workspace</strong><small>Lead-scoped creative production</small><a href="/studio">Open ↗</a></div><div><span>Research</span><strong>{enrichmentCoverage}% coverage</strong><small>Places + website + contacts + social + career + ATS + audit + AI brief</small><button type="button" onClick={() => selectView("intelligence")}>Open</button></div></div></section><section className={styles.panel}><div className={styles.panelHead}><div><span>ABSENDER & ANALYSE-SEITE</span><h3>Einstellungen</h3></div></div><form className={styles.dealForm} onSubmit={saveSettings}><div className={styles.formGrid}><label>Firmenname<input name="companyName" defaultValue={store.settings.companyName} /></label><label>Absendername<input name="senderName" defaultValue={store.settings.senderName} /></label><label>Kalender-Link (Termin buchen)<input name="calendarUrl" defaultValue={store.settings.calendarUrl} placeholder="https://cal.com/..." /></label><label>Pitch-Video-URL<input name="pitchVideoUrl" defaultValue={store.settings.pitchVideoUrl || ""} placeholder="https://.../pitch.mp4" /></label></div><p className={styles.mutedText}>Ein Video für alle Leads · erscheint auf jeder Analyse-Seite (/a/&lt;leadId&gt;) neben der echten, live eingebetteten Website des jeweiligen Leads.</p><footer><button className={styles.primaryButton} disabled={busy === "settings"}>{busy === "settings" ? "Speichert…" : "Speichern"}</button></footer></form></section></>}
+        {view === "system" && <><div className={styles.pageHead}><div><span>INTEGRATIONS</span><h2>Operative Infrastruktur.</h2><p>Telefonie, Domains/Mailboxen, Studio und Research-Stack am selben CRM.</p></div></div><section className={styles.panel}><div className={styles.integrationRows}><div><span>CloudTalk</span><strong>Phone + Click-to-Dial + Call events</strong><small>{data.calls.today} calls today</small><button type="button" onClick={() => window.dispatchEvent(new Event("cloudtalk:open"))}>Open</button></div><div><span>Domains & Mail</span><strong>{sendableMailboxes.length} sendefähig · {activeMailboxes.length} aktiv</strong><small>DNS health, sender inventory, deliverability</small><button type="button" onClick={() => window.dispatchEvent(new Event("domainmail:open"))}>Open</button></div><div><span>Studio V3</span><strong>Personalized video + landing page workspace</strong><small>Lead-scoped creative production</small><a href="/studio">Open ↗</a></div><div><span>Research</span><strong>{enrichmentCoverage}% coverage</strong><small>Places + website + contacts + social + career + ATS + audit + AI brief</small><button type="button" onClick={() => selectView("intelligence")}>Open</button></div></div></section><section className={styles.panel}><div className={styles.panelHead}><div><span>ABSENDER & ANALYSE-SEITE</span><h3>Einstellungen</h3></div></div><form className={styles.dealForm} onSubmit={saveSettings}><div className={styles.formGrid}><label>Firmenname<input name="companyName" defaultValue={store.settings.companyName} /></label><label>Absendername<input name="senderName" defaultValue={store.settings.senderName} /></label><label>Kalender-Link (Termin buchen)<input name="calendarUrl" defaultValue={store.settings.calendarUrl} placeholder="https://cal.com/..." /></label></div><label className={styles.fullField}>Pitch-Video<input ref={pitchVideoInputRef} name="pitchVideoUrl" defaultValue={store.settings.pitchVideoUrl || ""} placeholder="https://.../pitch.mp4 · oder Datei hochladen" /><span style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 6 }}><input type="file" accept="video/*" onChange={uploadPitchVideo} disabled={busy === "upload-video"} style={{ fontSize: 11 }} />{busy === "upload-video" && <small>Lädt hoch…</small>}</span></label><p className={styles.mutedText}>Ein Video für alle Leads · erscheint auf jeder Analyse-Seite (/a/&lt;leadId&gt;) neben der echten, live eingebetteten Website des jeweiligen Leads.</p><footer><button className={styles.primaryButton} disabled={busy === "settings"}>{busy === "settings" ? "Speichert…" : "Speichern"}</button></footer></form></section></>}
       </main>
     </section></div>
 
