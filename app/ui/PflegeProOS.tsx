@@ -88,7 +88,7 @@ type InboxItem = { id: number; leadId: string; company: string; contact: string;
 type Step = { waitDays: number; subject: string; body: string; variants?: Array<{ label: string; subject: string; body: string }> };
 type Campaign = { id: string; name: string; audience: string; status: "Entwurf" | "Aktiv" | "Pausiert"; dailyLimit: number; steps: Step[]; sent: number; replies: number; positive: number; appointments: number };
 type Mailbox = { id: string; name: string; email: string; provider: string; dailyLimit: number; sentToday: number; warmupDay: number; health: number; enabled: boolean; spf?: boolean; dkim?: boolean; dmarc?: boolean };
-type Store = { campaigns: Campaign[]; mailboxes: Mailbox[]; settings: { companyName: string; senderName: string; calendarUrl: string; timezone: string }; [key: string]: unknown };
+type Store = { campaigns: Campaign[]; mailboxes: Mailbox[]; settings: { companyName: string; senderName: string; calendarUrl: string; timezone: string; pitchVideoUrl?: string }; [key: string]: unknown };
 type ResearchDetail = {
   lead?: { id: string; companyId: string; company: string; city: string; industry: string; website: string; companyPhone: string; metadata: Record<string, unknown> };
   contact?: { id: string | null; name: string; email: string; phone: string; metadata: Record<string, unknown> };
@@ -402,6 +402,21 @@ export default function PflegeProOS() {
     finally { setBusy(""); }
   }
   async function saveStore(next: Store) { const response = await fetch("/api/state", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(next) }); if (!response.ok) throw new Error("State konnte nicht gespeichert werden."); setStore(next); }
+  async function saveSettings(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault(); const form = new FormData(event.currentTarget); setBusy("settings");
+    try {
+      const settings = {
+        companyName: String(form.get("companyName") || "").trim() || store.settings.companyName,
+        senderName: String(form.get("senderName") || "").trim() || store.settings.senderName,
+        calendarUrl: String(form.get("calendarUrl") || "").trim(),
+        timezone: store.settings.timezone,
+        pitchVideoUrl: String(form.get("pitchVideoUrl") || "").trim(),
+      };
+      await saveStore({ ...store, settings });
+      notify("Einstellungen gespeichert.");
+    } catch (e) { notify(e instanceof Error ? e.message : "Einstellungen konnten nicht gespeichert werden."); }
+    finally { setBusy(""); }
+  }
   async function launchCampaign(campaign: Campaign) {
     if (!activeMailboxes.length) return notify("Vor dem E-Mail-Start eine Mailbox unter /mail verbinden (IMAP/SMTP).");
     const leads = data.leads.filter((lead) => lead.email && !lead.do_not_contact && !["Gewonnen", "Verloren"].includes(lead.stage)).map((lead) => ({ id: lead.id, company: lead.company, contact: lead.contact, email: lead.email, phone: lead.phone, website: lead.website, city: lead.city, industry: lead.industry, stage: lead.stage, dealValue: lead.deal_value, notes: lead.notes, intentScore: lead.intent_score }));
@@ -490,7 +505,7 @@ export default function PflegeProOS() {
 
         {view === "analytics" && <><div className={styles.pageHead}><div><span>REVENUE ANALYTICS</span><h2>Nur die Zahlen, die Entscheidungen ändern.</h2><p>Connect Rate, Meetings, Pipeline, Research Coverage und Funnel.</p></div></div><MetricStrip /><div className={styles.twoPanels}><section className={styles.panel}><div className={styles.panelHead}><div><span>FUNNEL</span><h3>Sales conversion</h3></div></div><Funnel /></section><section className={styles.panel}><div className={styles.panelHead}><div><span>RECENT EVENTS</span><h3>Activity</h3></div></div><ActivityList items={data.activities.slice(0, 18)} /></section></div></>}
 
-        {view === "system" && <><div className={styles.pageHead}><div><span>INTEGRATIONS</span><h2>Operative Infrastruktur.</h2><p>Telefonie, Domains/Mailboxen, Studio und Research-Stack am selben CRM.</p></div></div><section className={styles.panel}><div className={styles.integrationRows}><div><span>CloudTalk</span><strong>Phone + Click-to-Dial + Call events</strong><small>{data.calls.today} calls today</small><button type="button" onClick={() => window.dispatchEvent(new Event("cloudtalk:open"))}>Open</button></div><div><span>Domains & Mail</span><strong>{sendableMailboxes.length} sendefähig · {activeMailboxes.length} aktiv</strong><small>DNS health, sender inventory, deliverability</small><button type="button" onClick={() => window.dispatchEvent(new Event("domainmail:open"))}>Open</button></div><div><span>Studio V3</span><strong>Personalized video + landing page workspace</strong><small>Lead-scoped creative production</small><a href="/studio">Open ↗</a></div><div><span>Research</span><strong>{enrichmentCoverage}% coverage</strong><small>Places + website + contacts + social + career + ATS + audit + AI brief</small><button type="button" onClick={() => selectView("intelligence")}>Open</button></div></div></section></>}
+        {view === "system" && <><div className={styles.pageHead}><div><span>INTEGRATIONS</span><h2>Operative Infrastruktur.</h2><p>Telefonie, Domains/Mailboxen, Studio und Research-Stack am selben CRM.</p></div></div><section className={styles.panel}><div className={styles.integrationRows}><div><span>CloudTalk</span><strong>Phone + Click-to-Dial + Call events</strong><small>{data.calls.today} calls today</small><button type="button" onClick={() => window.dispatchEvent(new Event("cloudtalk:open"))}>Open</button></div><div><span>Domains & Mail</span><strong>{sendableMailboxes.length} sendefähig · {activeMailboxes.length} aktiv</strong><small>DNS health, sender inventory, deliverability</small><button type="button" onClick={() => window.dispatchEvent(new Event("domainmail:open"))}>Open</button></div><div><span>Studio V3</span><strong>Personalized video + landing page workspace</strong><small>Lead-scoped creative production</small><a href="/studio">Open ↗</a></div><div><span>Research</span><strong>{enrichmentCoverage}% coverage</strong><small>Places + website + contacts + social + career + ATS + audit + AI brief</small><button type="button" onClick={() => selectView("intelligence")}>Open</button></div></div></section><section className={styles.panel}><div className={styles.panelHead}><div><span>ABSENDER & ANALYSE-SEITE</span><h3>Einstellungen</h3></div></div><form className={styles.dealForm} onSubmit={saveSettings}><div className={styles.formGrid}><label>Firmenname<input name="companyName" defaultValue={store.settings.companyName} /></label><label>Absendername<input name="senderName" defaultValue={store.settings.senderName} /></label><label>Kalender-Link (Termin buchen)<input name="calendarUrl" defaultValue={store.settings.calendarUrl} placeholder="https://cal.com/..." /></label><label>Pitch-Video-URL<input name="pitchVideoUrl" defaultValue={store.settings.pitchVideoUrl || ""} placeholder="https://.../pitch.mp4" /></label></div><p className={styles.mutedText}>Ein Video für alle Leads · erscheint auf jeder Analyse-Seite (/a/&lt;leadId&gt;) neben der echten, live eingebetteten Website des jeweiligen Leads.</p><footer><button className={styles.primaryButton} disabled={busy === "settings"}>{busy === "settings" ? "Speichert…" : "Speichern"}</button></footer></form></section></>}
       </main>
     </section></div>
 

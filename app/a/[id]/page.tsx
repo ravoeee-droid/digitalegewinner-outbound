@@ -6,8 +6,16 @@ export const dynamic = "force-dynamic";
 
 type Priority={rank:number;title:string;why:string;action:string;expectedImpact:string};
 type WebsiteAudit={scores?:{overall?:number;conversion?:number;trust?:number;seo?:number;technical?:number;content?:number};priorities?:Priority[];sales?:{opportunitySummary?:string}};
-type Lead={id:string;company:string;contact:string;city:string;industry:string;energyScore?:number;intentScore?:number;websiteScore?:number;websiteAudit?:WebsiteAudit;videoUrl?:string};
-type Store={leads:Lead[];settings?:{companyName?:string;senderName?:string;calendarUrl?:string}};
+type Lead={id:string;company:string;contact:string;city:string;industry:string;website?:string;energyScore?:number;intentScore?:number;websiteScore?:number;websiteAudit?:WebsiteAudit;videoUrl?:string};
+type Store={leads:Lead[];settings?:{companyName?:string;senderName?:string;calendarUrl?:string;pitchVideoUrl?:string}};
+
+function normalizedWebsite(value?:string){
+  const raw=(value||"").trim();if(!raw)return "";
+  try{return new URL(/^https?:\/\//i.test(raw)?raw:`https://${raw}`).toString()}catch{return ""}
+}
+function displayDomain(value:string){
+  try{return new URL(value).hostname.replace(/^www\./,"")}catch{return value}
+}
 
 function scoreColor(value:number){return value>=80?"#62e9a8":value>=60?"#f1cc72":"#ff8f96"}
 
@@ -19,6 +27,8 @@ export default async function AnalysisPage({params}:{params:Promise<{id:string}>
   const company=settings?.companyName&&settings.companyName!=="Walkenhorst Energie"?settings.companyName:"Digitale Gewinner";
   const sender=settings?.senderName&&settings.senderName!=="Andreas Walkenhorst"?settings.senderName:"Raphael Hermann";
   const audit=lead.websiteAudit;
+  const website=normalizedWebsite(lead.website);
+  const pitchVideoUrl=lead.videoUrl||settings?.pitchVideoUrl||"";
   const websiteScore=Math.round(Number(lead.websiteScore||audit?.scores?.overall||0));
   const opportunity=Math.max(websiteScore,Number(lead.intentScore||0),Number(lead.energyScore||0));
   const priorities=(audit?.priorities||[]).slice(0,3);
@@ -35,7 +45,21 @@ export default async function AnalysisPage({params}:{params:Promise<{id:string}>
       <header style={{display:"flex",justifyContent:"space-between",gap:18,alignItems:"center",marginBottom:46}}><div style={{fontSize:12,letterSpacing:".18em",color:"#63eaaa",fontWeight:900}}>{company.toUpperCase()} · PERSÖNLICHE ANALYSE</div><div style={{fontSize:11,color:"#5f6d80"}}>für {lead.company}</div></header>
       <section style={{display:"grid",gridTemplateColumns:"minmax(0,1.25fr) minmax(260px,.75fr)",gap:30,alignItems:"end"}}><div><div style={{display:"inline-block",padding:"7px 10px",border:"1px solid #244234",borderRadius:999,color:"#77ebb5",fontSize:10,fontWeight:800,letterSpacing:".08em"}}>KURZANALYSE · KEIN STANDARD-PITCH</div><h1 style={{fontSize:"clamp(38px,7vw,76px)",lineHeight:.98,letterSpacing:"-.055em",maxWidth:820,margin:"18px 0"}}>3 konkrete digitale Hebel für {lead.company}</h1><p style={{maxWidth:730,color:"#99a6b9",fontSize:18,lineHeight:1.65,margin:0}}>{summary}</p></div><div style={{border:"1px solid #243247",borderRadius:22,padding:22,background:"linear-gradient(145deg,#0d1622,#091019)"}}><small style={{color:"#718097",textTransform:"uppercase",letterSpacing:".12em"}}>Opportunity Signal</small><strong style={{display:"block",fontSize:54,lineHeight:1,marginTop:10,color:scoreColor(opportunity)}}>{opportunity||"—"}</strong><span style={{fontSize:12,color:"#647287"}}>{opportunity?"von 100":"wird im Gespräch qualifiziert"}</span></div></section>
 
-      {lead.videoUrl&&<section style={{margin:"34px 0",border:"1px solid #223244",borderRadius:24,padding:10,background:"#05080d",overflow:"hidden",boxShadow:"0 30px 80px rgba(0,0,0,.28)"}}><div style={{padding:"10px 12px 14px",fontSize:11,color:"#738198",fontWeight:700}}>Persönliches Kurzvideo für {lead.company}</div><video controls preload="metadata" src={lead.videoUrl} style={{width:"100%",display:"block",borderRadius:16,aspectRatio:"16/9",background:"#000"}}/></section>}
+      {pitchVideoUrl&&<section style={{margin:"34px 0",border:"1px solid #223244",borderRadius:24,padding:10,background:"#05080d",overflow:"hidden",boxShadow:"0 30px 80px rgba(0,0,0,.28)"}}>
+        <div style={{padding:"10px 12px 14px",fontSize:11,color:"#738198",fontWeight:700}}>Persönliches Kurzvideo für {lead.company}</div>
+        <div style={{display:"grid",gridTemplateColumns:website?"minmax(0,1.3fr) minmax(0,1fr)":"1fr",gap:10}}>
+          <video controls preload="metadata" src={pitchVideoUrl} style={{width:"100%",display:"block",borderRadius:16,aspectRatio:"16/9",background:"#000"}}/>
+          {website&&<div style={{borderRadius:16,overflow:"hidden",background:"#0b0f16",border:"1px solid #1b2536",display:"flex",flexDirection:"column"}}>
+            <div style={{display:"flex",alignItems:"center",gap:6,padding:"8px 10px",background:"#11161f",borderBottom:"1px solid #1b2536"}}>
+              <i style={{width:7,height:7,borderRadius:"50%",background:"#ff5f57",display:"inline-block"}}/>
+              <i style={{width:7,height:7,borderRadius:"50%",background:"#febc2e",display:"inline-block"}}/>
+              <i style={{width:7,height:7,borderRadius:"50%",background:"#28c840",display:"inline-block"}}/>
+              <span style={{marginLeft:6,fontSize:10,color:"#8593a8",fontFamily:"monospace",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{displayDomain(website)}</span>
+            </div>
+            <iframe src={website} title={`${lead.company} Website`} sandbox="allow-same-origin allow-scripts" loading="lazy" style={{flex:1,minHeight:220,width:"100%",border:0,background:"#fff"}}/>
+          </div>}
+        </div>
+      </section>}
 
       {scores.length>0&&<div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(175px,1fr))",gap:12,margin:"34px 0"}}>{scores.map(([label,value])=><div key={label} style={{border:"1px solid #1f2b3b",borderRadius:17,padding:19,background:"#0c141e"}}><small style={{color:"#728096",textTransform:"uppercase",letterSpacing:".1em"}}>{label}</small><strong style={{display:"block",fontSize:28,marginTop:7,color:scoreColor(value)}}>{value}/100</strong></div>)}</div>}
 
