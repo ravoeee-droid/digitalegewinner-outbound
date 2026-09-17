@@ -1,4 +1,5 @@
 import { query } from "@/lib/db";
+import SendDraftButton from "./SendDraftButton";
 
 export const dynamic = "force-dynamic";
 
@@ -124,6 +125,11 @@ export default async function OutreachPage() {
                           <pre style={{ margin: 0, whiteSpace: "pre-wrap", fontFamily: "inherit", color: "#aeb6c2", fontSize: 12, lineHeight: 1.55 }}>{row.body}</pre>
                         </div>
                       </details>
+                      {row.status === "draft" && (
+                        <div style={{ marginTop: 10 }}>
+                          <SendDraftButton outreachId={row.id} />
+                        </div>
+                      )}
                     </td>
                   </tr>
                 ))}
