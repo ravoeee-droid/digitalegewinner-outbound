@@ -271,12 +271,37 @@ async function loadPayload(workspace: string) {
   );
   const campaignStats = Object.fromEntries(campaignStatsRows.map((row) => [row.campaign_id, { sent: row.sent, replies: row.replies, positive: row.positive, appointments: row.appointments }]));
 
+  // Per-variant breakdown (A/B subject-line tests) - only meaningful where a campaign
+  // step actually defines variants, but cheap enough to always compute.
+  const variantRows = await query<{ campaign_id: string; variant: string; sent: number; replies: number }>(
+    `with variant_sent as (
+       select campaign_id, variant, count(*)::int as sent from er_outbox
+       where workspace=$1 and campaign_id is not null and status='sent' group by campaign_id, variant
+     ),
+     variant_leads as (
+       select distinct campaign_id, variant, lead_id from er_outbox where workspace=$1 and campaign_id is not null
+     ),
+     variant_replies as (
+       select vl.campaign_id, vl.variant, count(distinct e.lead_id)::int as replies
+       from variant_leads vl
+       join er_events e on e.workspace=$1 and e.lead_id=vl.lead_id and e.type in ('reply','positive_reply')
+       group by vl.campaign_id, vl.variant
+     )
+     select coalesce(vs.campaign_id,vr.campaign_id) as campaign_id, coalesce(vs.variant,vr.variant) as variant,
+       coalesce(vs.sent,0) as sent, coalesce(vr.replies,0) as replies
+     from variant_sent vs full outer join variant_replies vr on vr.campaign_id=vs.campaign_id and vr.variant=vs.variant`,
+    [workspace],
+  );
+  const campaignVariantStats: Record<string, Array<{ variant: string; sent: number; replies: number }>> = {};
+  for (const row of variantRows) (campaignVariantStats[row.campaign_id] ||= []).push({ variant: row.variant, sent: row.sent, replies: row.replies });
+
   return {
     stats: stats || { companies: 0, leads: 0, hot: 0, appointments: 0, won: 0, pipeline: 0, weighted_pipeline: 0, due_actions: 0 },
     leads,
     activities,
     calls,
     campaignStats,
+    campaignVariantStats,
     system: { campaigns: campaigns.length, mailboxes: mailboxes.length, activeMailboxes: mailboxes.filter((mailbox) => Boolean((mailbox as Record<string, unknown>).enabled)).length },
   };
 }

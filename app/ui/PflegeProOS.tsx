@@ -82,6 +82,7 @@ type Payload = {
   leads: Lead[];
   activities: Activity[];
   campaignStats?: Record<string, { sent: number; replies: number; positive: number; appointments: number }>;
+  campaignVariantStats?: Record<string, Array<{ variant: string; sent: number; replies: number }>>;
   system: { campaigns: number; mailboxes: number; activeMailboxes: number };
 };
 type FoundLead = { id: string; company: string; contact: string; email: string; phone: string; website: string; city: string; industry: string; lat?: number; lng?: number };
@@ -388,11 +389,17 @@ export default function PflegeProOS() {
       const audience = String(form.get("audience") || "").trim();
       const offer = String(form.get("offer") || "").trim();
       const response = await fetch("/api/ai/campaign", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ audience, offer, sender: store.settings.senderName }) });
-      const json = await response.json() as { name?: string; audience?: string; steps?: Array<{ waitDays: number; subject: string; body: string }>; error?: string };
+      const json = await response.json() as { name?: string; audience?: string; steps?: Step[]; firstStepSubjectVariantB?: string; error?: string };
       if (!response.ok || !json.steps) throw new Error(json.error || "Kampagne konnte nicht erstellt werden.");
+      const steps = [...json.steps];
+      // Wire the AI's second subject-line angle into an A/B test on the first touch -
+      // that's the step where open rate (and therefore the subject line) matters most.
+      if (steps[0] && json.firstStepSubjectVariantB) {
+        steps[0] = { ...steps[0], variants: [{ label: "A", subject: steps[0].subject, body: steps[0].body }, { label: "B", subject: json.firstStepSubjectVariantB, body: steps[0].body }] };
+      }
       const campaign: Campaign = {
         id: crypto.randomUUID(), name: json.name || audience, audience: json.audience || audience,
-        status: "Entwurf", dailyLimit: 30, sent: 0, replies: 0, positive: 0, appointments: 0, steps: json.steps,
+        status: "Entwurf", dailyLimit: 30, sent: 0, replies: 0, positive: 0, appointments: 0, steps,
       };
       await saveStore({ ...store, campaigns: [...store.campaigns, campaign] });
       setCampaignGenOpen(false);
@@ -536,7 +543,10 @@ export default function PflegeProOS() {
         {view === "meetings" && <><div className={styles.pageHead}><div><span>MEETINGS</span><h2>Vorbereitung statt Kalenderliste.</h2><p>Research und Deal-Kontext für jeden anstehenden Termin.</p></div></div><section className={styles.panel}><LeadTable rows={data.leads.filter((lead) => lead.stage === "Termin")} selectable={false} /></section></>}
         {view === "proposals" && <><div className={styles.pageHead}><div><span>PROPOSALS</span><h2>Angebote & Verhandlung.</h2><p>Offene Deals nach Wert, Probability und Next Action.</p></div></div><section className={styles.panel}><LeadTable rows={data.leads.filter((lead) => ["Angebot", "Verhandlung"].includes(lead.stage))} selectable={false} /></section></>}
 
-        {view === "campaigns" && <><div className={styles.pageHead}><div><span>CAMPAIGNS</span><h2>Outbound-Sequenzen.</h2><p>Mailboxen, Versandlimit, Replies und Meetings ohne übergroße Cards.</p></div><div className={styles.pageHeadActions}><span className={styles.softBadge}>{activeMailboxes.length} active mailboxes</span><button className={styles.primaryButton} type="button" onClick={() => setCampaignGenOpen(true)}>+ Neue Kampagne</button></div></div><section className={styles.panel}><div className={styles.tableWrap}><table className={styles.campaignTable}><thead><tr><th>Campaign</th><th>Audience</th><th>Status</th><th>Sequence</th><th>Sent</th><th>Replies</th><th>Positive</th><th>Meetings</th><th></th></tr></thead><tbody>{store.campaigns.map((campaign) => { const live = data.campaignStats?.[campaign.id]; return <tr key={campaign.id}><td><strong>{campaign.name}</strong></td><td>{campaign.audience}</td><td><span className={styles.softBadge}>{campaign.status}</span></td><td>{campaign.steps.length} steps · {campaign.dailyLimit}/d</td><td>{live?.sent ?? campaign.sent ?? 0}</td><td>{live?.replies ?? campaign.replies ?? 0}</td><td>{live?.positive ?? campaign.positive ?? 0}</td><td>{live?.appointments ?? campaign.appointments ?? 0}</td><td><button className={styles.primaryTiny} type="button" onClick={() => void launchCampaign(campaign)} disabled={busy === campaign.id} title={campaign.status === "Aktiv" ? "Bereits enrollte Leads werden übersprungen - nur neue Leads werden ergänzt." : undefined}>{busy === campaign.id ? "Startet…" : campaign.status === "Aktiv" ? "Neue Leads ergänzen" : "Launch"}</button></td></tr>; })}</tbody></table></div></section></>}
+        {view === "campaigns" && <><div className={styles.pageHead}><div><span>CAMPAIGNS</span><h2>Outbound-Sequenzen.</h2><p>Mailboxen, Versandlimit, Replies und Meetings ohne übergroße Cards.</p></div><div className={styles.pageHeadActions}><span className={styles.softBadge}>{activeMailboxes.length} active mailboxes</span><button className={styles.primaryButton} type="button" onClick={() => setCampaignGenOpen(true)}>+ Neue Kampagne</button></div></div><section className={styles.panel}><div className={styles.tableWrap}><table className={styles.campaignTable}><thead><tr><th>Campaign</th><th>Audience</th><th>Status</th><th>Sequence</th><th>Sent</th><th>Replies</th><th>Positive</th><th>Meetings</th><th></th></tr></thead><tbody>{store.campaigns.map((campaign) => { const live = data.campaignStats?.[campaign.id]; const variants = data.campaignVariantStats?.[campaign.id] || []; return [
+          <tr key={campaign.id}><td><strong>{campaign.name}</strong></td><td>{campaign.audience}</td><td><span className={styles.softBadge}>{campaign.status}</span></td><td>{campaign.steps.length} steps · {campaign.dailyLimit}/d</td><td>{live?.sent ?? campaign.sent ?? 0}</td><td>{live?.replies ?? campaign.replies ?? 0}</td><td>{live?.positive ?? campaign.positive ?? 0}</td><td>{live?.appointments ?? campaign.appointments ?? 0}</td><td><button className={styles.primaryTiny} type="button" onClick={() => void launchCampaign(campaign)} disabled={busy === campaign.id} title={campaign.status === "Aktiv" ? "Bereits enrollte Leads werden übersprungen - nur neue Leads werden ergänzt." : undefined}>{busy === campaign.id ? "Startet…" : campaign.status === "Aktiv" ? "Neue Leads ergänzen" : "Launch"}</button></td></tr>,
+          variants.length > 1 && <tr key={`${campaign.id}-variants`}><td colSpan={9} style={{ padding: "6px 10px", fontSize: 11, color: "#6b7280", background: "rgba(0,0,0,.02)" }}>A/B Betreffzeile: {variants.map((v) => `${v.variant} ${v.sent} gesendet · ${v.replies} Antworten${v.sent ? ` (${Math.round(v.replies / v.sent * 100)}%)` : ""}`).join("  ·  ")}</td></tr>,
+        ]; })}</tbody></table></div></section></>}
 
         {view === "inbox" && <><div className={styles.pageHead}><div><span>UNIFIED INBOX</span><h2>Replies mit CRM-Kontext.</h2><p>Antworten direkt mit Lead und Stage verknüpft.</p></div><button className={styles.quietButton} type="button" onClick={() => void loadInbox()}>Refresh inbox</button></div><section className={styles.panel}><div className={styles.inboxList}>{inbox.map((item) => <button key={item.id} type="button" onClick={() => item.leadId && openInspector(item.leadId, "timeline")}><span>✉</span><div><strong>{item.company || item.from}</strong><p>{item.subject}</p><small>{item.from} · {fmtDate(item.createdAt, true)}</small></div><StagePill stage={(STAGES.includes(item.stage as Stage) ? item.stage : "Kontaktiert") as Stage} /></button>)}{!inbox.length && <div className={styles.empty}>Noch keine Antworten.</div>}</div></section></>}
 
