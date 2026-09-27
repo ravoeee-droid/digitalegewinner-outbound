@@ -110,6 +110,19 @@ export const campaignVersionSchema = z.object({
   approvedAt: z.coerce.date().optional().nullable(),
   publishedAt: z.coerce.date().optional().nullable(),
   contentHash: z.string().min(8).optional(),
+}).superRefine((value, ctx) => {
+  const ids = new Set<string>();
+  const orders = new Set<number>();
+  for (const [index, step] of value.steps.entries()) {
+    if (ids.has(step.id)) {
+      ctx.addIssue({ code: "custom", path: ["steps", index, "id"], message: "Step IDs must be unique." });
+    }
+    if (orders.has(step.order)) {
+      ctx.addIssue({ code: "custom", path: ["steps", index, "order"], message: "Step order values must be unique." });
+    }
+    ids.add(step.id);
+    orders.add(step.order);
+  }
 });
 export type CampaignVersion = z.infer<typeof campaignVersionSchema>;
 
@@ -152,6 +165,22 @@ export const experimentSpecSchema = z.object({
   practicalEffectThreshold: z.number().min(0).max(1).default(0.01),
   arms: z.array(experimentArmSchema).min(2).max(8),
   stopPolicy: z.record(z.string(), z.unknown()).default({}),
+}).superRefine((value, ctx) => {
+  const keys = new Set<string>();
+  let totalWeight = 0;
+  for (const [index, arm] of value.arms.entries()) {
+    if (keys.has(arm.key)) {
+      ctx.addIssue({ code: "custom", path: ["arms", index, "key"], message: "Experiment arm keys must be unique." });
+    }
+    keys.add(arm.key);
+    totalWeight += arm.weight;
+  }
+  if (Math.abs(totalWeight - 1) > 0.000001) {
+    ctx.addIssue({ code: "custom", path: ["arms"], message: "Experiment arm weights must sum to 1." });
+  }
+  if (value.guardrailMetrics.includes(value.primaryMetric)) {
+    ctx.addIssue({ code: "custom", path: ["guardrailMetrics"], message: "Primary metric must not be duplicated as a guardrail metric." });
+  }
 });
 export type ExperimentSpec = z.infer<typeof experimentSpecSchema>;
 
