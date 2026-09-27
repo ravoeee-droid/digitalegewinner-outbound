@@ -25,7 +25,7 @@ create table if not exists public.outbound_workflow_runs (
   terminal_reason text,
   next_wake_at timestamptz,
   attempt integer not null default 0 check (attempt >= 0),
-  max_attempts integer not null default 10 check (max_attempts > 0),
+  max_attempts integer not null default 288 check (max_attempts > 0),
   lease_owner text,
   lease_expires_at timestamptz,
   last_error text,
