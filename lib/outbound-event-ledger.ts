@@ -1,5 +1,6 @@
 import { query } from "@/lib/db";
 import { outboundEventSchema, type OutboundEvent } from "@/lib/outbound-contracts";
+import { getOutboundRuntimeConfig } from "@/lib/outbound-runtime-config";
 
 type EventRow = {
   id: string;
@@ -75,4 +76,22 @@ export async function recordOutboundEvent(input: OutboundEvent) {
     id: existing[0]?.id ?? null,
     occurredAt: existing[0]?.occurred_at ?? event.occurredAt,
   };
+}
+
+
+export async function recordOutboundEventByMode(input: OutboundEvent) {
+  const { v3Mode } = getOutboundRuntimeConfig();
+  if (v3Mode === "off") {
+    return { mode: v3Mode, skipped: true as const };
+  }
+
+  try {
+    const result = await recordOutboundEvent(input);
+    return { mode: v3Mode, skipped: false as const, ...result };
+  } catch (error) {
+    if (v3Mode === "active") throw error;
+    const message = error instanceof Error ? error.message : "Unknown V3 event ledger error";
+    console.error("[outbound-v3-shadow] event write failed", message);
+    return { mode: v3Mode, skipped: false as const, inserted: false, error: message };
+  }
 }
