@@ -112,25 +112,41 @@ Only after:
 
 Then legacy tables may be marked deprecated. Dropping them requires a separate migration and explicit review.
 
-## Migration flags
+## Runtime control plane
 
-Target flags:
+Normal operational mode is stored in `outbound_runtime_settings` and changed through the authenticated V3 control plane with optimistic version checks and an audit event.
+
+The equivalent environment variables remain higher-priority infrastructure overrides:
 
 ```
 OUTBOUND_OS_V3_MODE=off|shadow|active
 OUTBOUND_COMPLIANCE_MODE=off|shadow|enforce
 OUTBOUND_AUTONOMY_LEVEL=0..5
 OUTBOUND_DURABLE_WORKFLOWS_MODE=off|shadow|active
+OUTBOUND_EMERGENCY_KILL_SWITCH=true|false
 ```
 
-Defaults during first production deployment:
+If an environment override is absent, the database value is used. `OUTBOUND_EMERGENCY_KILL_SWITCH=true` always forces V3/workflows off and autonomy L0.
+
+Initial database state:
 
 ```
-OUTBOUND_OS_V3_MODE=shadow
-OUTBOUND_COMPLIANCE_MODE=shadow
-OUTBOUND_AUTONOMY_LEVEL=2
-OUTBOUND_DURABLE_WORKFLOWS_MODE=off
+v3_mode=off
+compliance_mode=off
+autonomy_level=2
+durable_workflows_mode=off
 ```
+
+First controlled production transition after the control-plane build is healthy:
+
+```
+v3_mode=shadow
+compliance_mode=shadow
+autonomy_level=2
+durable_workflows_mode=off
+```
+
+The control plane must reject `active`, compliance `enforce`, workflow execution and autonomy above L2 until their capability gates are explicitly marked ready.
 
 ## Production promotion checklist
 

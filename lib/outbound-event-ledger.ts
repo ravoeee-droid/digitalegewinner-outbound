@@ -1,6 +1,6 @@
 import { query } from "@/lib/db";
 import { outboundEventSchema, type OutboundEventInput } from "@/lib/outbound-contracts";
-import { getOutboundRuntimeConfig } from "@/lib/outbound-runtime-config";
+import { resolveOutboundRuntimeConfig } from "@/lib/outbound-runtime-config";
 
 type EventRow = {
   id: string;
@@ -80,7 +80,7 @@ export async function recordOutboundEvent(input: OutboundEventInput) {
 
 
 export async function recordOutboundEventByMode(input: OutboundEventInput) {
-  const { v3Mode } = getOutboundRuntimeConfig();
+  const { v3Mode } = await resolveOutboundRuntimeConfig(input.workspace ?? "default");
   if (v3Mode === "off") {
     return { mode: v3Mode, skipped: true as const };
   }

@@ -3,7 +3,7 @@ import { getMailboxAccessToken } from "@/lib/mailer";
 import { loadMailboxCredentials, type StoredMailboxCredential } from "@/lib/mailbox-credentials";
 import { listImapMessages, type ImapMailboxCredential } from "@/lib/imap-client";
 import { recordOutboundEventByMode } from "@/lib/outbound-event-ledger";
-import { getOutboundRuntimeConfig } from "@/lib/outbound-runtime-config";
+import { resolveOutboundRuntimeConfig } from "@/lib/outbound-runtime-config";
 
 export const runtime="nodejs";export const maxDuration=60;
 type State={leads?:Array<Record<string,unknown>>};
@@ -124,7 +124,7 @@ async function syncImap(c:Credential){
 }
 async function run(request:Request){
  if(!auth(request))return Response.json({error:"Unauthorized"},{status:401});
- if(getOutboundRuntimeConfig().v3Mode==="active"){
+ if((await resolveOutboundRuntimeConfig()).v3Mode==="active"){
   return Response.json({error:"Legacy reply worker is disabled while Outbound OS V3 is active."},{status:409});
  }
  let credentials:Credential[]=[];try{credentials=await loadMailboxCredentials()}catch{return Response.json({error:"Mailbox Credentials JSON ungültig."},{status:503})}let replies=0,bounces=0;const errors:string[]=[];for(const c of credentials){try{if(c.provider==="gmail")replies+=await syncGmail(c);else if(c.provider==="microsoft")replies+=await syncMicrosoft(c);else if(c.provider==="smtp"&&(c as ImapMailboxCredential).imapHost){const r=await syncImap(c);replies+=r.replies;bounces+=r.bounces}}catch(e){errors.push(`${c.id}: ${e instanceof Error?e.message:"Sync Fehler"}`)}}return Response.json({ok:true,mailboxes:credentials.length,newReplies:replies,newBounces:bounces,errors})}

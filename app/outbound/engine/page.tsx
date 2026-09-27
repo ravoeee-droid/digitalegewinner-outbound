@@ -1,6 +1,7 @@
 import Link from "next/link";
 import OpenOutreachSyncButton from "@/app/ui/OpenOutreachSyncButton";
 import OutboundEngineRuntime from "@/app/ui/OutboundEngineRuntime";
+import OutboundV3ControlPanel from "@/app/ui/OutboundV3ControlPanel";
 
 export const dynamic = "force-dynamic";
 
@@ -32,6 +33,7 @@ export default function ChannelEnginePage() {
       >
         ← REVENUE OS
       </Link>
+      <OutboundV3ControlPanel />
       <OutboundEngineRuntime />
     </>
   );

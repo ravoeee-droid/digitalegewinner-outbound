@@ -1,6 +1,6 @@
 import { query } from "@/lib/db";
 import { recordOutboundEventByMode } from "@/lib/outbound-event-ledger";
-import { getOutboundRuntimeConfig } from "@/lib/outbound-runtime-config";
+import { resolveOutboundRuntimeConfig } from "@/lib/outbound-runtime-config";
 import { z } from "zod";
 
 export const runtime = "nodejs";
@@ -18,7 +18,7 @@ function hash(value:string){let h=2166136261;for(let i=0;i<value.length;i++){h^=
 function matches(lead:{industry:string;city:string;energyScore:number;websiteScore:number;intentScore:number},filters?:z.infer<typeof filterSchema>){if(!filters)return true;if(filters.industry&&!lead.industry.toLowerCase().includes(filters.industry.toLowerCase()))return false;if(filters.city&&!lead.city.toLowerCase().includes(filters.city.toLowerCase()))return false;if(typeof filters.minEnergyScore==="number"&&lead.energyScore<filters.minEnergyScore)return false;if(typeof filters.minWebsiteScore==="number"&&lead.websiteScore<filters.minWebsiteScore)return false;if(typeof filters.minIntentScore==="number"&&lead.intentScore<filters.minIntentScore)return false;return true}
 export async function POST(request:Request){
  try{
-  if(getOutboundRuntimeConfig().v3Mode==="active"){
+  if((await resolveOutboundRuntimeConfig()).v3Mode==="active"){
     return Response.json({error:"Legacy campaign launch is disabled while Outbound OS V3 is active."},{status:409});
   }
   const input=schema.parse(await request.json());const active=input.mailboxes.filter(m=>m.enabled&&m.dailyLimit>0);if(!active.length)return Response.json({error:"Keine aktive Mailbox."},{status:409});

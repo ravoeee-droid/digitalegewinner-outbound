@@ -50,7 +50,7 @@ export default function OutboundCommandCenter(){
   <div className={styles.ambient}/>
   <header className={`${styles.topbar} ${premium.topbar}`}>
    <Link href="/" className={styles.brand}><span className={styles.brandMark}>DG</span><span><strong>DIGITALE GEWINNER</strong><small>Revenue Intelligence OS</small></span></Link>
-   <nav className={styles.nav}><span className={styles.active}>Command</span><Link href="/call">Call Mode</Link><Link href="/websites">Websites</Link><button onClick={()=>setDetailOpen(true)}>CRM / Pipeline</button></nav>
+   <nav className={styles.nav}><span className={styles.active}>Command</span><Link href="/outbound/engine">Engine</Link><Link href="/call">Call Mode</Link><Link href="/websites">Websites</Link><button onClick={()=>setDetailOpen(true)}>CRM / Pipeline</button></nav>
    <div className={styles.system}><i className={online?styles.live:styles.warn}/>{online?"DG CORE LIVE":"API SETUP"}</div>
   </header>
 
