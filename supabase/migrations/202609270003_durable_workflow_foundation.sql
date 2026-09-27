@@ -90,6 +90,10 @@ create table if not exists public.outbound_workflow_signals (
   subject_id text not null,
   idempotency_key text not null,
   payload jsonb not null default '{}'::jsonb,
+  attempt integer not null default 0 check (attempt >= 0),
+  max_attempts integer not null default 10 check (max_attempts > 0),
+  lease_owner text,
+  lease_expires_at timestamptz,
   received_at timestamptz not null default now(),
   processed_at timestamptz,
   processing_error text,
@@ -128,6 +132,10 @@ create index if not exists outbound_workflow_steps_lease_idx
 create index if not exists outbound_workflow_signals_pending_idx
   on public.outbound_workflow_signals(workspace,processed_at,received_at)
   where processed_at is null;
+
+create index if not exists outbound_workflow_signals_lease_idx
+  on public.outbound_workflow_signals(lease_expires_at)
+  where processed_at is null and lease_expires_at is not null;
 
 drop trigger if exists outbound_workflow_runs_touch on public.outbound_workflow_runs;
 create trigger outbound_workflow_runs_touch
