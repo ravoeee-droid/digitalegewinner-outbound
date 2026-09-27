@@ -277,13 +277,21 @@ export async function ensureLegacyWorkflowForLead(input:{
 
 export async function syncLegacyWorkflowShadowBatch(limit=100,workspace="default"){
   const sequences=await query<LegacySequenceKey>(
-    `select campaign_id,lead_id
-     from er_outbox
-     where workspace=$1
-       and campaign_id is not null
-       and created_at>=now()-interval '30 days'
-     group by campaign_id,lead_id
-     order by max(created_at) desc
+    `with legacy_sequences as (
+       select campaign_id,lead_id,max(created_at) as last_created_at
+       from er_outbox
+       where workspace=$1
+         and campaign_id is not null
+         and created_at>=now()-interval '30 days'
+       group by campaign_id,lead_id
+     )
+     select s.campaign_id,s.lead_id
+     from legacy_sequences s
+     left join outbound_workflow_runs r
+       on r.workspace=$1
+      and r.legacy_campaign_id=s.campaign_id
+      and r.lead_id=s.lead_id
+     order by (r.id is null) desc,s.last_created_at desc
      limit $2`,
     [workspace,limit],
   );
