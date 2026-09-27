@@ -386,18 +386,24 @@ async function applySignal(signal:WorkflowSignalRow,workspace:string){
     ? await query<{id:string}>(
         `select id from outbound_workflow_runs
          where workspace=$1 and id=$2
-           and status not in ('completed','failed','cancelled')`,
+           and status not in ('failed','cancelled')
+           and (status<>'completed' or terminal_reason is null)`,
         [workspace,signal.run_id],
       )
     : signal.subject_type==="lead"
       ? await query<{id:string}>(
           `select id from outbound_workflow_runs
            where workspace=$1 and lead_id=$2
-             and status not in ('completed','failed','cancelled')
+             and status not in ('failed','cancelled')
+             and (status<>'completed' or terminal_reason is null)
            order by created_at desc`,
           [workspace,signal.subject_id],
         )
       : [];
+
+  if(!runs.length){
+    throw new Error("No matching workflow run is available for this signal yet.");
+  }
 
   for(const run of runs){
     const terminal=signal.signal_type==="reply_received"||
