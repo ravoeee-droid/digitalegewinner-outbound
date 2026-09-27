@@ -10,10 +10,26 @@ function auth(request:Request){const s=process.env.CRON_SECRET;return Boolean(s&
 function fromHeader(value:string){const m=value.match(/<([^>]+)>/);return (m?.[1]||value).trim().toLowerCase()}
 async function recordReply(messageId:string,from:string,subject:string,mailboxId:string){
  const existing=await query<{id:number}>("select id from er_events where workspace='default' and type='reply' and meta->>'providerMessageId'=$1 limit 1",[messageId]);if(existing.length)return false;
- const row=await readState();const state=row?.payload as State|undefined;const lead=state?.leads?.find(l=>String(l.email||"").toLowerCase()===from);if(!lead)return false;const leadId=String(lead.id);
- await query("insert into er_events(workspace,lead_id,type,meta) values('default',$1,'reply',$2::jsonb)",[leadId,JSON.stringify({providerMessageId:messageId,from,subject,mailboxId})]);await query("update er_outbox set status='stopped' where workspace='default' and lead_id=$1 and status='queued'",[leadId]);
- // Update the real CRM row directly - the legacy JSON mirror below gets overwritten by
- // sales_leads on every /api/crm/launch load, so writing only there silently loses this.
+ const row=await readState();const state=row?.payload as State|undefined;
+ // Prefer the relational CRM as source of truth. Fall back to the legacy JSON mirror only
+ // for older imported leads that have not been normalized yet.
+ const dbLead=await query<{id:string}>(
+  "select l.id from sales_leads l join sales_contacts c on c.id=l.contact_id where l.workspace='default' and lower(c.email)=lower($1) order by l.updated_at desc limit 1",
+  [from],
+ );
+ const legacyLead=state?.leads?.find(l=>String(l.email||"").toLowerCase()===from);
+ const leadId=dbLead[0]?.id||String(legacyLead?.id||"");
+ if(!leadId)return false;
+ const attribution=await query<{id:string;campaign_id:string|null;variant:string}>(
+  "select id,campaign_id,variant from er_outbox where workspace='default' and lead_id=$1 and status='sent' order by sent_at desc nulls last limit 1",
+  [leadId],
+ );
+ const last=attribution[0];
+ await query(
+  "insert into er_events(workspace,lead_id,type,meta) values('default',$1,'reply',$2::jsonb)",
+  [leadId,JSON.stringify({providerMessageId:messageId,from,subject,mailboxId,outboxId:last?.id||null,campaignId:last?.campaign_id||null,variant:last?.variant||null})],
+ );
+ await query("update er_outbox set status='stopped' where workspace='default' and lead_id=$1 and status='queued'",[leadId]);
  await query("update sales_leads set intent_score=least(100,intent_score+30),stage=case when stage in ('Neu','Kontaktiert') then 'Engaged' else stage end,last_contact_at=now(),updated_at=now() where id=$1 and workspace='default'",[leadId]);
  if(state?.leads){const leads=state.leads.map(l=>String(l.id)===leadId?{...l,intentScore:Math.min(100,Number(l.intentScore||0)+30),stage:String(l.stage)==="Neu"||String(l.stage)==="Kontaktiert"?"Engaged":l.stage}:l);await writeState({...state,leads})}
  return true;
