@@ -3,6 +3,7 @@ import { query } from "@/lib/db";
 import { recordOutboundEvent } from "@/lib/outbound-event-ledger";
 import { invalidateOutboundRuntimeConfigCache, resolveOutboundRuntimeConfig, type OutboundRuntimeConfig } from "@/lib/outbound-runtime-config";
 import type { AutonomyLevel } from "@/lib/outbound-contracts";
+import { loadMailboxCredentials } from "@/lib/mailbox-credentials";
 
 const modeSchema = z.enum(["off","shadow","active"]);
 const complianceSchema = z.enum(["off","shadow","enforce"]);
@@ -75,6 +76,9 @@ export function validateRuntimeTransition(next:OutboundRuntimeConfig) {
   }
   if(next.deliverabilityMode==="enforce"&&!OUTBOUND_V3_CAPABILITIES.deliverabilityEnforcement){
     blockers.push("Deliverability enforcement is locked until health checks and recovery gates pass.");
+  }
+  if(next.deliverabilityMode==="enforce"&&next.autonomyLevel<2){
+    blockers.push("Deliverability enforcement requires at least L2 safety autonomy.");
   }
   if(next.autonomyLevel>2){
     blockers.push("Autonomy above L2 is locked until conversation and optimization eval gates are complete.");
@@ -337,6 +341,38 @@ export async function updateRuntimeControlPlane(
   };
 
   const validation=validateRuntimeTransition(next);
+  if(parsed.deliverabilityMode==="enforce"&&before.deliverability_mode!=="enforce"){
+    const credentials=await loadMailboxCredentials().catch(()=>[]);
+    const ids=credentials.map(item=>item.id);
+    const healthRows=ids.length?await query<{target_id:string;observed_at:Date}>(
+      `select target_id,observed_at
+       from outbound_sender_health_state
+       where workspace=$1 and target_type='mailbox' and target_id=any($2::text[])`,
+      [workspace,ids],
+    ):[];
+    const healthById=new Map(healthRows.map(row=>[row.target_id,row]));
+    const missing=ids.filter(id=>!healthById.has(id));
+    const stale=ids.filter(id=>{
+      const observed=healthById.get(id)?.observed_at;
+      return !observed||(Date.now()-new Date(observed).getTime())>3*60*60*1000;
+    });
+    if(!ids.length||missing.length||stale.length){
+      const blockers=[
+        !ids.length?"No configured mailboxes were found.":null,
+        missing.length?`Missing health state for: ${missing.join(", ")}`:null,
+        stale.length?`Stale health state for: ${stale.join(", ")}`:null,
+      ].filter(Boolean) as string[];
+      await recordOutboundEvent({
+        workspace,
+        type:"runtime_activation_blocked",
+        actorType:"human",
+        actorId,
+        idempotencyKey:`deliverability-enforce-blocked:${workspace}:${before.version}`,
+        payload:{requested:next,reason:parsed.reason,blockers},
+      });
+      return {ok:false,conflict:false,blocked:true,blockers,current:before};
+    }
+  }
   if(!validation.allowed){
     await recordOutboundEvent({
       workspace,
