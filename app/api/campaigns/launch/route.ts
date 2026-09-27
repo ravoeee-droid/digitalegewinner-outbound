@@ -23,7 +23,36 @@ export async function POST(request:Request){
   // Re-check the real CRM row so a lead closed/blocked since the page loaded can't get enrolled.
   const closedRows=leadIds.length?await query<{id:string}>("select id from sales_leads where workspace='default' and id=any($1::text[]) and (stage in ('Gewonnen','Verloren') or do_not_contact)",[leadIds]):[];const closed=new Set(closedRows.map(r=>r.id));
   let queued=0,skipped=0,index=0;const variants:Record<string,number>={};
-  for(const lead of eligible){if(suppressed.has(lead.email.toLowerCase())||enrolled.has(lead.id)||closed.has(lead.id)){skipped++;continue}const mailbox=active[index++%active.length];for(let stepIndex=0;stepIndex<input.campaign.steps.length;stepIndex++){const step=input.campaign.steps[stepIndex];const candidates=step.variants?.length?step.variants:[{label:"A",subject:step.subject,body:step.body}];const selected=candidates[hash(`${input.campaign.id}:${lead.id}:${stepIndex}`)%candidates.length];variants[selected.label]=(variants[selected.label]||0)+1;const scheduled=new Date(Date.now()+step.waitDays*86400000);await query(`insert into er_outbox(id,workspace,campaign_id,lead_id,mailbox_id,recipient,subject,body,variant,scheduled_at) values($1,'default',$2,$3,$4,$5,$6,$7,$8,$9)`,[crypto.randomUUID(),input.campaign.id,lead.id,mailbox.id,lead.email,render(selected.subject,lead,input.senderName,appUrl),render(selected.body,lead,input.senderName,appUrl),selected.label,scheduled]);queued++}}
+  for(const lead of eligible){
+    if(suppressed.has(lead.email.toLowerCase())||enrolled.has(lead.id)||closed.has(lead.id)){skipped++;continue}
+    const mailbox=active[index++%active.length];
+    // One deterministic assignment per lead + campaign. Previously the hash included the
+    // step index, so the same lead could receive A in step 1 and B in step 2, corrupting
+    // sequence-level A/B tests. We now keep the ordinal stable across the whole sequence.
+    const experimentOrdinal=hash(`${input.campaign.id}:${lead.id}`);
+    let assignedVariant="A";
+    let assignmentRecorded=false;
+    for(let stepIndex=0;stepIndex<input.campaign.steps.length;stepIndex++){
+      const step=input.campaign.steps[stepIndex];
+      const candidates=step.variants?.length?step.variants:[{label:"A",subject:step.subject,body:step.body}];
+      const selected=candidates[experimentOrdinal%candidates.length];
+      if(!assignmentRecorded){
+        assignedVariant=selected.label;
+        variants[assignedVariant]=(variants[assignedVariant]||0)+1;
+        await query(
+          "insert into er_events(workspace,lead_id,type,meta) values('default',$1,'experiment_assignment',$2::jsonb)",
+          [lead.id,JSON.stringify({campaignId:input.campaign.id,variant:assignedVariant,experimentKey:`${input.campaign.id}:sequence-v1`})],
+        );
+        assignmentRecorded=true;
+      }
+      const scheduled=new Date(Date.now()+step.waitDays*86400000);
+      await query(
+        `insert into er_outbox(id,workspace,campaign_id,lead_id,mailbox_id,recipient,subject,body,variant,scheduled_at) values($1,'default',$2,$3,$4,$5,$6,$7,$8,$9)`,
+        [crypto.randomUUID(),input.campaign.id,lead.id,mailbox.id,lead.email,render(selected.subject,lead,input.senderName,appUrl),render(selected.body,lead,input.senderName,appUrl),assignedVariant,scheduled],
+      );
+      queued++;
+    }
+  }
   return Response.json({ok:true,queued,skipped,eligibleLeads:eligible.length,totalLeads:input.leads.length,variants});
  }catch(error){return Response.json({error:error instanceof Error?error.message:"Kampagne konnte nicht gestartet werden."},{status:400})}
 }
