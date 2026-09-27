@@ -9,6 +9,7 @@ import { getComplianceEnforcementReadiness } from "@/lib/outbound-compliance-eng
 const modeSchema = z.enum(["off","shadow","active"]);
 const complianceSchema = z.enum(["off","shadow","enforce"]);
 const deliverabilitySchema = z.enum(["off","shadow","enforce"]);
+const conversationSchema = z.enum(["off","shadow","assist"]);
 
 export const runtimeUpdateSchema = z.object({
   expectedVersion: z.number().int().positive(),
@@ -17,6 +18,7 @@ export const runtimeUpdateSchema = z.object({
   autonomyLevel: z.number().int().min(0).max(5).optional(),
   durableWorkflowsMode: modeSchema.optional(),
   deliverabilityMode: deliverabilitySchema.optional(),
+  conversationMode: conversationSchema.optional(),
   reason: z.string().min(3).max(1000),
 });
 
@@ -29,6 +31,7 @@ type RuntimeRow = {
   autonomy_level:number;
   durable_workflows_mode:"off"|"shadow"|"active";
   deliverability_mode:"off"|"shadow"|"enforce";
+  conversation_mode:"off"|"shadow"|"assist";
   version:number;
   updated_by:string;
   updated_at:Date;
@@ -43,6 +46,7 @@ export const OUTBOUND_V3_CAPABILITIES = {
   durableWorkflowExecution: false,
   deliverabilityShadow: true,
   deliverabilityEnforcement: true,
+  conversationIntelligence: true,
   conversationAutopilot: false,
   optimizationAutopilot: false,
 } as const;
@@ -54,6 +58,7 @@ function toConfig(row:RuntimeRow):OutboundRuntimeConfig {
     autonomyLevel:row.autonomy_level as AutonomyLevel,
     durableWorkflowsMode:row.durable_workflows_mode,
     deliverabilityMode:row.deliverability_mode,
+    conversationMode:row.conversation_mode,
   };
 }
 
@@ -81,6 +86,9 @@ export function validateRuntimeTransition(next:OutboundRuntimeConfig) {
   if(next.deliverabilityMode==="enforce"&&next.autonomyLevel<2){
     blockers.push("Deliverability enforcement requires at least L2 safety autonomy.");
   }
+  if(next.conversationMode==="assist"&&next.autonomyLevel<2){
+    blockers.push("Conversation assist requires at least L2 safety autonomy.");
+  }
   if(next.autonomyLevel>2){
     blockers.push("Autonomy above L2 is locked until conversation and optimization eval gates are complete.");
   }
@@ -91,7 +99,7 @@ export function validateRuntimeTransition(next:OutboundRuntimeConfig) {
 export async function getRuntimeControlPlane(workspace="default"){
   const resolved=await resolveOutboundRuntimeConfig(workspace);
   const [raw]=await query<RuntimeRow>(
-    `select workspace,v3_mode,compliance_mode,autonomy_level,durable_workflows_mode,deliverability_mode,version,updated_by,updated_at
+    `select workspace,v3_mode,compliance_mode,autonomy_level,durable_workflows_mode,deliverability_mode,conversation_mode,version,updated_by,updated_at
      from outbound_runtime_settings where workspace=$1 limit 1`,
     [workspace],
   );
@@ -118,6 +126,10 @@ export async function getRuntimeControlPlane(workspace="default"){
       "outbound_sender_health_state",
       "outbound_compliance_suppressions",
       "outbound_permission_reviews",
+      "outbound_conversation_threads",
+      "outbound_conversation_messages",
+      "outbound_reply_classifications",
+      "outbound_conversation_escalations",
     ]],
   );
 
@@ -284,6 +296,7 @@ export async function getRuntimeControlPlane(workspace="default"){
     autonomyLevel:resolved.autonomyLevel,
     durableWorkflowsMode:resolved.durableWorkflowsMode,
     deliverabilityMode:resolved.deliverabilityMode,
+    conversationMode:resolved.conversationMode,
   });
 
   return {
@@ -295,14 +308,15 @@ export async function getRuntimeControlPlane(workspace="default"){
       autonomyLevel:raw.autonomy_level,
       durableWorkflowsMode:raw.durable_workflows_mode,
       deliverabilityMode:raw.deliverability_mode,
+      conversationMode:raw.conversation_mode,
       version:raw.version,
       updatedBy:raw.updated_by,
       updatedAt:raw.updated_at,
     }:null,
     schema:{
-      expectedTables:16,
+      expectedTables:20,
       presentTables:Number(schema?.present||0),
-      ready:Number(schema?.present||0)===16,
+      ready:Number(schema?.present||0)===20,
     },
     capabilities:OUTBOUND_V3_CAPABILITIES,
     parity,
@@ -317,6 +331,7 @@ export async function getRuntimeControlPlane(workspace="default"){
       autonomyLevel:Boolean(process.env.OUTBOUND_AUTONOMY_LEVEL),
       durableWorkflowsMode:Boolean(process.env.OUTBOUND_DURABLE_WORKFLOWS_MODE),
       deliverabilityMode:Boolean(process.env.OUTBOUND_DELIVERABILITY_MODE),
+      conversationMode:Boolean(process.env.OUTBOUND_CONVERSATION_MODE),
       emergencyKillSwitch:process.env.OUTBOUND_EMERGENCY_KILL_SWITCH==="true",
     },
   };
@@ -329,7 +344,7 @@ export async function updateRuntimeControlPlane(
 ){
   const parsed=runtimeUpdateSchema.parse(input);
   const [before]=await query<RuntimeRow>(
-    `select workspace,v3_mode,compliance_mode,autonomy_level,durable_workflows_mode,deliverability_mode,version,updated_by,updated_at
+    `select workspace,v3_mode,compliance_mode,autonomy_level,durable_workflows_mode,deliverability_mode,conversation_mode,version,updated_by,updated_at
      from outbound_runtime_settings where workspace=$1 limit 1`,
     [workspace],
   );
@@ -341,6 +356,7 @@ export async function updateRuntimeControlPlane(
     autonomyLevel:(parsed.autonomyLevel??before.autonomy_level) as AutonomyLevel,
     durableWorkflowsMode:parsed.durableWorkflowsMode??before.durable_workflows_mode,
     deliverabilityMode:parsed.deliverabilityMode??before.deliverability_mode,
+    conversationMode:parsed.conversationMode??before.conversation_mode,
   };
 
   const validation=validateRuntimeTransition(next);
@@ -418,11 +434,12 @@ export async function updateRuntimeControlPlane(
          autonomy_level=$5,
          durable_workflows_mode=$6,
          deliverability_mode=$7,
+         conversation_mode=$8,
          version=version+1,
-         updated_by=$8,
+         updated_by=$9,
          updated_at=now()
      where workspace=$1 and version=$2
-     returning workspace,v3_mode,compliance_mode,autonomy_level,durable_workflows_mode,deliverability_mode,version,updated_by,updated_at`,
+     returning workspace,v3_mode,compliance_mode,autonomy_level,durable_workflows_mode,deliverability_mode,conversation_mode,version,updated_by,updated_at`,
     [
       workspace,
       parsed.expectedVersion,
@@ -431,6 +448,7 @@ export async function updateRuntimeControlPlane(
       next.autonomyLevel,
       next.durableWorkflowsMode,
       next.deliverabilityMode,
+      next.conversationMode,
       actorId,
     ],
   );
@@ -438,7 +456,7 @@ export async function updateRuntimeControlPlane(
   const after=rows[0];
   if(!after){
     const [current]=await query<RuntimeRow>(
-      `select workspace,v3_mode,compliance_mode,autonomy_level,durable_workflows_mode,deliverability_mode,version,updated_by,updated_at
+      `select workspace,v3_mode,compliance_mode,autonomy_level,durable_workflows_mode,deliverability_mode,conversation_mode,version,updated_by,updated_at
        from outbound_runtime_settings where workspace=$1 limit 1`,
       [workspace],
     );
