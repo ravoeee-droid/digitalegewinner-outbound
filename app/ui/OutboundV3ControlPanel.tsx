@@ -37,6 +37,13 @@ type ControlSnapshot={
     replies:{legacy:number;v3:number};
     bounces:{legacy:number;v3:number};
   };
+  complianceShadow:{
+    window:string;
+    evaluated:number;
+    allowed:number;
+    denied:number;
+    reasons:Record<string,number>;
+  };
   environmentOverrides:{
     v3Mode:boolean;
     complianceMode:boolean;
@@ -147,6 +154,12 @@ export default function OutboundV3ControlPanel(){
             <strong style={metricStyle}>{snapshot?.capabilities.nativeV3Execution?"READY":"LOCKED"}</strong>
             <span style={subStyle}>Cutover erst nach Shadow-Parität</span>
           </Card>
+          <Card title="Permission Gate">
+            <strong style={metricStyle}>{snapshot?snapshot.complianceShadow.evaluated:"—"}</strong>
+            <span style={subStyle}>
+              {snapshot?(snapshot.complianceShadow.allowed+" allow · "+snapshot.complianceShadow.denied+" deny"):"24h Shadow-Auswertung"}
+            </span>
+          </Card>
         </div>
 
         <div style={{display:"grid",gridTemplateColumns:"minmax(0,1.35fr) minmax(280px,.65fr)",gap:12,marginTop:12}}>
@@ -198,6 +211,10 @@ export default function OutboundV3ControlPanel(){
             <p style={{...subStyle,marginTop:12}}>
               Einstellungen werden optimistisch versioniert. Paralleländerungen erzeugen einen Conflict statt still überschrieben zu werden.
             </p>
+            {snapshot&&snapshot.complianceShadow.denied>0&&
+              <div style={{marginTop:10,paddingTop:10,borderTop:"1px solid rgba(255,255,255,.06)",fontSize:9,color:"#89958e",lineHeight:1.6}}>
+                Deny-Gründe: {Object.entries(snapshot.complianceShadow.reasons).map(([reason,count])=>reason+" "+count).join(" · ")}
+              </div>}
           </div>
         </div>
       </div>
