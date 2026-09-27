@@ -249,7 +249,8 @@ export const outboundEventSchema = z.object({
   occurredAt: z.coerce.date().default(() => new Date()),
   payload: z.record(z.string(), z.unknown()).default({}),
 });
-export type OutboundEvent = z.infer<typeof outboundEventSchema>;
+export type OutboundEventInput = z.input<typeof outboundEventSchema>;
+export type OutboundEvent = z.output<typeof outboundEventSchema>;
 
 export const evidenceItemSchema = z.object({
   key: z.string().min(1),
