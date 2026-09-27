@@ -4,6 +4,7 @@ import { recordOutboundEvent } from "@/lib/outbound-event-ledger";
 import { invalidateOutboundRuntimeConfigCache, resolveOutboundRuntimeConfig, type OutboundRuntimeConfig } from "@/lib/outbound-runtime-config";
 import type { AutonomyLevel } from "@/lib/outbound-contracts";
 import { loadMailboxCredentials } from "@/lib/mailbox-credentials";
+import { getComplianceEnforcementReadiness } from "@/lib/outbound-compliance-engine";
 
 const modeSchema = z.enum(["off","shadow","active"]);
 const complianceSchema = z.enum(["off","shadow","enforce"]);
@@ -37,7 +38,7 @@ export const OUTBOUND_V3_CAPABILITIES = {
   schemaFoundation: true,
   shadowEventLedger: true,
   nativeV3Execution: false,
-  complianceEnforcement: false,
+  complianceEnforcement: true,
   durableWorkflowShadow: true,
   durableWorkflowExecution: false,
   deliverabilityShadow: true,
@@ -115,6 +116,8 @@ export async function getRuntimeControlPlane(workspace="default"){
       "outbound_workflow_steps",
       "outbound_workflow_signals",
       "outbound_sender_health_state",
+      "outbound_compliance_suppressions",
+      "outbound_permission_reviews",
     ]],
   );
 
@@ -297,9 +300,9 @@ export async function getRuntimeControlPlane(workspace="default"){
       updatedAt:raw.updated_at,
     }:null,
     schema:{
-      expectedTables:14,
+      expectedTables:16,
       presentTables:Number(schema?.present||0),
-      ready:Number(schema?.present||0)===14,
+      ready:Number(schema?.present||0)===16,
     },
     capabilities:OUTBOUND_V3_CAPABILITIES,
     parity,
@@ -341,6 +344,26 @@ export async function updateRuntimeControlPlane(
   };
 
   const validation=validateRuntimeTransition(next);
+
+  if(parsed.complianceMode==="enforce"&&before.compliance_mode!=="enforce"){
+    const readiness=await getComplianceEnforcementReadiness(workspace);
+    if(!readiness.ready){
+      const blockers=[
+        `${readiness.blocked} bereits gequeue-te Nachricht(en) würden vom Compliance Gate blockiert.`,
+        ...Object.entries(readiness.reasons).map(([reason,count])=>`${reason}: ${count}`),
+      ];
+      await recordOutboundEvent({
+        workspace,
+        type:"runtime_activation_blocked",
+        actorType:"human",
+        actorId,
+        idempotencyKey:`compliance-enforce-blocked:${workspace}:${before.version}`,
+        payload:{requested:next,reason:parsed.reason,blockers,readiness},
+      });
+      return {ok:false,conflict:false,blocked:true,blockers,current:before};
+    }
+  }
+
   if(parsed.deliverabilityMode==="enforce"&&before.deliverability_mode!=="enforce"){
     const credentials=await loadMailboxCredentials().catch(()=>[]);
     const state=(await readState().catch(()=>null))?.payload as {mailboxes?:Array<{id:string;enabled?:boolean}>}|undefined;

@@ -91,9 +91,18 @@ export async function evaluateEmailSendCompliance(
   );
 
   const [suppression]=await query<{exists:boolean}>(
-    `select exists(
-       select 1 from er_suppressions
-       where workspace=$1 and lower(email)=lower($2)
+    `select (
+       exists(
+         select 1 from er_suppressions
+         where workspace=$1 and lower(email)=lower($2)
+       )
+       or exists(
+         select 1 from outbound_compliance_suppressions
+         where workspace=$1
+           and channel='email'
+           and status='active'
+           and lower(identifier)=lower($2)
+       )
      ) as exists`,
     [workspace,recipient],
   );
@@ -113,6 +122,7 @@ export async function evaluateEmailSendCompliance(
          )
        order by
          case when $2::text is not null and contact_id=$2 then 0 else 1 end,
+         case when status='verified' then 0 else 1 end,
          updated_at desc
        limit 1`,
       [workspace,lead.contact_id,lead.company_id],

@@ -3,6 +3,7 @@ import OpenOutreachSyncButton from "@/app/ui/OpenOutreachSyncButton";
 import OutboundEngineRuntime from "@/app/ui/OutboundEngineRuntime";
 import OutboundV3ControlPanel from "@/app/ui/OutboundV3ControlPanel";
 import DeliverabilityControlTower from "@/app/ui/DeliverabilityControlTower";
+import ComplianceControlTower from "@/app/ui/ComplianceControlTower";
 
 export const dynamic = "force-dynamic";
 
@@ -35,6 +36,7 @@ export default function ChannelEnginePage() {
         ← REVENUE OS
       </Link>
       <OutboundV3ControlPanel />
+      <ComplianceControlTower />
       <DeliverabilityControlTower />
       <OutboundEngineRuntime />
     </>

@@ -219,7 +219,7 @@ Persist runs, steps, waits, retries, leases and signals in Postgres. The protect
 Continuously score domain/mailbox health from authentication, connectivity and delivery events. Run in shadow first, then enforce adaptive daily capacity, L2 sender pauses and two-snapshot recovery at the final send boundary.
 
 ### M4 — Compliance Engine
-Permission UI, evidence, policy evaluation and hard send gate.
+Human-reviewed permission evidence, immutable review trail, unified suppressions, explicit opt-out detection, launch preflight and a final fail-closed send gate. AI may gather evidence and propose reviews but cannot invent or upgrade a legal/permission basis.
 
 ### M5 — Conversation Intelligence
 Thread model, reply classes, safe auto-actions and human escalation.
