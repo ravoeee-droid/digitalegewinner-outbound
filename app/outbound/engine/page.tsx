@@ -5,6 +5,7 @@ import OutboundV3ControlPanel from "@/app/ui/OutboundV3ControlPanel";
 import DeliverabilityControlTower from "@/app/ui/DeliverabilityControlTower";
 import ComplianceControlTower from "@/app/ui/ComplianceControlTower";
 import ConversationControlTower from "@/app/ui/ConversationControlTower";
+import ExperimentControlTower from "@/app/ui/ExperimentControlTower";
 
 export const dynamic = "force-dynamic";
 
@@ -39,6 +40,7 @@ export default function ChannelEnginePage() {
       <OutboundV3ControlPanel />
       <ComplianceControlTower />
       <ConversationControlTower />
+      <ExperimentControlTower />
       <DeliverabilityControlTower />
       <OutboundEngineRuntime />
     </>

@@ -3,6 +3,7 @@ import { recordOutboundEventByMode } from "@/lib/outbound-event-ledger";
 import { resolveOutboundRuntimeConfig } from "@/lib/outbound-runtime-config";
 import { ensureLegacyWorkflowForLead } from "@/lib/outbound-durable-workflows";
 import { evaluateEmailSendCompliance } from "@/lib/outbound-compliance-runtime";
+import { ensureLegacySequenceExperiment, assignLegacyExperiment } from "@/lib/outbound-experiment-engine";
 import { z } from "zod";
 
 export const runtime = "nodejs";
@@ -10,13 +11,18 @@ const variantSchema=z.object({label:z.string().min(1).max(20),subject:z.string()
 const stepSchema=z.object({waitDays:z.number().int().min(0).max(60),subject:z.string().min(1),body:z.string().min(1),variants:z.array(variantSchema).min(2).max(3).optional()});
 const filterSchema=z.object({industry:z.string().optional(),city:z.string().optional(),minEnergyScore:z.number().min(0).max(100).optional(),minWebsiteScore:z.number().min(0).max(100).optional(),minIntentScore:z.number().min(0).max(100).optional()});
 const schema = z.object({
-  campaign: z.object({id:z.string(),steps:z.array(stepSchema).min(1),filters:filterSchema.optional()}),
+  campaign: z.object({
+    id:z.string(),
+    name:z.string().optional(),
+    audience:z.string().optional(),
+    steps:z.array(stepSchema).min(1),
+    filters:filterSchema.optional(),
+  }),
   leads:z.array(z.object({id:z.string(),companyId:z.string().optional(),email:z.string().email(),company:z.string(),contact:z.string().optional().default(""),city:z.string().optional().default(""),industry:z.string().optional().default(""),energyScore:z.number().optional().default(0),websiteScore:z.number().optional().default(0),intentScore:z.number().optional().default(0)})).min(1).max(5000),
   mailboxes:z.array(z.object({id:z.string(),enabled:z.boolean(),dailyLimit:z.number().int().min(1).max(100)})).min(1),
   senderName:z.string().default("Digitale Gewinner"),appUrl:z.string().url().optional(),
 });
 function render(template:string,lead:{id:string;company:string;contact:string;city:string},senderName:string,appUrl:string){const first=lead.contact.trim().split(/\s+/)[0]||"zusammen";return template.replaceAll("{{first_name}}",first).replaceAll("{{company}}",lead.company).replaceAll("{{city}}",lead.city).replaceAll("{{sender_name}}",senderName).replaceAll("{{analysis_link}}",`${appUrl}/a/${encodeURIComponent(lead.id)}`)}
-function hash(value:string){let h=2166136261;for(let i=0;i<value.length;i++){h^=value.charCodeAt(i);h=Math.imul(h,16777619)}return h>>>0}
 function matches(lead:{industry:string;city:string;energyScore:number;websiteScore:number;intentScore:number},filters?:z.infer<typeof filterSchema>){if(!filters)return true;if(filters.industry&&!lead.industry.toLowerCase().includes(filters.industry.toLowerCase()))return false;if(filters.city&&!lead.city.toLowerCase().includes(filters.city.toLowerCase()))return false;if(typeof filters.minEnergyScore==="number"&&lead.energyScore<filters.minEnergyScore)return false;if(typeof filters.minWebsiteScore==="number"&&lead.websiteScore<filters.minWebsiteScore)return false;if(typeof filters.minIntentScore==="number"&&lead.intentScore<filters.minIntentScore)return false;return true}
 export async function POST(request:Request){
  try{
@@ -39,6 +45,16 @@ export async function POST(request:Request){
       return Response.json({error:"Alle experimentellen Sequenzschritte müssen dieselben Variant-Labels verwenden."},{status:400});
     }
   }
+
+  const experimentBundle=variantSteps.length
+    ? await ensureLegacySequenceExperiment({
+        campaignId:input.campaign.id,
+        campaignName:input.campaign.name,
+        audience:input.campaign.audience,
+        steps:input.campaign.steps,
+        workspace:"default",
+      })
+    : null;
 
   let queued=0,skipped=0,index=0,complianceBlocked=0;
   const variants:Record<string,number>={};
@@ -80,34 +96,32 @@ export async function POST(request:Request){
     }
 
     const mailbox=active[index++%active.length];
-    const companyKey=(lead.companyId?.trim()||lead.company.trim().toLowerCase().replace(/\s+/g," "));
-    const experimentOrdinal=hash(`${input.campaign.id}:${companyKey}`);
-    const assignedVariant=experimentLabels[experimentOrdinal%experimentLabels.length]??"A";
+    const experimentAssignment=experimentBundle
+      ? await assignLegacyExperiment({
+          experiment:experimentBundle.experiment,
+          arms:experimentBundle.arms,
+          leadId:lead.id,
+          companyId:lead.companyId||null,
+          companyName:lead.company,
+          workspace:"default",
+        })
+      : null;
+    const assignedVariant=experimentAssignment?.armKey??experimentLabels[0]??"A";
     variants[assignedVariant]=(variants[assignedVariant]||0)+1;
-    await query(
-      "insert into er_events(workspace,lead_id,type,meta) values('default',$1,'experiment_assignment',$2::jsonb)",
-      [lead.id,JSON.stringify({
-        campaignId:input.campaign.id,
-        variant:assignedVariant,
-        experimentKey:`${input.campaign.id}:sequence-v1`,
-        randomizationUnit:"company",
-        randomizationKey:companyKey,
-      })],
-    );
-    await recordOutboundEventByMode({
-      workspace:"default",
-      type:"experiment_assigned",
-      actorType:"system",
-      leadId:lead.id,
-      idempotencyKey:`legacy:experiment-assigned:${input.campaign.id}:${companyKey}`,
-      payload:{
-        legacyCampaignId:input.campaign.id,
-        variant:assignedVariant,
-        experimentKey:`${input.campaign.id}:sequence-v1`,
-        randomizationUnit:"company",
-        randomizationKey:companyKey,
-      },
-    });
+
+    if(experimentAssignment?.active){
+      await query(
+        "insert into er_events(workspace,lead_id,type,meta) values('default',$1,'experiment_assignment',$2::jsonb)",
+        [lead.id,JSON.stringify({
+          campaignId:input.campaign.id,
+          variant:assignedVariant,
+          experimentId:experimentBundle?.experiment.id||null,
+          campaignVersionId:experimentBundle?.campaignVersion.id||null,
+          randomizationUnit:"company",
+          randomizationKey:experimentAssignment.subjectId,
+        })],
+      );
+    }
 
     for(let stepIndex=0;stepIndex<input.campaign.steps.length;stepIndex++){
       const step=input.campaign.steps[stepIndex];
@@ -119,8 +133,20 @@ export async function POST(request:Request){
       }
       const scheduled=new Date(Date.now()+step.waitDays*86400000);
       await query(
-        `insert into er_outbox(id,workspace,campaign_id,lead_id,mailbox_id,recipient,subject,body,variant,scheduled_at) values($1,'default',$2,$3,$4,$5,$6,$7,$8,$9)`,
-        [crypto.randomUUID(),input.campaign.id,lead.id,mailbox.id,lead.email,render(selected.subject,lead,input.senderName,appUrl),render(selected.body,lead,input.senderName,appUrl),assignedVariant,scheduled],
+        `insert into er_outbox(
+           id,workspace,campaign_id,lead_id,mailbox_id,recipient,subject,body,variant,scheduled_at,
+           campaign_version_id,experiment_id,experiment_arm_key
+         )
+         values($1,'default',$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
+        [
+          crypto.randomUUID(),input.campaign.id,lead.id,mailbox.id,lead.email,
+          render(selected.subject,lead,input.senderName,appUrl),
+          render(selected.body,lead,input.senderName,appUrl),
+          assignedVariant,scheduled,
+          experimentAssignment?.active?experimentBundle?.campaignVersion.id??null:null,
+          experimentAssignment?.active?experimentBundle?.experiment.id??null:null,
+          experimentAssignment?.active?assignedVariant:null,
+        ],
       );
       queued++;
     }
@@ -145,6 +171,12 @@ export async function POST(request:Request){
       blocked:complianceBlocked,
       reasons:complianceReasons,
     },
+    experiment:experimentBundle?{
+      id:experimentBundle.experiment.id,
+      status:experimentBundle.experiment.status,
+      campaignVersionId:experimentBundle.campaignVersion.id,
+      controlArm:experimentBundle.experiment.control_arm_key,
+    }:null,
   });
  }catch(error){return Response.json({error:error instanceof Error?error.message:"Kampagne konnte nicht gestartet werden."},{status:400})}
 }

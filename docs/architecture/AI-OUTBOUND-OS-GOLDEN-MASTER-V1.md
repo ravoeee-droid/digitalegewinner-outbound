@@ -225,7 +225,7 @@ Human-reviewed permission evidence, immutable review trail, unified suppressions
 Persist conversation threads/messages, classify replies asynchronously with deterministic fallback, prioritize high-intent and risky replies, generate human-review drafts, and route escalations. L2 may classify, draft and create internal tasks but cannot send an automatic external reply.
 
 ### M6 — Experiment Engine
-Company-level assignment, SRM/data-quality checks, minimum sample, conservative winner recommendations.
+Version legacy A/B/n sequences into durable company-level experiments, persist deterministic assignments, count only provider-accepted first exposures, evaluate primary/guardrail metrics with SRM and multiplicity controls, auto-pause only for safety/validity failures, and require human approval for any performance-driven traffic change.
 
 ### M7 — Research + Strategy Agents
 Evidence-backed research and hypothesis generation.

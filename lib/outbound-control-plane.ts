@@ -48,6 +48,7 @@ export const OUTBOUND_V3_CAPABILITIES = {
   deliverabilityEnforcement: true,
   conversationIntelligence: true,
   conversationAutopilot: false,
+  experimentEngine: true,
   optimizationAutopilot: false,
 } as const;
 
@@ -130,6 +131,8 @@ export async function getRuntimeControlPlane(workspace="default"){
       "outbound_conversation_messages",
       "outbound_reply_classifications",
       "outbound_conversation_escalations",
+      "outbound_experiment_exposures",
+      "outbound_experiment_evaluations",
     ]],
   );
 
@@ -314,9 +317,9 @@ export async function getRuntimeControlPlane(workspace="default"){
       updatedAt:raw.updated_at,
     }:null,
     schema:{
-      expectedTables:20,
+      expectedTables:22,
       presentTables:Number(schema?.present||0),
-      ready:Number(schema?.present||0)===20,
+      ready:Number(schema?.present||0)===22,
     },
     capabilities:OUTBOUND_V3_CAPABILITIES,
     parity,
