@@ -86,6 +86,7 @@ async function refreshRunState(runId:string){
        select
          count(*)::int as total,
          count(*) filter(where status='failed')::int as failed,
+         count(*) filter(where status='blocked')::int as blocked,
          count(*) filter(where status='running')::int as running,
          count(*) filter(where status='ready')::int as ready,
          count(*) filter(where status in ('pending','waiting'))::int as waiting,
@@ -97,7 +98,7 @@ async function refreshRunState(runId:string){
      update outbound_workflow_runs r
      set status=case
            when r.terminal_reason is not null then r.status
-           when stats.total>0 and stats.failed>0 then 'failed'
+           when stats.total>0 and (stats.failed>0 or stats.blocked>0) then 'failed'
            when stats.total>0 and stats.terminal=stats.total then 'completed'
            when stats.running>0 or stats.ready>0 then 'running'
            when stats.waiting>0 then 'waiting'
@@ -110,7 +111,7 @@ async function refreshRunState(runId:string){
            else r.completed_at
          end,
          failed_at=case
-           when r.terminal_reason is null and stats.failed>0 then coalesce(r.failed_at,now())
+           when r.terminal_reason is null and (stats.failed>0 or stats.blocked>0) then coalesce(r.failed_at,now())
            else r.failed_at
          end
      from stats
