@@ -1,6 +1,7 @@
 import { query } from "@/lib/db";
 import { recordOutboundEventByMode } from "@/lib/outbound-event-ledger";
 import { resolveOutboundRuntimeConfig } from "@/lib/outbound-runtime-config";
+import { ensureLegacyWorkflowForLead } from "@/lib/outbound-durable-workflows";
 import { z } from "zod";
 
 export const runtime = "nodejs";
@@ -18,7 +19,8 @@ function hash(value:string){let h=2166136261;for(let i=0;i<value.length;i++){h^=
 function matches(lead:{industry:string;city:string;energyScore:number;websiteScore:number;intentScore:number},filters?:z.infer<typeof filterSchema>){if(!filters)return true;if(filters.industry&&!lead.industry.toLowerCase().includes(filters.industry.toLowerCase()))return false;if(filters.city&&!lead.city.toLowerCase().includes(filters.city.toLowerCase()))return false;if(typeof filters.minEnergyScore==="number"&&lead.energyScore<filters.minEnergyScore)return false;if(typeof filters.minWebsiteScore==="number"&&lead.websiteScore<filters.minWebsiteScore)return false;if(typeof filters.minIntentScore==="number"&&lead.intentScore<filters.minIntentScore)return false;return true}
 export async function POST(request:Request){
  try{
-  if((await resolveOutboundRuntimeConfig()).v3Mode==="active"){
+  const runtimeConfig=await resolveOutboundRuntimeConfig();
+  if(runtimeConfig.v3Mode==="active"){
     return Response.json({error:"Legacy campaign launch is disabled while Outbound OS V3 is active."},{status:409});
   }
   const input=schema.parse(await request.json());const active=input.mailboxes.filter(m=>m.enabled&&m.dailyLimit>0);if(!active.length)return Response.json({error:"Keine aktive Mailbox."},{status:409});
@@ -84,6 +86,14 @@ export async function POST(request:Request){
         [crypto.randomUUID(),input.campaign.id,lead.id,mailbox.id,lead.email,render(selected.subject,lead,input.senderName,appUrl),render(selected.body,lead,input.senderName,appUrl),assignedVariant,scheduled],
       );
       queued++;
+    }
+
+    if(runtimeConfig.durableWorkflowsMode==="shadow"){
+      await ensureLegacyWorkflowForLead({
+        campaignId:input.campaign.id,
+        leadId:lead.id,
+        workspace:"default",
+      });
     }
   }
   return Response.json({ok:true,queued,skipped,eligibleLeads:eligible.length,totalLeads:input.leads.length,variants});
