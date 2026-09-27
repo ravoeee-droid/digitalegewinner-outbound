@@ -5,6 +5,7 @@ import { recordOutboundEventByMode } from "@/lib/outbound-event-ledger";
 import { resolveOutboundRuntimeConfig } from "@/lib/outbound-runtime-config";
 import { evaluateEmailSendCompliance } from "@/lib/outbound-compliance-runtime";
 import { getMailboxHealthMap } from "@/lib/outbound-deliverability";
+import { recordOutboundConversationMessage } from "@/lib/outbound-conversation-intelligence";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -246,6 +247,24 @@ async function run(request: Request) {
           providerMessageId:result.id,
         },
       });
+      try{
+        await recordOutboundConversationMessage({
+          leadId:row.lead_id,
+          mailboxId:row.mailbox_id,
+          providerMessageId:result.id,
+          subject:row.subject,
+          bodyText:row.body,
+          sentAt:new Date(),
+          metadata:{
+            legacyOutboxId:row.id,
+            legacyCampaignId:row.campaign_id,
+            variant:row.variant,
+            recipient:row.recipient,
+          },
+        });
+      }catch(conversationError){
+        console.error("[conversation-outbound-mirror] failed",conversationError instanceof Error?conversationError.message:"unknown error");
+      }
       sentToday.set(row.mailbox_id,mailboxCurrent+1);
       if(row.campaign_id)campaignToday.set(row.campaign_id,campaignCurrent+1);
       sent++;

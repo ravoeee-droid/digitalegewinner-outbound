@@ -222,7 +222,7 @@ Continuously score domain/mailbox health from authentication, connectivity and d
 Human-reviewed permission evidence, immutable review trail, unified suppressions, explicit opt-out detection, launch preflight and a final fail-closed send gate. AI may gather evidence and propose reviews but cannot invent or upgrade a legal/permission basis.
 
 ### M5 — Conversation Intelligence
-Thread model, reply classes, safe auto-actions and human escalation.
+Persist conversation threads/messages, classify replies asynchronously with deterministic fallback, prioritize high-intent and risky replies, generate human-review drafts, and route escalations. L2 may classify, draft and create internal tasks but cannot send an automatic external reply.
 
 ### M6 — Experiment Engine
 Company-level assignment, SRM/data-quality checks, minimum sample, conservative winner recommendations.

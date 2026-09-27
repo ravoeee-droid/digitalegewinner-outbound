@@ -6,6 +6,7 @@ import { recordOutboundEventByMode } from "@/lib/outbound-event-ledger";
 import { resolveOutboundRuntimeConfig } from "@/lib/outbound-runtime-config";
 import { recordWorkflowSignal } from "@/lib/outbound-durable-workflows";
 import { createComplianceSuppression, detectExplicitOptOut } from "@/lib/outbound-compliance-engine";
+import { ingestInboundConversationMessage } from "@/lib/outbound-conversation-intelligence";
 
 export const runtime="nodejs";export const maxDuration=60;
 type State={leads?:Array<Record<string,unknown>>};
@@ -30,6 +31,21 @@ async function recordReply(messageId:string,from:string,subject:string,mailboxId
  );
  const last=attribution[0];
  const optOut=detectExplicitOptOut(bodyText||subject);
+ const conversation=await ingestInboundConversationMessage({
+  leadId,
+  mailboxId,
+  providerMessageId:messageId,
+  subject,
+  bodyText:bodyText||subject,
+  forcedClass:optOut.matched?"unsubscribe":null,
+  metadata:{
+   from,
+   legacyOutboxId:last?.id||null,
+   legacyCampaignId:last?.campaign_id||null,
+   variant:last?.variant||null,
+   explicitOptOut:optOut.matched,
+  },
+ });
  await query(
   "insert into er_events(workspace,lead_id,type,meta) values('default',$1,'reply',$2::jsonb)",
   [leadId,JSON.stringify({
@@ -41,6 +57,8 @@ async function recordReply(messageId:string,from:string,subject:string,mailboxId
     campaignId:last?.campaign_id||null,
     variant:last?.variant||null,
     optOut:optOut.matched,
+    conversationThreadId:conversation.threadId,
+    conversationMessageId:conversation.messageId,
   })],
  );
  await recordOutboundEventByMode({

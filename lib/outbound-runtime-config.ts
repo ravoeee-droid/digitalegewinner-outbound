@@ -5,6 +5,7 @@ import type { AutonomyLevel } from "@/lib/outbound-contracts";
 const modeSchema = z.enum(["off", "shadow", "active"]);
 const complianceModeSchema = z.enum(["off", "shadow", "enforce"]);
 const deliverabilityModeSchema = z.enum(["off", "shadow", "enforce"]);
+const conversationModeSchema = z.enum(["off", "shadow", "assist"]);
 
 function parseAutonomyLevel(value: unknown, fallback: AutonomyLevel = 2): AutonomyLevel {
   if (value === undefined || value === null || value === "") return fallback;
@@ -21,6 +22,7 @@ export type OutboundRuntimeConfig = {
   autonomyLevel: AutonomyLevel;
   durableWorkflowsMode: z.infer<typeof modeSchema>;
   deliverabilityMode: z.infer<typeof deliverabilityModeSchema>;
+  conversationMode: z.infer<typeof conversationModeSchema>;
 };
 
 export type ResolvedOutboundRuntimeConfig = OutboundRuntimeConfig & {
@@ -38,6 +40,7 @@ type RuntimeSettingsRow = {
   autonomy_level: number;
   durable_workflows_mode: string;
   deliverability_mode: string;
+  conversation_mode: string;
   version: number;
   updated_by: string;
   updated_at: Date;
@@ -49,6 +52,7 @@ const defaults: OutboundRuntimeConfig = {
   autonomyLevel: 2,
   durableWorkflowsMode: "off",
   deliverabilityMode: "shadow",
+  conversationMode: "shadow",
 };
 
 const runtimeCache = new Map<string,{expiresAt:number;value:ResolvedOutboundRuntimeConfig}>();
@@ -76,6 +80,9 @@ function envOverrides(): Partial<OutboundRuntimeConfig> {
   if (process.env.OUTBOUND_DELIVERABILITY_MODE) {
     overrides.deliverabilityMode = deliverabilityModeSchema.parse(process.env.OUTBOUND_DELIVERABILITY_MODE);
   }
+  if (process.env.OUTBOUND_CONVERSATION_MODE) {
+    overrides.conversationMode = conversationModeSchema.parse(process.env.OUTBOUND_CONVERSATION_MODE);
+  }
   return overrides;
 }
 
@@ -85,7 +92,7 @@ function envOverrides(): Partial<OutboundRuntimeConfig> {
  */
 export function getOutboundRuntimeConfig(): OutboundRuntimeConfig {
   if (process.env.OUTBOUND_EMERGENCY_KILL_SWITCH === "true") {
-    return { v3Mode:"off", complianceMode:"off", autonomyLevel:0, durableWorkflowsMode:"off", deliverabilityMode:"off" };
+    return { v3Mode:"off", complianceMode:"off", autonomyLevel:0, durableWorkflowsMode:"off", deliverabilityMode:"off", conversationMode:"off" };
   }
   return { ...defaults, ...envOverrides() };
 }
@@ -108,6 +115,7 @@ export async function resolveOutboundRuntimeConfig(
       autonomyLevel:0,
       durableWorkflowsMode:"off",
       deliverabilityMode:"off",
+      conversationMode:"off",
       version:null,
       updatedBy:null,
       updatedAt:null,
@@ -121,7 +129,7 @@ export async function resolveOutboundRuntimeConfig(
   let row: RuntimeSettingsRow | undefined;
   try {
     [row] = await query<RuntimeSettingsRow>(
-      `select workspace,v3_mode,compliance_mode,autonomy_level,durable_workflows_mode,deliverability_mode,version,updated_by,updated_at
+      `select workspace,v3_mode,compliance_mode,autonomy_level,durable_workflows_mode,deliverability_mode,conversation_mode,version,updated_by,updated_at
        from outbound_runtime_settings
        where workspace=$1
        limit 1`,
@@ -139,6 +147,7 @@ export async function resolveOutboundRuntimeConfig(
         autonomyLevel: parseAutonomyLevel(row.autonomy_level),
         durableWorkflowsMode: modeSchema.parse(row.durable_workflows_mode),
         deliverabilityMode: deliverabilityModeSchema.parse(row.deliverability_mode),
+        conversationMode: conversationModeSchema.parse(row.conversation_mode),
       }
     : defaults;
 

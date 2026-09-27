@@ -10,6 +10,7 @@ type ControlSnapshot={
     autonomyLevel:number;
     durableWorkflowsMode:RuntimeMode;
     deliverabilityMode:"off"|"shadow"|"enforce";
+    conversationMode:"off"|"shadow"|"assist";
     source:string;
     version:number|null;
   };
@@ -19,6 +20,7 @@ type ControlSnapshot={
     autonomyLevel:number;
     durableWorkflowsMode:RuntimeMode;
     deliverabilityMode:"off"|"shadow"|"enforce";
+    conversationMode:"off"|"shadow"|"assist";
     version:number;
     updatedBy:string;
     updatedAt:string;
@@ -33,6 +35,7 @@ type ControlSnapshot={
     durableWorkflowExecution:boolean;
     deliverabilityShadow:boolean;
     deliverabilityEnforcement:boolean;
+    conversationIntelligence:boolean;
     conversationAutopilot:boolean;
     optimizationAutopilot:boolean;
   };
@@ -64,6 +67,7 @@ type ControlSnapshot={
     autonomyLevel:boolean;
     durableWorkflowsMode:boolean;
     deliverabilityMode:boolean;
+    conversationMode:boolean;
     emergencyKillSwitch:boolean;
   };
 };
@@ -143,6 +147,7 @@ export default function OutboundV3ControlPanel(){
             <ModeBadge label="AI" value={snapshot?("L"+snapshot.resolved.autonomyLevel):"…"} />
             <ModeBadge label="Workflows" value={snapshot?.resolved.durableWorkflowsMode||"…"} />
             <ModeBadge label="Deliverability" value={snapshot?.resolved.deliverabilityMode||"…"} />
+            <ModeBadge label="Conversation" value={snapshot?.resolved.conversationMode||"…"} />
           </div>
         </div>
 
@@ -270,7 +275,7 @@ export default function OutboundV3ControlPanel(){
 }
 
 function ModeBadge({label,value}:{label:string;value:string}){
-  const active=value==="shadow"||value==="active"||value==="enforce"||value==="L2";
+  const active=value==="shadow"||value==="active"||value==="enforce"||value==="assist"||value==="L2";
   return <span style={{padding:"7px 9px",borderRadius:999,border:"1px solid rgba(255,255,255,.08)",background:active?"rgba(52,199,89,.09)":"rgba(255,255,255,.035)",fontSize:9,color:active?"#84f5c8":"#8f9b94",fontWeight:850}}>
     {label}: {value.toUpperCase()}
   </span>;
