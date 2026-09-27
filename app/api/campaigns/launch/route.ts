@@ -1,4 +1,6 @@
 import { query } from "@/lib/db";
+import { recordOutboundEventByMode } from "@/lib/outbound-event-ledger";
+import { getOutboundRuntimeConfig } from "@/lib/outbound-runtime-config";
 import { z } from "zod";
 
 export const runtime = "nodejs";
@@ -16,6 +18,9 @@ function hash(value:string){let h=2166136261;for(let i=0;i<value.length;i++){h^=
 function matches(lead:{industry:string;city:string;energyScore:number;websiteScore:number;intentScore:number},filters?:z.infer<typeof filterSchema>){if(!filters)return true;if(filters.industry&&!lead.industry.toLowerCase().includes(filters.industry.toLowerCase()))return false;if(filters.city&&!lead.city.toLowerCase().includes(filters.city.toLowerCase()))return false;if(typeof filters.minEnergyScore==="number"&&lead.energyScore<filters.minEnergyScore)return false;if(typeof filters.minWebsiteScore==="number"&&lead.websiteScore<filters.minWebsiteScore)return false;if(typeof filters.minIntentScore==="number"&&lead.intentScore<filters.minIntentScore)return false;return true}
 export async function POST(request:Request){
  try{
+  if(getOutboundRuntimeConfig().v3Mode==="active"){
+    return Response.json({error:"Legacy campaign launch is disabled while Outbound OS V3 is active."},{status:409});
+  }
   const input=schema.parse(await request.json());const active=input.mailboxes.filter(m=>m.enabled&&m.dailyLimit>0);if(!active.length)return Response.json({error:"Keine aktive Mailbox."},{status:409});
   const suppressedRows=await query<{email:string}>("select email from er_suppressions where workspace='default'");const suppressed=new Set(suppressedRows.map(r=>r.email.toLowerCase()));const appUrl=input.appUrl||process.env.NEXT_PUBLIC_APP_URL||new URL(request.url).origin;
   const eligible=input.leads.filter(l=>matches(l,input.campaign.filters));const leadIds=eligible.map(l=>l.id);const enrolledRows=leadIds.length?await query<{lead_id:string}>("select distinct lead_id from er_outbox where workspace='default' and campaign_id=$1 and lead_id=any($2::text[]) and status not in ('failed','suppressed')",[input.campaign.id,leadIds]):[];const enrolled=new Set(enrolledRows.map(r=>r.lead_id));
@@ -50,6 +55,20 @@ export async function POST(request:Request){
         randomizationKey:companyKey,
       })],
     );
+    await recordOutboundEventByMode({
+      workspace:"default",
+      type:"experiment_assigned",
+      actorType:"system",
+      leadId:lead.id,
+      idempotencyKey:`legacy:experiment-assigned:${input.campaign.id}:${companyKey}`,
+      payload:{
+        legacyCampaignId:input.campaign.id,
+        variant:assignedVariant,
+        experimentKey:`${input.campaign.id}:sequence-v1`,
+        randomizationUnit:"company",
+        randomizationKey:companyKey,
+      },
+    });
 
     for(let stepIndex=0;stepIndex<input.campaign.steps.length;stepIndex++){
       const step=input.campaign.steps[stepIndex];
