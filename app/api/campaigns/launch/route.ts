@@ -2,6 +2,7 @@ import { query } from "@/lib/db";
 import { recordOutboundEventByMode } from "@/lib/outbound-event-ledger";
 import { resolveOutboundRuntimeConfig } from "@/lib/outbound-runtime-config";
 import { ensureLegacyWorkflowForLead } from "@/lib/outbound-durable-workflows";
+import { evaluateEmailSendCompliance } from "@/lib/outbound-compliance-runtime";
 import { z } from "zod";
 
 export const runtime = "nodejs";
@@ -39,9 +40,45 @@ export async function POST(request:Request){
     }
   }
 
-  let queued=0,skipped=0,index=0;const variants:Record<string,number>={};
+  let queued=0,skipped=0,index=0,complianceBlocked=0;
+  const variants:Record<string,number>={};
+  const complianceReasons:Record<string,number>={};
   for(const lead of eligible){
     if(suppressed.has(lead.email.toLowerCase())||enrolled.has(lead.id)||closed.has(lead.id)){skipped++;continue}
+
+    if(runtimeConfig.complianceMode!=="off"){
+      const compliance=await evaluateEmailSendCompliance(lead.id,lead.email,"default");
+      await recordOutboundEventByMode({
+        workspace:"default",
+        type:compliance.decision.allowed?"permission_verified":"permission_denied",
+        actorType:"system",
+        companyId:compliance.companyId,
+        contactId:compliance.contactId,
+        leadId:lead.id,
+        idempotencyKey:`compliance-preflight:${input.campaign.id}:${lead.id}:${compliance.permission?.id||"none"}:${compliance.decision.reason}`,
+        payload:{
+          stage:"campaign_launch",
+          mode:runtimeConfig.complianceMode,
+          allowed:compliance.decision.allowed,
+          reason:compliance.decision.reason,
+          policyVersion:compliance.decision.policyVersion,
+          jurisdiction:compliance.jurisdiction,
+          permissionId:compliance.permission?.id||null,
+          permissionBasis:compliance.permission?.basis||null,
+          recipient:lead.email,
+          legacyCampaignId:input.campaign.id,
+        },
+      });
+      if(!compliance.decision.allowed){
+        complianceReasons[compliance.decision.reason]=(complianceReasons[compliance.decision.reason]||0)+1;
+        if(runtimeConfig.complianceMode==="enforce"){
+          complianceBlocked++;
+          skipped++;
+          continue;
+        }
+      }
+    }
+
     const mailbox=active[index++%active.length];
     const companyKey=(lead.companyId?.trim()||lead.company.trim().toLowerCase().replace(/\s+/g," "));
     const experimentOrdinal=hash(`${input.campaign.id}:${companyKey}`);
@@ -96,6 +133,18 @@ export async function POST(request:Request){
       });
     }
   }
-  return Response.json({ok:true,queued,skipped,eligibleLeads:eligible.length,totalLeads:input.leads.length,variants});
+  return Response.json({
+    ok:true,
+    queued,
+    skipped,
+    eligibleLeads:eligible.length,
+    totalLeads:input.leads.length,
+    variants,
+    compliance:{
+      mode:runtimeConfig.complianceMode,
+      blocked:complianceBlocked,
+      reasons:complianceReasons,
+    },
+  });
  }catch(error){return Response.json({error:error instanceof Error?error.message:"Kampagne konnte nicht gestartet werden."},{status:400})}
 }
