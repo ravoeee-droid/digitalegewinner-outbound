@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { query } from "@/lib/db";
 import { recordOutboundEvent } from "@/lib/outbound-event-ledger";
-import { resolveOutboundRuntimeConfig, type OutboundRuntimeConfig } from "@/lib/outbound-runtime-config";
+import { invalidateOutboundRuntimeConfigCache, resolveOutboundRuntimeConfig, type OutboundRuntimeConfig } from "@/lib/outbound-runtime-config";
 import type { AutonomyLevel } from "@/lib/outbound-contracts";
 
 const modeSchema = z.enum(["off","shadow","active"]);
@@ -234,6 +234,8 @@ export async function updateRuntimeControlPlane(
     );
     return {ok:false,conflict:true,blocked:false,current};
   }
+
+  invalidateOutboundRuntimeConfigCache(workspace);
 
   await recordOutboundEvent({
     workspace,
