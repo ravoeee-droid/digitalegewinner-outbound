@@ -31,6 +31,16 @@ export const outboundEventTypes = [
   "agent_decision_executed",
   "runtime_config_changed",
   "runtime_activation_blocked",
+  "workflow_started",
+  "workflow_step_scheduled",
+  "workflow_step_observed",
+  "workflow_signal_received",
+  "workflow_signal_applied",
+  "workflow_waiting",
+  "workflow_completed",
+  "workflow_failed",
+  "workflow_cancelled",
+  "workflow_recovered",
 ] as const;
 
 export const outboundEventTypeSchema = z.enum(outboundEventTypes);

@@ -27,6 +27,7 @@ type ControlSnapshot={
     shadowEventLedger:boolean;
     nativeV3Execution:boolean;
     complianceEnforcement:boolean;
+    durableWorkflowShadow:boolean;
     durableWorkflowExecution:boolean;
     conversationAutopilot:boolean;
     optimizationAutopilot:boolean;
@@ -43,6 +44,15 @@ type ControlSnapshot={
     allowed:number;
     denied:number;
     reasons:Record<string,number>;
+  };
+  workflowShadow:{
+    window:string;
+    legacySequences:number;
+    mirroredSequences:number;
+    parityPercent:number;
+    runs:Record<string,number>;
+    steps:{total:number;due:number;leased:number;failed:number};
+    signals:{pending:number;failed:number};
   };
   environmentOverrides:{
     v3Mode:boolean;
@@ -160,6 +170,12 @@ export default function OutboundV3ControlPanel(){
               {snapshot?(snapshot.complianceShadow.allowed+" allow · "+snapshot.complianceShadow.denied+" deny"):"24h Shadow-Auswertung"}
             </span>
           </Card>
+          <Card title="Durable Workflows">
+            <strong style={metricStyle}>{snapshot?(snapshot.workflowShadow.parityPercent+"%"):"—"}</strong>
+            <span style={subStyle}>
+              {snapshot?(snapshot.workflowShadow.mirroredSequences+"/"+snapshot.workflowShadow.legacySequences+" Sequenzen gespiegelt"):"30d Shadow-Parität"}
+            </span>
+          </Card>
         </div>
 
         <div style={{display:"grid",gridTemplateColumns:"minmax(0,1.35fr) minmax(280px,.65fr)",gap:12,marginTop:12}}>
@@ -206,6 +222,27 @@ export default function OutboundV3ControlPanel(){
               >
                 ■ V3 pausieren
               </button>
+              {snapshot?.resolved.durableWorkflowsMode==="off"
+                ? <button
+                    disabled={busy||!snapshot?.schema.ready||snapshot?.resolved.v3Mode!=="shadow"||!snapshot?.capabilities.durableWorkflowShadow||envPinned}
+                    onClick={()=>void update({
+                      durableWorkflowsMode:"shadow",
+                      reason:"Start durable workflow shadow after schema and worker validation",
+                    })}
+                    style={actionStyle(true)}
+                  >
+                    ◌ Workflow Shadow starten
+                  </button>
+                : <button
+                    disabled={busy||snapshot?.resolved.durableWorkflowsMode!=="shadow"||envPinned}
+                    onClick={()=>void update({
+                      durableWorkflowsMode:"off",
+                      reason:"Pause durable workflow shadow while keeping V3 event shadow active",
+                    })}
+                    style={actionStyle(false)}
+                  >
+                    ◌ Workflow Shadow pausieren
+                  </button>}
               <button disabled style={actionStyle(false)}>Active Cutover · gesperrt</button>
             </div>
             <p style={{...subStyle,marginTop:12}}>
@@ -214,6 +251,10 @@ export default function OutboundV3ControlPanel(){
             {snapshot&&snapshot.complianceShadow.denied>0&&
               <div style={{marginTop:10,paddingTop:10,borderTop:"1px solid rgba(255,255,255,.06)",fontSize:9,color:"#89958e",lineHeight:1.6}}>
                 Deny-Gründe: {Object.entries(snapshot.complianceShadow.reasons).map(([reason,count])=>reason+" "+count).join(" · ")}
+              </div>}
+            {snapshot&&
+              <div style={{marginTop:10,paddingTop:10,borderTop:"1px solid rgba(255,255,255,.06)",fontSize:9,color:"#89958e",lineHeight:1.6}}>
+                Workflow: {snapshot.workflowShadow.steps.total} Steps · {snapshot.workflowShadow.steps.due} due · {snapshot.workflowShadow.steps.leased} leased · {snapshot.workflowShadow.steps.failed} failed · {snapshot.workflowShadow.signals.pending} Signals offen
               </div>}
           </div>
         </div>

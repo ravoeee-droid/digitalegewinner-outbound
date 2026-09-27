@@ -213,7 +213,7 @@ This document + ADRs + typed contracts.
 Add `outbound_*` tables, indexes and RLS. No destructive changes.
 
 ### M2 — Durable Execution
-Move waits, retries, sequence scheduling and health jobs from cron-driven orchestration to a durable workflow layer.
+Persist runs, steps, waits, retries, leases and signals in Postgres. The protected workflow worker is scheduled through the existing Supabase pg_cron/pg_net transport. Legacy execution remains canonical until shadow parity and recovery gates pass.
 
 ### M3 — Deliverability Control Tower
 Domain/mailbox health snapshots, provider diagnostics and automatic safety actions.
