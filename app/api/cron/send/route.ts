@@ -3,6 +3,7 @@ import { sendMail } from "@/lib/mailer";
 import { loadMailboxCredentials, type StoredMailboxCredential } from "@/lib/mailbox-credentials";
 import { recordOutboundEventByMode } from "@/lib/outbound-event-ledger";
 import { resolveOutboundRuntimeConfig } from "@/lib/outbound-runtime-config";
+import { evaluateEmailSendCompliance } from "@/lib/outbound-compliance-runtime";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -18,7 +19,8 @@ function authorized(request: Request) {
 
 async function run(request: Request) {
   if (!authorized(request)) return Response.json({ error:"Unauthorized" }, { status:401 });
-  if ((await resolveOutboundRuntimeConfig()).v3Mode === "active") {
+  const runtimeConfig=await resolveOutboundRuntimeConfig();
+  if (runtimeConfig.v3Mode === "active") {
     return Response.json(
       { error:"Legacy send worker is disabled while Outbound OS V3 is active." },
       { status:409 },
@@ -80,8 +82,7 @@ async function run(request: Request) {
      returning o.id,o.lead_id,o.campaign_id,o.mailbox_id,o.recipient,o.subject,o.body,o.variant,o.attempts`
   );
 
-  let sent=0, failed=0, limited=0;
-  const skipped=0;
+  let sent=0, failed=0, limited=0, skipped=0;
   for (const row of due) {
     const credential = credMap.get(row.mailbox_id);
     if (!credential) {
@@ -110,6 +111,70 @@ async function run(request: Request) {
       await query("update er_outbox set status='queued',attempts=greatest(attempts-1,0),scheduled_at=now()+interval '60 minutes',error=null where id=$1 and status='sending'", [row.id]);
       limited++; continue;
     }
+
+    if(runtimeConfig.complianceMode!=="off"){
+      try{
+        const compliance=await evaluateEmailSendCompliance(row.lead_id,row.recipient);
+        await recordOutboundEventByMode({
+          workspace:"default",
+          type:compliance.decision.allowed?"permission_verified":"permission_denied",
+          actorType:"system",
+          companyId:compliance.companyId,
+          contactId:compliance.contactId,
+          leadId:row.lead_id,
+          idempotencyKey:`compliance:email:${row.id}:${compliance.decision.policyVersion}`,
+          payload:{
+            mode:runtimeConfig.complianceMode,
+            allowed:compliance.decision.allowed,
+            reason:compliance.decision.reason,
+            policyVersion:compliance.decision.policyVersion,
+            jurisdiction:compliance.jurisdiction,
+            permissionId:compliance.permission?.id||null,
+            permissionBasis:compliance.permission?.basis||null,
+            permissionStatus:compliance.permission?.status||null,
+            legacyOutboxId:row.id,
+            legacyCampaignId:row.campaign_id,
+            variant:row.variant,
+          },
+        });
+
+        if(runtimeConfig.complianceMode==="enforce"&&!compliance.decision.allowed){
+          await query(
+            "update er_outbox set status='suppressed',error=$2 where id=$1 and status='sending'",
+            [row.id,`Compliance gate: ${compliance.decision.reason}`],
+          );
+          skipped++;
+          continue;
+        }
+      }catch(error){
+        const message=error instanceof Error?error.message:"Compliance evaluation failed";
+        await recordOutboundEventByMode({
+          workspace:"default",
+          type:"permission_denied",
+          actorType:"system",
+          leadId:row.lead_id,
+          idempotencyKey:`compliance-error:email:${row.id}:${row.attempts}`,
+          payload:{
+            mode:runtimeConfig.complianceMode,
+            allowed:false,
+            reason:"evaluation_error",
+            error:message,
+            legacyOutboxId:row.id,
+            legacyCampaignId:row.campaign_id,
+            variant:row.variant,
+          },
+        });
+        if(runtimeConfig.complianceMode==="enforce"){
+          await query(
+            "update er_outbox set status='queued',attempts=greatest(attempts-1,0),scheduled_at=now()+interval '60 minutes',error=$2 where id=$1 and status='sending'",
+            [row.id,`Compliance evaluator unavailable: ${message}`],
+          );
+          skipped++;
+          continue;
+        }
+      }
+    }
+
     try {
       await recordOutboundEventByMode({
         workspace:"default",
