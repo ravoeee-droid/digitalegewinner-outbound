@@ -125,11 +125,33 @@ export async function getRuntimeControlPlane(workspace="default"){
     [workspace],
   );
 
+  const complianceRows=await query<{event_type:string;reason:string|null;count:string}>(
+    `select event_type,payload->>'reason' as reason,count(*)::text as count
+     from outbound_events
+     where workspace=$1
+       and event_type in ('permission_verified','permission_denied')
+       and occurred_at>=now()-interval '24 hours'
+     group by event_type,payload->>'reason'
+     order by count(*) desc`,
+    [workspace],
+  );
+
   const parity={
     window:"24h",
     sends:{legacy:Number(legacySends?.count||0),v3:Number(v3Sends?.count||0)},
     replies:{legacy:Number(legacyReplies?.count||0),v3:Number(v3Replies?.count||0)},
     bounces:{legacy:Number(legacyBounces?.count||0),v3:Number(v3Bounces?.count||0)},
+  };
+  const complianceShadow={
+    window:"24h",
+    evaluated:complianceRows.reduce((sum,row)=>sum+Number(row.count||0),0),
+    allowed:complianceRows.filter(row=>row.event_type==="permission_verified").reduce((sum,row)=>sum+Number(row.count||0),0),
+    denied:complianceRows.filter(row=>row.event_type==="permission_denied").reduce((sum,row)=>sum+Number(row.count||0),0),
+    reasons:Object.fromEntries(
+      complianceRows
+        .filter(row=>row.event_type==="permission_denied")
+        .map(row=>[row.reason||"unknown",Number(row.count||0)]),
+    ),
   };
 
   const transition=validateRuntimeTransition({
@@ -158,6 +180,7 @@ export async function getRuntimeControlPlane(workspace="default"){
     },
     capabilities:OUTBOUND_V3_CAPABILITIES,
     parity,
+    complianceShadow,
     currentTransitionValid:transition.allowed,
     currentTransitionBlockers:transition.blockers,
     environmentOverrides:{
