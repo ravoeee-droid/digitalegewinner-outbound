@@ -1,7 +1,7 @@
 {
   "contractVersion": "1.0.0",
   "instance": "DG-MAIN",
-  "updatedAt": "2026-09-16",
+  "updatedAt": "2026-09-27",
   "policy": "same-task-adapt-both-directions",
   "status": "parity-realignment-in-progress",
   "sharedSurfaces": {
@@ -18,7 +18,8 @@
     "salesBrief": "needs-parity-review",
     "applicationFrame": "single-primary-workspace-no-parallel-pro-ui",
     "studioGenericV3": "peer-webmotion-v3-blocked-no-equivalent-browser-render-seam",
-    "websiteBuildStreamVercelLink": "implemented-in-dg-peer-has-no-website-build-stream"
+    "websiteBuildStreamVercelLink": "implemented-in-dg-peer-has-no-website-build-stream",
+    "outboundOsV3": "dg-foundation-feature-branch-peer-parity-blocked"
   },
   "blockers": [
     {
@@ -32,6 +33,12 @@
       "surface": "websiteBuildStreamVercelLink",
       "peer": "CLIENT-WALKENHORST",
       "detail": "DG-MAIN now exposes and requires the Vercel preview URL in its Website Build Stream. CLIENT-WALKENHORST has no Website Build Stream, website_projects model, or equivalent route to adapt without creating a new unrequested product surface."
+    },
+    {
+      "id": "outbound-os-v3-peer-2026-09-27",
+      "surface": "outboundOsV3",
+      "peer": "CLIENT-WALKENHORST",
+      "detail": "DG-MAIN is introducing a new additive outbound event/version/experiment/compliance foundation. The peer source was inspected read-only and does not expose an equivalent Supabase migration/runtime seam for a safe same-task adaptation. No peer runtime data, credentials, branding or customer-specific logic were read or copied. Parity must be handled as a separate reviewed migration rather than creating a parallel unrequested outbound architecture."
     }
   ],
   "rules": [
