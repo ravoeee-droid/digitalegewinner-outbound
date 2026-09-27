@@ -5,7 +5,7 @@ import { loadMailboxCredentials, type StoredMailboxCredential } from "@/lib/mail
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-type OutboxRow = { id:string; lead_id:string; campaign_id:string|null; mailbox_id:string; recipient:string; subject:string; body:string; attempts:number };
+type OutboxRow = { id:string; lead_id:string; campaign_id:string|null; mailbox_id:string; recipient:string; subject:string; body:string; variant:string; attempts:number };
 type Credential = StoredMailboxCredential;
 type State = { mailboxes?: Array<{id:string;email?:string;enabled:boolean;dailyLimit:number}>; campaigns?: Array<{id:string;status?:string;dailyLimit?:number}> };
 
@@ -69,7 +69,7 @@ async function run(request: Request) {
      set status='sending',attempts=o.attempts+1,scheduled_at=now()
      from claim
      where o.id=claim.id
-     returning o.id,o.lead_id,o.campaign_id,o.mailbox_id,o.recipient,o.subject,o.body,o.attempts`
+     returning o.id,o.lead_id,o.campaign_id,o.mailbox_id,o.recipient,o.subject,o.body,o.variant,o.attempts`
   );
 
   let sent=0, failed=0, limited=0;
@@ -91,7 +91,7 @@ async function run(request: Request) {
     try {
       const result = await sendMail({ ...credential, to:row.recipient, subject:row.subject, text:row.body });
       await query("update er_outbox set status='sent',sent_at=now(),provider_message_id=$2,error=null where id=$1 and status='sending'", [row.id,result.id]);
-      await query("insert into er_events(workspace,lead_id,type,meta) values('default',$1,'email_sent',$2::jsonb)", [row.lead_id,JSON.stringify({ outboxId:row.id, mailboxId:row.mailbox_id, campaignId:row.campaign_id })]);
+      await query("insert into er_events(workspace,lead_id,type,meta) values('default',$1,'email_sent',$2::jsonb)", [row.lead_id,JSON.stringify({ outboxId:row.id, mailboxId:row.mailbox_id, campaignId:row.campaign_id, variant:row.variant })]);
       sentToday.set(row.mailbox_id,mailboxCurrent+1);
       if(row.campaign_id)campaignToday.set(row.campaign_id,campaignCurrent+1);
       sent++;
