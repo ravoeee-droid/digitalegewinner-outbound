@@ -1,11 +1,13 @@
 import { query, readState } from "@/lib/db";
 import { sendMail } from "@/lib/mailer";
 import { loadMailboxCredentials, type StoredMailboxCredential } from "@/lib/mailbox-credentials";
+import { recordOutboundEventByMode } from "@/lib/outbound-event-ledger";
+import { getOutboundRuntimeConfig } from "@/lib/outbound-runtime-config";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-type OutboxRow = { id:string; lead_id:string; campaign_id:string|null; mailbox_id:string; recipient:string; subject:string; body:string; attempts:number };
+type OutboxRow = { id:string; lead_id:string; campaign_id:string|null; mailbox_id:string; recipient:string; subject:string; body:string; variant:string; attempts:number };
 type Credential = StoredMailboxCredential;
 type State = { mailboxes?: Array<{id:string;email?:string;enabled:boolean;dailyLimit:number}>; campaigns?: Array<{id:string;status?:string;dailyLimit?:number}> };
 
@@ -16,6 +18,12 @@ function authorized(request: Request) {
 
 async function run(request: Request) {
   if (!authorized(request)) return Response.json({ error:"Unauthorized" }, { status:401 });
+  if (getOutboundRuntimeConfig().v3Mode === "active") {
+    return Response.json(
+      { error:"Legacy send worker is disabled while Outbound OS V3 is active." },
+      { status:409 },
+    );
+  }
   let credentials: Credential[] = [];
   try { credentials = await loadMailboxCredentials(); }
   catch { return Response.json({ error:"Mailbox Credentials JSON ist ungültig." }, { status:503 }); }
@@ -69,7 +77,7 @@ async function run(request: Request) {
      set status='sending',attempts=o.attempts+1,scheduled_at=now()
      from claim
      where o.id=claim.id
-     returning o.id,o.lead_id,o.campaign_id,o.mailbox_id,o.recipient,o.subject,o.body,o.attempts`
+     returning o.id,o.lead_id,o.campaign_id,o.mailbox_id,o.recipient,o.subject,o.body,o.variant,o.attempts`
   );
 
   let sent=0, failed=0, limited=0;
@@ -78,6 +86,20 @@ async function run(request: Request) {
     const credential = credMap.get(row.mailbox_id);
     if (!credential) {
       await query("update er_outbox set status='failed',error='Keine Zugangsdaten für Mailbox-ID' where id=$1 and status='sending'", [row.id]);
+      await recordOutboundEventByMode({
+        workspace:"default",
+        type:"send_failed",
+        actorType:"system",
+        leadId:row.lead_id,
+        idempotencyKey:`legacy:send-failed:${row.id}:missing-credential`,
+        payload:{
+          legacyOutboxId:row.id,
+          legacyCampaignId:row.campaign_id,
+          variant:row.variant,
+          mailboxId:row.mailbox_id,
+          reason:"missing_mailbox_credentials",
+        },
+      });
       failed++; continue;
     }
     const mailboxLimit = mailboxLimits.get(row.mailbox_id) ?? 30;
@@ -89,9 +111,40 @@ async function run(request: Request) {
       limited++; continue;
     }
     try {
+      await recordOutboundEventByMode({
+        workspace:"default",
+        type:"send_attempted",
+        actorType:"workflow",
+        leadId:row.lead_id,
+        idempotencyKey:`legacy:send-attempted:${row.id}:${row.attempts}`,
+        payload:{
+          legacyOutboxId:row.id,
+          legacyCampaignId:row.campaign_id,
+          variant:row.variant,
+          mailboxId:row.mailbox_id,
+          recipient:row.recipient,
+          attempt:row.attempts,
+        },
+      });
       const result = await sendMail({ ...credential, to:row.recipient, subject:row.subject, text:row.body });
       await query("update er_outbox set status='sent',sent_at=now(),provider_message_id=$2,error=null where id=$1 and status='sending'", [row.id,result.id]);
-      await query("insert into er_events(workspace,lead_id,type,meta) values('default',$1,'email_sent',$2::jsonb)", [row.lead_id,JSON.stringify({ outboxId:row.id, mailboxId:row.mailbox_id, campaignId:row.campaign_id })]);
+      await query("insert into er_events(workspace,lead_id,type,meta) values('default',$1,'email_sent',$2::jsonb)", [row.lead_id,JSON.stringify({ outboxId:row.id, mailboxId:row.mailbox_id, campaignId:row.campaign_id, variant:row.variant })]);
+      await recordOutboundEventByMode({
+        workspace:"default",
+        type:"provider_accepted",
+        actorType:"provider",
+        leadId:row.lead_id,
+        messageId:result.id,
+        idempotencyKey:`legacy:provider-accepted:${row.id}:${result.id}`,
+        payload:{
+          legacyOutboxId:row.id,
+          legacyCampaignId:row.campaign_id,
+          variant:row.variant,
+          mailboxId:row.mailbox_id,
+          recipient:row.recipient,
+          providerMessageId:result.id,
+        },
+      });
       sentToday.set(row.mailbox_id,mailboxCurrent+1);
       if(row.campaign_id)campaignToday.set(row.campaign_id,campaignCurrent+1);
       sent++;
@@ -99,6 +152,22 @@ async function run(request: Request) {
       const message = error instanceof Error ? error.message : "Versandfehler";
       const nextStatus = row.attempts >= 3 ? "failed" : "queued";
       await query("update er_outbox set status=$2,error=$3,scheduled_at=now()+interval '30 minutes' where id=$1 and status='sending'", [row.id,nextStatus,message]);
+      await recordOutboundEventByMode({
+        workspace:"default",
+        type:nextStatus === "failed" ? "send_failed" : "send_deferred",
+        actorType:"workflow",
+        leadId:row.lead_id,
+        idempotencyKey:`legacy:${nextStatus === "failed" ? "send-failed" : "send-deferred"}:${row.id}:${row.attempts}`,
+        payload:{
+          legacyOutboxId:row.id,
+          legacyCampaignId:row.campaign_id,
+          variant:row.variant,
+          mailboxId:row.mailbox_id,
+          recipient:row.recipient,
+          attempt:row.attempts,
+          error:message,
+        },
+      });
       failed++;
     }
   }

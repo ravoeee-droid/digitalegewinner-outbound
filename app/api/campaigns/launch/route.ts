@@ -1,4 +1,6 @@
 import { query } from "@/lib/db";
+import { recordOutboundEventByMode } from "@/lib/outbound-event-ledger";
+import { getOutboundRuntimeConfig } from "@/lib/outbound-runtime-config";
 import { z } from "zod";
 
 export const runtime = "nodejs";
@@ -7,7 +9,7 @@ const stepSchema=z.object({waitDays:z.number().int().min(0).max(60),subject:z.st
 const filterSchema=z.object({industry:z.string().optional(),city:z.string().optional(),minEnergyScore:z.number().min(0).max(100).optional(),minWebsiteScore:z.number().min(0).max(100).optional(),minIntentScore:z.number().min(0).max(100).optional()});
 const schema = z.object({
   campaign: z.object({id:z.string(),steps:z.array(stepSchema).min(1),filters:filterSchema.optional()}),
-  leads:z.array(z.object({id:z.string(),email:z.string().email(),company:z.string(),contact:z.string().optional().default(""),city:z.string().optional().default(""),industry:z.string().optional().default(""),energyScore:z.number().optional().default(0),websiteScore:z.number().optional().default(0),intentScore:z.number().optional().default(0)})).min(1).max(5000),
+  leads:z.array(z.object({id:z.string(),companyId:z.string().optional(),email:z.string().email(),company:z.string(),contact:z.string().optional().default(""),city:z.string().optional().default(""),industry:z.string().optional().default(""),energyScore:z.number().optional().default(0),websiteScore:z.number().optional().default(0),intentScore:z.number().optional().default(0)})).min(1).max(5000),
   mailboxes:z.array(z.object({id:z.string(),enabled:z.boolean(),dailyLimit:z.number().int().min(1).max(100)})).min(1),
   senderName:z.string().default("Digitale Gewinner"),appUrl:z.string().url().optional(),
 });
@@ -16,14 +18,74 @@ function hash(value:string){let h=2166136261;for(let i=0;i<value.length;i++){h^=
 function matches(lead:{industry:string;city:string;energyScore:number;websiteScore:number;intentScore:number},filters?:z.infer<typeof filterSchema>){if(!filters)return true;if(filters.industry&&!lead.industry.toLowerCase().includes(filters.industry.toLowerCase()))return false;if(filters.city&&!lead.city.toLowerCase().includes(filters.city.toLowerCase()))return false;if(typeof filters.minEnergyScore==="number"&&lead.energyScore<filters.minEnergyScore)return false;if(typeof filters.minWebsiteScore==="number"&&lead.websiteScore<filters.minWebsiteScore)return false;if(typeof filters.minIntentScore==="number"&&lead.intentScore<filters.minIntentScore)return false;return true}
 export async function POST(request:Request){
  try{
+  if(getOutboundRuntimeConfig().v3Mode==="active"){
+    return Response.json({error:"Legacy campaign launch is disabled while Outbound OS V3 is active."},{status:409});
+  }
   const input=schema.parse(await request.json());const active=input.mailboxes.filter(m=>m.enabled&&m.dailyLimit>0);if(!active.length)return Response.json({error:"Keine aktive Mailbox."},{status:409});
   const suppressedRows=await query<{email:string}>("select email from er_suppressions where workspace='default'");const suppressed=new Set(suppressedRows.map(r=>r.email.toLowerCase()));const appUrl=input.appUrl||process.env.NEXT_PUBLIC_APP_URL||new URL(request.url).origin;
   const eligible=input.leads.filter(l=>matches(l,input.campaign.filters));const leadIds=eligible.map(l=>l.id);const enrolledRows=leadIds.length?await query<{lead_id:string}>("select distinct lead_id from er_outbox where workspace='default' and campaign_id=$1 and lead_id=any($2::text[]) and status not in ('failed','suppressed')",[input.campaign.id,leadIds]):[];const enrolled=new Set(enrolledRows.map(r=>r.lead_id));
   // Don't trust the client's snapshot of lead stage - it can be stale by the time this runs.
   // Re-check the real CRM row so a lead closed/blocked since the page loaded can't get enrolled.
   const closedRows=leadIds.length?await query<{id:string}>("select id from sales_leads where workspace='default' and id=any($1::text[]) and (stage in ('Gewonnen','Verloren') or do_not_contact)",[leadIds]):[];const closed=new Set(closedRows.map(r=>r.id));
+  const variantSteps=input.campaign.steps.filter(step=>step.variants?.length);
+  const experimentLabels=variantSteps[0]?.variants?.map(v=>v.label)??["A"];
+  const canonicalLabels=[...experimentLabels].sort();
+  for(const step of variantSteps){
+    const labels=(step.variants??[]).map(v=>v.label).sort();
+    if(labels.length!==canonicalLabels.length||labels.some((label,i)=>label!==canonicalLabels[i])){
+      return Response.json({error:"Alle experimentellen Sequenzschritte müssen dieselben Variant-Labels verwenden."},{status:400});
+    }
+  }
+
   let queued=0,skipped=0,index=0;const variants:Record<string,number>={};
-  for(const lead of eligible){if(suppressed.has(lead.email.toLowerCase())||enrolled.has(lead.id)||closed.has(lead.id)){skipped++;continue}const mailbox=active[index++%active.length];for(let stepIndex=0;stepIndex<input.campaign.steps.length;stepIndex++){const step=input.campaign.steps[stepIndex];const candidates=step.variants?.length?step.variants:[{label:"A",subject:step.subject,body:step.body}];const selected=candidates[hash(`${input.campaign.id}:${lead.id}:${stepIndex}`)%candidates.length];variants[selected.label]=(variants[selected.label]||0)+1;const scheduled=new Date(Date.now()+step.waitDays*86400000);await query(`insert into er_outbox(id,workspace,campaign_id,lead_id,mailbox_id,recipient,subject,body,variant,scheduled_at) values($1,'default',$2,$3,$4,$5,$6,$7,$8,$9)`,[crypto.randomUUID(),input.campaign.id,lead.id,mailbox.id,lead.email,render(selected.subject,lead,input.senderName,appUrl),render(selected.body,lead,input.senderName,appUrl),selected.label,scheduled]);queued++}}
+  for(const lead of eligible){
+    if(suppressed.has(lead.email.toLowerCase())||enrolled.has(lead.id)||closed.has(lead.id)){skipped++;continue}
+    const mailbox=active[index++%active.length];
+    const companyKey=(lead.companyId?.trim()||lead.company.trim().toLowerCase().replace(/\s+/g," "));
+    const experimentOrdinal=hash(`${input.campaign.id}:${companyKey}`);
+    const assignedVariant=experimentLabels[experimentOrdinal%experimentLabels.length]??"A";
+    variants[assignedVariant]=(variants[assignedVariant]||0)+1;
+    await query(
+      "insert into er_events(workspace,lead_id,type,meta) values('default',$1,'experiment_assignment',$2::jsonb)",
+      [lead.id,JSON.stringify({
+        campaignId:input.campaign.id,
+        variant:assignedVariant,
+        experimentKey:`${input.campaign.id}:sequence-v1`,
+        randomizationUnit:"company",
+        randomizationKey:companyKey,
+      })],
+    );
+    await recordOutboundEventByMode({
+      workspace:"default",
+      type:"experiment_assigned",
+      actorType:"system",
+      leadId:lead.id,
+      idempotencyKey:`legacy:experiment-assigned:${input.campaign.id}:${companyKey}`,
+      payload:{
+        legacyCampaignId:input.campaign.id,
+        variant:assignedVariant,
+        experimentKey:`${input.campaign.id}:sequence-v1`,
+        randomizationUnit:"company",
+        randomizationKey:companyKey,
+      },
+    });
+
+    for(let stepIndex=0;stepIndex<input.campaign.steps.length;stepIndex++){
+      const step=input.campaign.steps[stepIndex];
+      const selected=step.variants?.length
+        ? step.variants.find(v=>v.label===assignedVariant)
+        : {label:assignedVariant,subject:step.subject,body:step.body};
+      if(!selected){
+        return Response.json({error:`Variante ${assignedVariant} fehlt in Schritt ${stepIndex+1}.`},{status:400});
+      }
+      const scheduled=new Date(Date.now()+step.waitDays*86400000);
+      await query(
+        `insert into er_outbox(id,workspace,campaign_id,lead_id,mailbox_id,recipient,subject,body,variant,scheduled_at) values($1,'default',$2,$3,$4,$5,$6,$7,$8,$9)`,
+        [crypto.randomUUID(),input.campaign.id,lead.id,mailbox.id,lead.email,render(selected.subject,lead,input.senderName,appUrl),render(selected.body,lead,input.senderName,appUrl),assignedVariant,scheduled],
+      );
+      queued++;
+    }
+  }
   return Response.json({ok:true,queued,skipped,eligibleLeads:eligible.length,totalLeads:input.leads.length,variants});
  }catch(error){return Response.json({error:error instanceof Error?error.message:"Kampagne konnte nicht gestartet werden."},{status:400})}
 }

@@ -1,5 +1,8 @@
 # Digitale Gewinner Outbound OS
 
+> **AI Outbound OS V3 architecture:** The next-generation campaign, experiment, compliance and AI-autonomy layer is specified in `docs/architecture/AI-OUTBOUND-OS-GOLDEN-MASTER-V1.md`. The migration is additive and follows `docs/architecture/V3-ZERO-DOWNTIME-MIGRATION.md`; existing `er_*` production flows remain the rollback path until parity is proven.
+
+
 Ein integriertes B2B-Outbound-System für Lead Discovery, öffentliche Kontaktanreicherung, Website-Analyse, personalisierte Microsites, Fake-Loom-Videojobs, Multi-Mailbox-Sequenzen, Reply-Sync, Intent Scoring, CRM/Pipeline und No-Show-Recovery.
 
 **Production release:** 2.0.0 · Vercel deployment trigger 2026-08-12
