@@ -6,6 +6,7 @@ import type { AutonomyLevel } from "@/lib/outbound-contracts";
 
 const modeSchema = z.enum(["off","shadow","active"]);
 const complianceSchema = z.enum(["off","shadow","enforce"]);
+const deliverabilitySchema = z.enum(["off","shadow","enforce"]);
 
 export const runtimeUpdateSchema = z.object({
   expectedVersion: z.number().int().positive(),
@@ -13,6 +14,7 @@ export const runtimeUpdateSchema = z.object({
   complianceMode: complianceSchema.optional(),
   autonomyLevel: z.number().int().min(0).max(5).optional(),
   durableWorkflowsMode: modeSchema.optional(),
+  deliverabilityMode: deliverabilitySchema.optional(),
   reason: z.string().min(3).max(1000),
 });
 
@@ -24,6 +26,7 @@ type RuntimeRow = {
   compliance_mode:"off"|"shadow"|"enforce";
   autonomy_level:number;
   durable_workflows_mode:"off"|"shadow"|"active";
+  deliverability_mode:"off"|"shadow"|"enforce";
   version:number;
   updated_by:string;
   updated_at:Date;
@@ -36,6 +39,8 @@ export const OUTBOUND_V3_CAPABILITIES = {
   complianceEnforcement: false,
   durableWorkflowShadow: true,
   durableWorkflowExecution: false,
+  deliverabilityShadow: true,
+  deliverabilityEnforcement: true,
   conversationAutopilot: false,
   optimizationAutopilot: false,
 } as const;
@@ -46,6 +51,7 @@ function toConfig(row:RuntimeRow):OutboundRuntimeConfig {
     complianceMode:row.compliance_mode,
     autonomyLevel:row.autonomy_level as AutonomyLevel,
     durableWorkflowsMode:row.durable_workflows_mode,
+    deliverabilityMode:row.deliverability_mode,
   };
 }
 
@@ -64,6 +70,12 @@ export function validateRuntimeTransition(next:OutboundRuntimeConfig) {
   if(next.durableWorkflowsMode==="active"&&!OUTBOUND_V3_CAPABILITIES.durableWorkflowExecution){
     blockers.push("Durable workflow active execution is locked until shadow parity and recovery drills pass.");
   }
+  if(next.deliverabilityMode==="shadow"&&!OUTBOUND_V3_CAPABILITIES.deliverabilityShadow){
+    blockers.push("Deliverability shadow is not ready yet.");
+  }
+  if(next.deliverabilityMode==="enforce"&&!OUTBOUND_V3_CAPABILITIES.deliverabilityEnforcement){
+    blockers.push("Deliverability enforcement is locked until health checks and recovery gates pass.");
+  }
   if(next.autonomyLevel>2){
     blockers.push("Autonomy above L2 is locked until conversation and optimization eval gates are complete.");
   }
@@ -74,7 +86,7 @@ export function validateRuntimeTransition(next:OutboundRuntimeConfig) {
 export async function getRuntimeControlPlane(workspace="default"){
   const resolved=await resolveOutboundRuntimeConfig(workspace);
   const [raw]=await query<RuntimeRow>(
-    `select workspace,v3_mode,compliance_mode,autonomy_level,durable_workflows_mode,version,updated_by,updated_at
+    `select workspace,v3_mode,compliance_mode,autonomy_level,durable_workflows_mode,deliverability_mode,version,updated_by,updated_at
      from outbound_runtime_settings where workspace=$1 limit 1`,
     [workspace],
   );
@@ -98,6 +110,7 @@ export async function getRuntimeControlPlane(workspace="default"){
       "outbound_workflow_runs",
       "outbound_workflow_steps",
       "outbound_workflow_signals",
+      "outbound_sender_health_state",
     ]],
   );
 
@@ -233,11 +246,37 @@ export async function getRuntimeControlPlane(workspace="default"){
     },
   };
 
+  const healthRows=await query<{
+    target_type:"mailbox"|"domain";target_id:string;domain:string|null;health_status:string;
+    health_score:number;base_daily_limit:number|null;recommended_daily_limit:number|null;
+    enforced_daily_limit:number|null;last_action:string|null;last_reason:string|null;
+    reasons:string[];metrics:Record<string,unknown>;observed_at:Date
+  }>(
+    `select target_type,target_id,domain,health_status,health_score,base_daily_limit,
+            recommended_daily_limit,enforced_daily_limit,last_action,last_reason,reasons,metrics,observed_at
+     from outbound_sender_health_state
+     where workspace=$1
+     order by target_type,target_id`,
+    [workspace],
+  );
+  const deliverability={
+    mode:resolved.deliverabilityMode,
+    summary:{
+      healthy:healthRows.filter(row=>row.health_status==="healthy").length,
+      watch:healthRows.filter(row=>row.health_status==="watch").length,
+      degraded:healthRows.filter(row=>row.health_status==="degraded").length,
+      paused:healthRows.filter(row=>row.health_status==="paused").length,
+    },
+    domains:healthRows.filter(row=>row.target_type==="domain"),
+    mailboxes:healthRows.filter(row=>row.target_type==="mailbox"),
+  };
+
   const transition=validateRuntimeTransition({
     v3Mode:resolved.v3Mode,
     complianceMode:resolved.complianceMode,
     autonomyLevel:resolved.autonomyLevel,
     durableWorkflowsMode:resolved.durableWorkflowsMode,
+    deliverabilityMode:resolved.deliverabilityMode,
   });
 
   return {
@@ -248,19 +287,21 @@ export async function getRuntimeControlPlane(workspace="default"){
       complianceMode:raw.compliance_mode,
       autonomyLevel:raw.autonomy_level,
       durableWorkflowsMode:raw.durable_workflows_mode,
+      deliverabilityMode:raw.deliverability_mode,
       version:raw.version,
       updatedBy:raw.updated_by,
       updatedAt:raw.updated_at,
     }:null,
     schema:{
-      expectedTables:13,
+      expectedTables:14,
       presentTables:Number(schema?.present||0),
-      ready:Number(schema?.present||0)===13,
+      ready:Number(schema?.present||0)===14,
     },
     capabilities:OUTBOUND_V3_CAPABILITIES,
     parity,
     complianceShadow,
     workflowShadow,
+    deliverability,
     currentTransitionValid:transition.allowed,
     currentTransitionBlockers:transition.blockers,
     environmentOverrides:{
@@ -268,6 +309,7 @@ export async function getRuntimeControlPlane(workspace="default"){
       complianceMode:Boolean(process.env.OUTBOUND_COMPLIANCE_MODE),
       autonomyLevel:Boolean(process.env.OUTBOUND_AUTONOMY_LEVEL),
       durableWorkflowsMode:Boolean(process.env.OUTBOUND_DURABLE_WORKFLOWS_MODE),
+      deliverabilityMode:Boolean(process.env.OUTBOUND_DELIVERABILITY_MODE),
       emergencyKillSwitch:process.env.OUTBOUND_EMERGENCY_KILL_SWITCH==="true",
     },
   };
@@ -291,6 +333,7 @@ export async function updateRuntimeControlPlane(
     complianceMode:parsed.complianceMode??before.compliance_mode,
     autonomyLevel:(parsed.autonomyLevel??before.autonomy_level) as AutonomyLevel,
     durableWorkflowsMode:parsed.durableWorkflowsMode??before.durable_workflows_mode,
+    deliverabilityMode:parsed.deliverabilityMode??before.deliverability_mode,
   };
 
   const validation=validateRuntimeTransition(next);
@@ -312,11 +355,12 @@ export async function updateRuntimeControlPlane(
          compliance_mode=$4,
          autonomy_level=$5,
          durable_workflows_mode=$6,
+         deliverability_mode=$7,
          version=version+1,
-         updated_by=$7,
+         updated_by=$8,
          updated_at=now()
      where workspace=$1 and version=$2
-     returning workspace,v3_mode,compliance_mode,autonomy_level,durable_workflows_mode,version,updated_by,updated_at`,
+     returning workspace,v3_mode,compliance_mode,autonomy_level,durable_workflows_mode,deliverability_mode,version,updated_by,updated_at`,
     [
       workspace,
       parsed.expectedVersion,
@@ -324,6 +368,7 @@ export async function updateRuntimeControlPlane(
       next.complianceMode,
       next.autonomyLevel,
       next.durableWorkflowsMode,
+      next.deliverabilityMode,
       actorId,
     ],
   );
