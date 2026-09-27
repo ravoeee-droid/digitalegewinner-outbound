@@ -4,6 +4,7 @@ import { loadMailboxCredentials, type StoredMailboxCredential } from "@/lib/mail
 import { recordOutboundEventByMode } from "@/lib/outbound-event-ledger";
 import { resolveOutboundRuntimeConfig } from "@/lib/outbound-runtime-config";
 import { evaluateEmailSendCompliance } from "@/lib/outbound-compliance-runtime";
+import { getMailboxHealthMap } from "@/lib/outbound-deliverability";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -42,6 +43,9 @@ async function run(request: Request) {
       .map(({ id, known }) => [id, Math.max(1, Math.min(100, Number(known?.dailyLimit || 5)))] as const),
   );
   const campaignLimits = new Map((state?.campaigns || []).map((c) => [c.id, Math.max(1, Math.min(500, Number(c.dailyLimit || 150)))]));
+  const healthMap = runtimeConfig.deliverabilityMode==="off"
+    ? new Map()
+    : await getMailboxHealthMap("default").catch(()=>new Map());
 
   await query("update er_outbox set status='queued',scheduled_at=now()+interval '5 minutes',error='Stale send claim recovered' where workspace='default' and status='sending' and scheduled_at<now()-interval '15 minutes'");
 
@@ -82,7 +86,7 @@ async function run(request: Request) {
      returning o.id,o.lead_id,o.campaign_id,o.mailbox_id,o.recipient,o.subject,o.body,o.variant,o.attempts`
   );
 
-  let sent=0, failed=0, limited=0, skipped=0;
+  let sent=0, failed=0, limited=0, skipped=0, deliverabilityLimited=0, deliverabilityWouldLimit=0;
   for (const row of due) {
     const credential = credMap.get(row.mailbox_id);
     if (!credential) {
@@ -103,7 +107,39 @@ async function run(request: Request) {
       });
       failed++; continue;
     }
-    const mailboxLimit = mailboxLimits.get(row.mailbox_id) ?? 30;
+    const configuredMailboxLimit = mailboxLimits.get(row.mailbox_id) ?? 30;
+    const health = healthMap.get(row.mailbox_id) as {
+      health_status?:string;
+      recommended_daily_limit?:number|null;
+      enforced_daily_limit?:number|null;
+      observed_at?:Date|string;
+      last_reason?:string|null;
+    }|undefined;
+
+    let mailboxLimit=configuredMailboxLimit;
+    if(runtimeConfig.deliverabilityMode==="enforce"){
+      const observedAt=health?.observed_at?new Date(health.observed_at).getTime():0;
+      const stale=!observedAt||(Date.now()-observedAt)>3*60*60*1000;
+      const paused=!health||stale||health.health_status==="paused"||Number(health.enforced_daily_limit??0)<=0;
+      if(paused){
+        const reason=!health?"health_state_missing":stale?"health_state_stale":health.last_reason||"sender_paused";
+        await query(
+          "update er_outbox set status='queued',attempts=greatest(attempts-1,0),scheduled_at=now()+interval '60 minutes',error=$2 where id=$1 and status='sending'",
+          [row.id,`Deliverability gate: ${reason}`],
+        );
+        limited++;
+        deliverabilityLimited++;
+        continue;
+      }
+      mailboxLimit=Math.min(
+        configuredMailboxLimit,
+        Math.max(1,Number(health.enforced_daily_limit??configuredMailboxLimit)),
+      );
+    }else if(runtimeConfig.deliverabilityMode==="shadow"&&health){
+      const recommended=Number(health.recommended_daily_limit??configuredMailboxLimit);
+      if(recommended<configuredMailboxLimit)deliverabilityWouldLimit++;
+    }
+
     const mailboxCurrent = sentToday.get(row.mailbox_id) ?? 0;
     const campaignLimit = row.campaign_id && !row.campaign_id.startsWith("noshow:") ? (campaignLimits.get(row.campaign_id) ?? 150) : undefined;
     const campaignCurrent = row.campaign_id ? campaignToday.get(row.campaign_id) ?? 0 : 0;
@@ -236,7 +272,17 @@ async function run(request: Request) {
       failed++;
     }
   }
-  return Response.json({ ok:true, claimed:due.length, sent, failed, skipped, limited });
+  return Response.json({
+    ok:true,
+    claimed:due.length,
+    sent,
+    failed,
+    skipped,
+    limited,
+    deliverabilityMode:runtimeConfig.deliverabilityMode,
+    deliverabilityLimited,
+    deliverabilityWouldLimit,
+  });
 }
 
 export async function GET(request: Request) { return run(request); }

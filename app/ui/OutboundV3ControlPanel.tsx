@@ -9,6 +9,7 @@ type ControlSnapshot={
     complianceMode:"off"|"shadow"|"enforce";
     autonomyLevel:number;
     durableWorkflowsMode:RuntimeMode;
+    deliverabilityMode:"off"|"shadow"|"enforce";
     source:string;
     version:number|null;
   };
@@ -17,6 +18,7 @@ type ControlSnapshot={
     complianceMode:"off"|"shadow"|"enforce";
     autonomyLevel:number;
     durableWorkflowsMode:RuntimeMode;
+    deliverabilityMode:"off"|"shadow"|"enforce";
     version:number;
     updatedBy:string;
     updatedAt:string;
@@ -29,6 +31,8 @@ type ControlSnapshot={
     complianceEnforcement:boolean;
     durableWorkflowShadow:boolean;
     durableWorkflowExecution:boolean;
+    deliverabilityShadow:boolean;
+    deliverabilityEnforcement:boolean;
     conversationAutopilot:boolean;
     optimizationAutopilot:boolean;
   };
@@ -59,6 +63,7 @@ type ControlSnapshot={
     complianceMode:boolean;
     autonomyLevel:boolean;
     durableWorkflowsMode:boolean;
+    deliverabilityMode:boolean;
     emergencyKillSwitch:boolean;
   };
 };
@@ -137,6 +142,7 @@ export default function OutboundV3ControlPanel(){
             <ModeBadge label="Compliance" value={snapshot?.resolved.complianceMode||"…"} />
             <ModeBadge label="AI" value={snapshot?("L"+snapshot.resolved.autonomyLevel):"…"} />
             <ModeBadge label="Workflows" value={snapshot?.resolved.durableWorkflowsMode||"…"} />
+            <ModeBadge label="Deliverability" value={snapshot?.resolved.deliverabilityMode||"…"} />
           </div>
         </div>
 
