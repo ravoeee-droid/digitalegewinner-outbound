@@ -7,7 +7,7 @@ const stepSchema=z.object({waitDays:z.number().int().min(0).max(60),subject:z.st
 const filterSchema=z.object({industry:z.string().optional(),city:z.string().optional(),minEnergyScore:z.number().min(0).max(100).optional(),minWebsiteScore:z.number().min(0).max(100).optional(),minIntentScore:z.number().min(0).max(100).optional()});
 const schema = z.object({
   campaign: z.object({id:z.string(),steps:z.array(stepSchema).min(1),filters:filterSchema.optional()}),
-  leads:z.array(z.object({id:z.string(),email:z.string().email(),company:z.string(),contact:z.string().optional().default(""),city:z.string().optional().default(""),industry:z.string().optional().default(""),energyScore:z.number().optional().default(0),websiteScore:z.number().optional().default(0),intentScore:z.number().optional().default(0)})).min(1).max(5000),
+  leads:z.array(z.object({id:z.string(),companyId:z.string().optional(),email:z.string().email(),company:z.string(),contact:z.string().optional().default(""),city:z.string().optional().default(""),industry:z.string().optional().default(""),energyScore:z.number().optional().default(0),websiteScore:z.number().optional().default(0),intentScore:z.number().optional().default(0)})).min(1).max(5000),
   mailboxes:z.array(z.object({id:z.string(),enabled:z.boolean(),dailyLimit:z.number().int().min(1).max(100)})).min(1),
   senderName:z.string().default("Digitale Gewinner"),appUrl:z.string().url().optional(),
 });
@@ -22,28 +22,42 @@ export async function POST(request:Request){
   // Don't trust the client's snapshot of lead stage - it can be stale by the time this runs.
   // Re-check the real CRM row so a lead closed/blocked since the page loaded can't get enrolled.
   const closedRows=leadIds.length?await query<{id:string}>("select id from sales_leads where workspace='default' and id=any($1::text[]) and (stage in ('Gewonnen','Verloren') or do_not_contact)",[leadIds]):[];const closed=new Set(closedRows.map(r=>r.id));
+  const variantSteps=input.campaign.steps.filter(step=>step.variants?.length);
+  const experimentLabels=variantSteps[0]?.variants?.map(v=>v.label)??["A"];
+  const canonicalLabels=[...experimentLabels].sort();
+  for(const step of variantSteps){
+    const labels=(step.variants??[]).map(v=>v.label).sort();
+    if(labels.length!==canonicalLabels.length||labels.some((label,i)=>label!==canonicalLabels[i])){
+      return Response.json({error:"Alle experimentellen Sequenzschritte müssen dieselben Variant-Labels verwenden."},{status:400});
+    }
+  }
+
   let queued=0,skipped=0,index=0;const variants:Record<string,number>={};
   for(const lead of eligible){
     if(suppressed.has(lead.email.toLowerCase())||enrolled.has(lead.id)||closed.has(lead.id)){skipped++;continue}
     const mailbox=active[index++%active.length];
-    // One deterministic assignment per lead + campaign. Previously the hash included the
-    // step index, so the same lead could receive A in step 1 and B in step 2, corrupting
-    // sequence-level A/B tests. We now keep the ordinal stable across the whole sequence.
-    const experimentOrdinal=hash(`${input.campaign.id}:${lead.id}`);
-    let assignedVariant="A";
-    let assignmentRecorded=false;
+    const companyKey=(lead.companyId?.trim()||lead.company.trim().toLowerCase().replace(/\s+/g," "));
+    const experimentOrdinal=hash(`${input.campaign.id}:${companyKey}`);
+    const assignedVariant=experimentLabels[experimentOrdinal%experimentLabels.length]??"A";
+    variants[assignedVariant]=(variants[assignedVariant]||0)+1;
+    await query(
+      "insert into er_events(workspace,lead_id,type,meta) values('default',$1,'experiment_assignment',$2::jsonb)",
+      [lead.id,JSON.stringify({
+        campaignId:input.campaign.id,
+        variant:assignedVariant,
+        experimentKey:`${input.campaign.id}:sequence-v1`,
+        randomizationUnit:"company",
+        randomizationKey:companyKey,
+      })],
+    );
+
     for(let stepIndex=0;stepIndex<input.campaign.steps.length;stepIndex++){
       const step=input.campaign.steps[stepIndex];
-      const candidates=step.variants?.length?step.variants:[{label:"A",subject:step.subject,body:step.body}];
-      const selected=candidates[experimentOrdinal%candidates.length];
-      if(!assignmentRecorded){
-        assignedVariant=selected.label;
-        variants[assignedVariant]=(variants[assignedVariant]||0)+1;
-        await query(
-          "insert into er_events(workspace,lead_id,type,meta) values('default',$1,'experiment_assignment',$2::jsonb)",
-          [lead.id,JSON.stringify({campaignId:input.campaign.id,variant:assignedVariant,experimentKey:`${input.campaign.id}:sequence-v1`})],
-        );
-        assignmentRecorded=true;
+      const selected=step.variants?.length
+        ? step.variants.find(v=>v.label===assignedVariant)
+        : {label:assignedVariant,subject:step.subject,body:step.body};
+      if(!selected){
+        return Response.json({error:`Variante ${assignedVariant} fehlt in Schritt ${stepIndex+1}.`},{status:400});
       }
       const scheduled=new Date(Date.now()+step.waitDays*86400000);
       await query(
