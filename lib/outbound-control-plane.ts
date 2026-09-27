@@ -34,6 +34,7 @@ export const OUTBOUND_V3_CAPABILITIES = {
   shadowEventLedger: true,
   nativeV3Execution: false,
   complianceEnforcement: false,
+  durableWorkflowShadow: true,
   durableWorkflowExecution: false,
   conversationAutopilot: false,
   optimizationAutopilot: false,
@@ -57,8 +58,11 @@ export function validateRuntimeTransition(next:OutboundRuntimeConfig) {
   if(next.complianceMode==="enforce"&&!OUTBOUND_V3_CAPABILITIES.complianceEnforcement){
     blockers.push("Compliance enforcement is locked until permission backfill and enforcement tests pass.");
   }
-  if(next.durableWorkflowsMode!=="off"&&!OUTBOUND_V3_CAPABILITIES.durableWorkflowExecution){
-    blockers.push("Durable workflow mode is locked until the Trigger.dev migration milestone is complete.");
+  if(next.durableWorkflowsMode==="shadow"&&!OUTBOUND_V3_CAPABILITIES.durableWorkflowShadow){
+    blockers.push("Durable workflow shadow is not ready yet.");
+  }
+  if(next.durableWorkflowsMode==="active"&&!OUTBOUND_V3_CAPABILITIES.durableWorkflowExecution){
+    blockers.push("Durable workflow active execution is locked until shadow parity and recovery drills pass.");
   }
   if(next.autonomyLevel>2){
     blockers.push("Autonomy above L2 is locked until conversation and optimization eval gates are complete.");
@@ -91,6 +95,9 @@ export async function getRuntimeControlPlane(workspace="default"){
       "outbound_approvals",
       "outbound_sender_health_snapshots",
       "outbound_runtime_settings",
+      "outbound_workflow_runs",
+      "outbound_workflow_steps",
+      "outbound_workflow_signals",
     ]],
   );
 
@@ -136,6 +143,59 @@ export async function getRuntimeControlPlane(workspace="default"){
     [workspace],
   );
 
+  const workflowRuns=await query<{status:string;count:string}>(
+    `select status,count(*)::text as count
+     from outbound_workflow_runs
+     where workspace=$1
+       and created_at>=now()-interval '30 days'
+     group by status`,
+    [workspace],
+  );
+  const [workflowSteps]=await query<{total:string;due:string;leased:string;failed:string}>(
+    `select
+       count(*)::text as total,
+       count(*) filter(
+         where status in ('pending','waiting','ready','running')
+           and (wake_at is null or wake_at<=now())
+       )::text as due,
+       count(*) filter(
+         where lease_expires_at is not null and lease_expires_at>now()
+       )::text as leased,
+       count(*) filter(where status in ('failed','blocked'))::text as failed
+     from outbound_workflow_steps
+     where workspace=$1
+       and created_at>=now()-interval '30 days'`,
+    [workspace],
+  );
+  const [workflowSignals]=await query<{pending:string;failed:string}>(
+    `select
+       count(*) filter(where processed_at is null and attempt<max_attempts)::text as pending,
+       count(*) filter(where processed_at is null and attempt>=max_attempts)::text as failed
+     from outbound_workflow_signals
+     where workspace=$1
+       and received_at>=now()-interval '30 days'`,
+    [workspace],
+  );
+  const [legacySequences]=await query<{count:string}>(
+    `select count(*)::text as count
+     from (
+       select distinct campaign_id,lead_id
+       from er_outbox
+       where workspace=$1
+         and campaign_id is not null
+         and created_at>=now()-interval '30 days'
+     ) sequences`,
+    [workspace],
+  );
+  const [mirroredSequences]=await query<{count:string}>(
+    `select count(*)::text as count
+     from outbound_workflow_runs
+     where workspace=$1
+       and legacy_campaign_id is not null
+       and created_at>=now()-interval '30 days'`,
+    [workspace],
+  );
+
   const parity={
     window:"24h",
     sends:{legacy:Number(legacySends?.count||0),v3:Number(v3Sends?.count||0)},
@@ -152,6 +212,25 @@ export async function getRuntimeControlPlane(workspace="default"){
         .filter(row=>row.event_type==="permission_denied")
         .map(row=>[row.reason||"unknown",Number(row.count||0)]),
     ),
+  };
+  const legacySequenceCount=Number(legacySequences?.count||0);
+  const mirroredSequenceCount=Number(mirroredSequences?.count||0);
+  const workflowShadow={
+    window:"30d",
+    legacySequences:legacySequenceCount,
+    mirroredSequences:mirroredSequenceCount,
+    parityPercent:legacySequenceCount===0?100:Math.min(100,Math.round((mirroredSequenceCount/legacySequenceCount)*100)),
+    runs:Object.fromEntries(workflowRuns.map(row=>[row.status,Number(row.count||0)])),
+    steps:{
+      total:Number(workflowSteps?.total||0),
+      due:Number(workflowSteps?.due||0),
+      leased:Number(workflowSteps?.leased||0),
+      failed:Number(workflowSteps?.failed||0),
+    },
+    signals:{
+      pending:Number(workflowSignals?.pending||0),
+      failed:Number(workflowSignals?.failed||0),
+    },
   };
 
   const transition=validateRuntimeTransition({
@@ -174,13 +253,14 @@ export async function getRuntimeControlPlane(workspace="default"){
       updatedAt:raw.updated_at,
     }:null,
     schema:{
-      expectedTables:10,
+      expectedTables:13,
       presentTables:Number(schema?.present||0),
-      ready:Number(schema?.present||0)===10,
+      ready:Number(schema?.present||0)===13,
     },
     capabilities:OUTBOUND_V3_CAPABILITIES,
     parity,
     complianceShadow,
+    workflowShadow,
     currentTransitionValid:transition.allowed,
     currentTransitionBlockers:transition.blockers,
     environmentOverrides:{
