@@ -31,9 +31,9 @@ async function run(request:Request){
 
   const result=await runDurableWorkflowShadowTick({
     workspace:"default",
-    syncLimit:120,
-    stepLimit:120,
-    signalLimit:120,
+    syncLimit:50,
+    stepLimit:100,
+    signalLimit:100,
   });
 
   return Response.json({
