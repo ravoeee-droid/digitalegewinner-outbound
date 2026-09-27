@@ -90,7 +90,8 @@ async function refreshRunState(runId:string){
          count(*) filter(where status='running')::int as running,
          count(*) filter(where status='ready')::int as ready,
          count(*) filter(where status in ('pending','waiting'))::int as waiting,
-         count(*) filter(where status in ('completed','cancelled'))::int as terminal,
+         count(*) filter(where status='completed')::int as completed,
+         count(*) filter(where status='cancelled')::int as cancelled,
          min(wake_at) filter(where status in ('pending','waiting','ready')) as next_wake_at
        from outbound_workflow_steps
        where run_id=$1
@@ -99,15 +100,15 @@ async function refreshRunState(runId:string){
      set status=case
            when r.terminal_reason is not null then r.status
            when stats.total>0 and (stats.failed>0 or stats.blocked>0) then 'failed'
-           when stats.total>0 and stats.terminal=stats.total then 'completed'
+           when stats.total>0 and stats.completed=stats.total then 'completed'
            when stats.running>0 or stats.ready>0 then 'running'
-           when stats.waiting>0 then 'waiting'
+           when stats.waiting>0 or stats.cancelled>0 then 'waiting'
            else 'pending'
          end,
          next_wake_at=case when r.terminal_reason is null then stats.next_wake_at else r.next_wake_at end,
          started_at=coalesce(r.started_at,now()),
          completed_at=case
-           when r.terminal_reason is null and stats.total>0 and stats.terminal=stats.total then coalesce(r.completed_at,now())
+           when r.terminal_reason is null and stats.total>0 and stats.completed=stats.total then coalesce(r.completed_at,now())
            else r.completed_at
          end,
          failed_at=case
