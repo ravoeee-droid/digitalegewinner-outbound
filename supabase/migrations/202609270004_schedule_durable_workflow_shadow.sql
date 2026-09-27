@@ -9,20 +9,12 @@ update public.outbound_workflow_signals
 set max_attempts=greatest(max_attempts,288)
 where processed_at is null;
 
-do $
-declare
-  existing_job bigint;
-begin
-  for existing_job in
-    select jobid from cron.job where jobname='dg-outbound-workflows'
-  loop
-    perform cron.unschedule(existing_job);
-  end loop;
+select cron.unschedule(jobid)
+from cron.job
+where jobname='dg-outbound-workflows';
 
-  perform cron.schedule(
-    'dg-outbound-workflows',
-    '*/5 * * * *',
-    $job$select dg_private.invoke_worker('/api/cron/workflows');$job$
-  );
-end
-$$;
+select cron.schedule(
+  'dg-outbound-workflows',
+  '*/5 * * * *',
+  'select dg_private.invoke_worker(''/api/cron/workflows'');'
+);
