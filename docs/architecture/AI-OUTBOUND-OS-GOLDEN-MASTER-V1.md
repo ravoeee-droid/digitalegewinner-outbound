@@ -216,7 +216,7 @@ Add `outbound_*` tables, indexes and RLS. No destructive changes.
 Persist runs, steps, waits, retries, leases and signals in Postgres. The protected workflow worker is scheduled through the existing Supabase pg_cron/pg_net transport. Legacy execution remains canonical until shadow parity and recovery gates pass.
 
 ### M3 — Deliverability Control Tower
-Domain/mailbox health snapshots, provider diagnostics and automatic safety actions.
+Continuously score domain/mailbox health from authentication, connectivity and delivery events. Run in shadow first, then enforce adaptive daily capacity, L2 sender pauses and two-snapshot recovery at the final send boundary.
 
 ### M4 — Compliance Engine
 Permission UI, evidence, policy evaluation and hard send gate.
