@@ -322,7 +322,7 @@ export async function updateRuntimeControlPlane(
 ){
   const parsed=runtimeUpdateSchema.parse(input);
   const [before]=await query<RuntimeRow>(
-    `select workspace,v3_mode,compliance_mode,autonomy_level,durable_workflows_mode,version,updated_by,updated_at
+    `select workspace,v3_mode,compliance_mode,autonomy_level,durable_workflows_mode,deliverability_mode,version,updated_by,updated_at
      from outbound_runtime_settings where workspace=$1 limit 1`,
     [workspace],
   );
@@ -376,7 +376,7 @@ export async function updateRuntimeControlPlane(
   const after=rows[0];
   if(!after){
     const [current]=await query<RuntimeRow>(
-      `select workspace,v3_mode,compliance_mode,autonomy_level,durable_workflows_mode,version,updated_by,updated_at
+      `select workspace,v3_mode,compliance_mode,autonomy_level,durable_workflows_mode,deliverability_mode,version,updated_by,updated_at
        from outbound_runtime_settings where workspace=$1 limit 1`,
       [workspace],
     );
