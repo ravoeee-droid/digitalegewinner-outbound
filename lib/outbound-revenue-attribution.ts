@@ -186,13 +186,18 @@ export async function syncRevenueAttribution(){
   const events=await query<{
     id:string;event_type:string;lead_id:string|null;company_id:string|null;occurred_at:Date;payload:Record<string,unknown>
   }>(
-    `select id,event_type,lead_id,company_id,occurred_at,payload
-     from outbound_events
-     where workspace='default'
-       and event_type=any($1::text[])
-       and not (payload ? 'attributionFactId')
-       and occurred_at>=now()-interval '365 days'
-     order by occurred_at asc`,
+    `select e.id,e.event_type,e.lead_id,e.company_id,e.occurred_at,e.payload
+     from outbound_events e
+     where e.workspace='default'
+       and e.event_type=any($1::text[])
+       and not (e.payload ? 'attributionFactId')
+       and e.occurred_at>=now()-interval '365 days'
+       and not exists(
+         select 1 from outbound_attribution_facts f
+         where f.workspace=e.workspace and f.fact_key='event:'||e.id::text
+       )
+     order by e.occurred_at asc
+     limit 250`,
     [["meeting_booked","meeting_held","opportunity_created","won","lost","revenue_recorded"]],
   );
   let eventFacts=0;
@@ -214,8 +219,16 @@ export async function syncRevenueAttribution(){
     id:string;lead_id:string|null;company_id:string|null;stage:string|null;status:string|null;
     setup_value:number|null;monthly_value:number|null;created_at:Date;updated_at:Date
   }>(
-    `select id,lead_id,company_id,stage,status,setup_value,monthly_value,created_at,updated_at
-     from sales_opportunities where workspace='default' and created_at>=now()-interval '365 days'`
+    `select o.id,o.lead_id,o.company_id,o.stage,o.status,o.setup_value,o.monthly_value,o.created_at,o.updated_at
+     from sales_opportunities o
+     left join outbound_attribution_facts f
+       on f.workspace=o.workspace
+      and f.fact_key='opportunity:'||o.id||':created'
+     where o.workspace='default'
+       and o.created_at>=now()-interval '365 days'
+       and (f.id is null or o.updated_at>f.updated_at)
+     order by case when f.id is null then 0 else 1 end,o.updated_at desc
+     limit 100`
   );
   let opportunityFacts=0,wonFacts=0,revenueFacts=0,lostFacts=0;
   for(const opportunity of opportunities){
@@ -260,7 +273,16 @@ export async function syncRevenueAttribution(){
       lostFacts++;
     }
   }
-  return {eventFacts,opportunityFacts,wonFacts,lostFacts,revenueFacts};
+  const [backlog]=await query<{count:string}>(
+    `select count(*)::text as count
+     from sales_opportunities o
+     left join outbound_attribution_facts f
+       on f.workspace=o.workspace and f.fact_key='opportunity:'||o.id||':created'
+     where o.workspace='default'
+       and o.created_at>=now()-interval '365 days'
+       and (f.id is null or o.updated_at>f.updated_at)`
+  );
+  return {eventFacts,opportunityFacts,wonFacts,lostFacts,revenueFacts,opportunityBacklog:Number(backlog?.count||0)};
 }
 
 export async function recordManualAttributionFact(raw:z.infer<typeof manualSchema>,actorId="admin-session"){
