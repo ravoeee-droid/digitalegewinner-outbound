@@ -47,6 +47,14 @@ const defaults: OutboundRuntimeConfig = {
   durableWorkflowsMode: "off",
 };
 
+const runtimeCache = new Map<string,{expiresAt:number;value:ResolvedOutboundRuntimeConfig}>();
+const RUNTIME_CACHE_MS = 5_000;
+
+export function invalidateOutboundRuntimeConfigCache(workspace?:string){
+  if(workspace)runtimeCache.delete(workspace);
+  else runtimeCache.clear();
+}
+
 function envOverrides(): Partial<OutboundRuntimeConfig> {
   const overrides: Partial<OutboundRuntimeConfig> = {};
   if (process.env.OUTBOUND_OS_V3_MODE) {
@@ -99,6 +107,9 @@ export async function resolveOutboundRuntimeConfig(
     };
   }
 
+  const cached=runtimeCache.get(workspace);
+  if(cached&&cached.expiresAt>Date.now())return cached.value;
+
   let row: RuntimeSettingsRow | undefined;
   try {
     [row] = await query<RuntimeSettingsRow>(
@@ -126,7 +137,7 @@ export async function resolveOutboundRuntimeConfig(
   const hasOverrides = Object.keys(overrides).length > 0;
   const resolved = { ...dbConfig, ...overrides };
 
-  return {
+  const value:ResolvedOutboundRuntimeConfig={
     workspace,
     ...resolved,
     version: row?.version ?? null,
@@ -134,4 +145,6 @@ export async function resolveOutboundRuntimeConfig(
     updatedAt: row?.updated_at ?? null,
     source: row ? (hasOverrides ? "database+env" : "database") : (hasOverrides ? "env" : "defaults"),
   };
+  runtimeCache.set(workspace,{expiresAt:Date.now()+RUNTIME_CACHE_MS,value});
+  return value;
 }
