@@ -11,6 +11,7 @@ export const outboundEventTypes = [
   "send_attempted",
   "provider_accepted",
   "send_deferred",
+  "send_failed",
   "bounce",
   "complaint",
   "reply_received",
