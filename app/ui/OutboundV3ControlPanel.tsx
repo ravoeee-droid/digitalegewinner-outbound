@@ -37,6 +37,7 @@ type ControlSnapshot={
     deliverabilityEnforcement:boolean;
     conversationIntelligence:boolean;
     conversationAutopilot:boolean;
+    experimentEngine:boolean;
     optimizationAutopilot:boolean;
   };
   parity:{
@@ -186,6 +187,10 @@ export default function OutboundV3ControlPanel(){
             <span style={subStyle}>
               {snapshot?(snapshot.workflowShadow.mirroredSequences+"/"+snapshot.workflowShadow.legacySequences+" Sequenzen gespiegelt"):"30d Shadow-Parität"}
             </span>
+          </Card>
+          <Card title="Experiment Engine">
+            <strong style={metricStyle}>{snapshot?.capabilities.experimentEngine?"READY":"LOCKED"}</strong>
+            <span style={subStyle}>Safety Stops L2 · Traffic-Optimierung approval-only</span>
           </Card>
         </div>
 

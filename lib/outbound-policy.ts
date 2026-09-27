@@ -94,6 +94,7 @@ const minimumAutonomyLevel: Record<AgentActionClass, AutonomyLevel> = {
   stop_sequence: 2,
   reduce_sender_capacity: 2,
   pause_sender: 2,
+  pause_experiment_safety: 2,
   classify_reply: 2,
   send_safe_reply: 3,
   allocate_experiment_traffic: 4,

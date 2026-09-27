@@ -6,11 +6,25 @@ import { resolveOutboundRuntimeConfig } from "@/lib/outbound-runtime-config";
 import { evaluateEmailSendCompliance } from "@/lib/outbound-compliance-runtime";
 import { getMailboxHealthMap } from "@/lib/outbound-deliverability";
 import { recordOutboundConversationMessage } from "@/lib/outbound-conversation-intelligence";
+import { recordExperimentExposureForSend } from "@/lib/outbound-experiment-engine";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-type OutboxRow = { id:string; lead_id:string; campaign_id:string|null; mailbox_id:string; recipient:string; subject:string; body:string; variant:string; attempts:number };
+type OutboxRow = {
+  id:string;
+  lead_id:string;
+  campaign_id:string|null;
+  mailbox_id:string;
+  recipient:string;
+  subject:string;
+  body:string;
+  variant:string;
+  attempts:number;
+  campaign_version_id:string|null;
+  experiment_id:string|null;
+  experiment_arm_key:string|null;
+};
 type Credential = StoredMailboxCredential;
 type State = { mailboxes?: Array<{id:string;email?:string;enabled:boolean;dailyLimit:number}>; campaigns?: Array<{id:string;status?:string;dailyLimit?:number}> };
 
@@ -84,7 +98,8 @@ async function run(request: Request) {
      set status='sending',attempts=o.attempts+1,scheduled_at=now()
      from claim
      where o.id=claim.id
-     returning o.id,o.lead_id,o.campaign_id,o.mailbox_id,o.recipient,o.subject,o.body,o.variant,o.attempts`
+     returning o.id,o.lead_id,o.campaign_id,o.mailbox_id,o.recipient,o.subject,o.body,o.variant,o.attempts,
+               o.campaign_version_id,o.experiment_id,o.experiment_arm_key`
   );
 
   let sent=0, failed=0, limited=0, skipped=0, deliverabilityLimited=0, deliverabilityWouldLimit=0;
@@ -248,6 +263,20 @@ async function run(request: Request) {
         },
       });
       try{
+        await recordExperimentExposureForSend({
+          experimentId:row.experiment_id,
+          campaignVersionId:row.campaign_version_id,
+          armKey:row.experiment_arm_key,
+          leadId:row.lead_id,
+          legacyCampaignId:row.campaign_id,
+          legacyOutboxId:row.id,
+          providerMessageId:result.id,
+          workspace:"default",
+        });
+      }catch(experimentError){
+        console.error("[experiment-exposure] failed",experimentError instanceof Error?experimentError.message:"unknown error");
+      }
+      try{
         await recordOutboundConversationMessage({
           leadId:row.lead_id,
           mailboxId:row.mailbox_id,
@@ -260,6 +289,8 @@ async function run(request: Request) {
             legacyCampaignId:row.campaign_id,
             variant:row.variant,
             recipient:row.recipient,
+            experimentId:row.experiment_id,
+            experimentArmKey:row.experiment_arm_key,
           },
         });
       }catch(conversationError){
