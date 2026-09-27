@@ -4,6 +4,7 @@ import { loadMailboxCredentials, type StoredMailboxCredential } from "@/lib/mail
 import { listImapMessages, type ImapMailboxCredential } from "@/lib/imap-client";
 import { recordOutboundEventByMode } from "@/lib/outbound-event-ledger";
 import { resolveOutboundRuntimeConfig } from "@/lib/outbound-runtime-config";
+import { recordWorkflowSignal } from "@/lib/outbound-durable-workflows";
 
 export const runtime="nodejs";export const maxDuration=60;
 type State={leads?:Array<Record<string,unknown>>};
@@ -47,6 +48,23 @@ async function recordReply(messageId:string,from:string,subject:string,mailboxId
    variant:last?.variant||null,
   },
  });
+ if((await resolveOutboundRuntimeConfig()).durableWorkflowsMode!=="off"){
+  await recordWorkflowSignal({
+   type:"reply_received",
+   subjectType:"lead",
+   subjectId:leadId,
+   idempotencyKey:`reply:${messageId}`,
+   payload:{
+    providerMessageId:messageId,
+    from,
+    subject,
+    mailboxId,
+    legacyOutboxId:last?.id||null,
+    legacyCampaignId:last?.campaign_id||null,
+    variant:last?.variant||null,
+   },
+  });
+ }
  await query("update er_outbox set status='stopped' where workspace='default' and lead_id=$1 and status='queued'",[leadId]);
  await query("update sales_leads set intent_score=least(100,intent_score+30),stage=case when stage in ('Neu','Kontaktiert') then 'Engaged' else stage end,last_contact_at=now(),updated_at=now() where id=$1 and workspace='default'",[leadId]);
  if(state?.leads){const leads=state.leads.map(l=>String(l.id)===leadId?{...l,intentScore:Math.min(100,Number(l.intentScore||0)+30),stage:String(l.stage)==="Neu"||String(l.stage)==="Kontaktiert"?"Engaged":l.stage}:l);await writeState({...state,leads})}
@@ -105,6 +123,22 @@ async function recordBounce(messageId:string,bouncedEmail:string,mailboxId:strin
    variant:last?.variant||null,
   },
  });
+ if(leadId&&(await resolveOutboundRuntimeConfig()).durableWorkflowsMode!=="off"){
+  await recordWorkflowSignal({
+   type:"bounce",
+   subjectType:"lead",
+   subjectId:leadId,
+   idempotencyKey:`bounce:${messageId}:${bouncedEmail}`,
+   payload:{
+    providerMessageId:messageId,
+    email:bouncedEmail,
+    mailboxId,
+    legacyOutboxId:last?.id||null,
+    legacyCampaignId:last?.campaign_id||null,
+    variant:last?.variant||null,
+   },
+  });
+ }
  return true;
 }
 async function syncImap(c:Credential){
