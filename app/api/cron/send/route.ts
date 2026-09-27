@@ -2,7 +2,7 @@ import { query, readState } from "@/lib/db";
 import { sendMail } from "@/lib/mailer";
 import { loadMailboxCredentials, type StoredMailboxCredential } from "@/lib/mailbox-credentials";
 import { recordOutboundEventByMode } from "@/lib/outbound-event-ledger";
-import { getOutboundRuntimeConfig } from "@/lib/outbound-runtime-config";
+import { resolveOutboundRuntimeConfig } from "@/lib/outbound-runtime-config";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -18,7 +18,7 @@ function authorized(request: Request) {
 
 async function run(request: Request) {
   if (!authorized(request)) return Response.json({ error:"Unauthorized" }, { status:401 });
-  if (getOutboundRuntimeConfig().v3Mode === "active") {
+  if ((await resolveOutboundRuntimeConfig()).v3Mode === "active") {
     return Response.json(
       { error:"Legacy send worker is disabled while Outbound OS V3 is active." },
       { status:409 },
