@@ -29,6 +29,8 @@ export const outboundEventTypes = [
   "domain_degraded",
   "agent_decision_proposed",
   "agent_decision_executed",
+  "runtime_config_changed",
+  "runtime_activation_blocked",
 ] as const;
 
 export const outboundEventTypeSchema = z.enum(outboundEventTypes);
