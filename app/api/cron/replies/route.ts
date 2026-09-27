@@ -2,6 +2,8 @@ import { query, readState, writeState } from "@/lib/db";
 import { getMailboxAccessToken } from "@/lib/mailer";
 import { loadMailboxCredentials, type StoredMailboxCredential } from "@/lib/mailbox-credentials";
 import { listImapMessages, type ImapMailboxCredential } from "@/lib/imap-client";
+import { recordOutboundEventByMode } from "@/lib/outbound-event-ledger";
+import { getOutboundRuntimeConfig } from "@/lib/outbound-runtime-config";
 
 export const runtime="nodejs";export const maxDuration=60;
 type State={leads?:Array<Record<string,unknown>>};
@@ -29,6 +31,22 @@ async function recordReply(messageId:string,from:string,subject:string,mailboxId
   "insert into er_events(workspace,lead_id,type,meta) values('default',$1,'reply',$2::jsonb)",
   [leadId,JSON.stringify({providerMessageId:messageId,from,subject,mailboxId,outboxId:last?.id||null,campaignId:last?.campaign_id||null,variant:last?.variant||null})],
  );
+ await recordOutboundEventByMode({
+  workspace:"default",
+  type:"reply_received",
+  actorType:"provider",
+  leadId,
+  messageId,
+  idempotencyKey:`legacy:reply:${messageId}`,
+  payload:{
+   from,
+   subject,
+   mailboxId,
+   legacyOutboxId:last?.id||null,
+   legacyCampaignId:last?.campaign_id||null,
+   variant:last?.variant||null,
+  },
+ });
  await query("update er_outbox set status='stopped' where workspace='default' and lead_id=$1 and status='queued'",[leadId]);
  await query("update sales_leads set intent_score=least(100,intent_score+30),stage=case when stage in ('Neu','Kontaktiert') then 'Engaged' else stage end,last_contact_at=now(),updated_at=now() where id=$1 and workspace='default'",[leadId]);
  if(state?.leads){const leads=state.leads.map(l=>String(l.id)===leadId?{...l,intentScore:Math.min(100,Number(l.intentScore||0)+30),stage:String(l.stage)==="Neu"||String(l.stage)==="Kontaktiert"?"Engaged":l.stage}:l);await writeState({...state,leads})}
@@ -56,14 +74,37 @@ function extractBouncedEmail(bodyText:string,ownEmail:string){
 }
 async function recordBounce(messageId:string,bouncedEmail:string,mailboxId:string){
  const existing=await query<{id:number}>("select id from er_events where workspace='default' and type='bounce' and meta->>'providerMessageId'=$1 limit 1",[messageId]);if(existing.length)return false;
+ const leadRows=await query<{id:string}>(
+  "select l.id from sales_leads l join sales_contacts ct on ct.id=l.contact_id where l.workspace='default' and lower(ct.email)=lower($1) order by l.updated_at desc limit 1",
+  [bouncedEmail],
+ );
+ const leadId=leadRows[0]?.id||null;
+ const attribution=leadId?await query<{id:string;campaign_id:string|null;variant:string}>(
+  "select id,campaign_id,variant from er_outbox where workspace='default' and lead_id=$1 and status='sent' order by sent_at desc nulls last limit 1",
+  [leadId],
+ ):[]; 
+ const last=attribution[0];
  await query("insert into er_suppressions(workspace,email,reason) values('default',lower($1),'bounce') on conflict(workspace,email) do update set reason=excluded.reason",[bouncedEmail]);
  await query("update er_outbox set status='suppressed' where workspace='default' and lower(recipient)=lower($1) and status='queued'",[bouncedEmail]);
  await query(
-  `insert into er_events(workspace,lead_id,type,meta) values('default',
-    (select l.id from sales_leads l join sales_contacts ct on ct.id=l.contact_id where l.workspace='default' and lower(ct.email)=lower($1) limit 1),
-    'bounce',$2::jsonb)`,
-  [bouncedEmail,JSON.stringify({providerMessageId:messageId,email:bouncedEmail,mailboxId})],
+  "insert into er_events(workspace,lead_id,type,meta) values('default',$1,'bounce',$2::jsonb)",
+  [leadId,JSON.stringify({providerMessageId:messageId,email:bouncedEmail,mailboxId,outboxId:last?.id||null,campaignId:last?.campaign_id||null,variant:last?.variant||null})],
  );
+ await recordOutboundEventByMode({
+  workspace:"default",
+  type:"bounce",
+  actorType:"provider",
+  leadId,
+  messageId,
+  idempotencyKey:`legacy:bounce:${messageId}:${bouncedEmail}`,
+  payload:{
+   email:bouncedEmail,
+   mailboxId,
+   legacyOutboxId:last?.id||null,
+   legacyCampaignId:last?.campaign_id||null,
+   variant:last?.variant||null,
+  },
+ });
  return true;
 }
 async function syncImap(c:Credential){
@@ -81,5 +122,10 @@ async function syncImap(c:Credential){
  }
  return {replies,bounces};
 }
-async function run(request:Request){if(!auth(request))return Response.json({error:"Unauthorized"},{status:401});let credentials:Credential[]=[];try{credentials=await loadMailboxCredentials()}catch{return Response.json({error:"Mailbox Credentials JSON ungültig."},{status:503})}let replies=0,bounces=0;const errors:string[]=[];for(const c of credentials){try{if(c.provider==="gmail")replies+=await syncGmail(c);else if(c.provider==="microsoft")replies+=await syncMicrosoft(c);else if(c.provider==="smtp"&&(c as ImapMailboxCredential).imapHost){const r=await syncImap(c);replies+=r.replies;bounces+=r.bounces}}catch(e){errors.push(`${c.id}: ${e instanceof Error?e.message:"Sync Fehler"}`)}}return Response.json({ok:true,mailboxes:credentials.length,newReplies:replies,newBounces:bounces,errors})}
+async function run(request:Request){
+ if(!auth(request))return Response.json({error:"Unauthorized"},{status:401});
+ if(getOutboundRuntimeConfig().v3Mode==="active"){
+  return Response.json({error:"Legacy reply worker is disabled while Outbound OS V3 is active."},{status:409});
+ }
+ let credentials:Credential[]=[];try{credentials=await loadMailboxCredentials()}catch{return Response.json({error:"Mailbox Credentials JSON ungültig."},{status:503})}let replies=0,bounces=0;const errors:string[]=[];for(const c of credentials){try{if(c.provider==="gmail")replies+=await syncGmail(c);else if(c.provider==="microsoft")replies+=await syncMicrosoft(c);else if(c.provider==="smtp"&&(c as ImapMailboxCredential).imapHost){const r=await syncImap(c);replies+=r.replies;bounces+=r.bounces}}catch(e){errors.push(`${c.id}: ${e instanceof Error?e.message:"Sync Fehler"}`)}}return Response.json({ok:true,mailboxes:credentials.length,newReplies:replies,newBounces:bounces,errors})}
 export async function GET(request:Request){return run(request)}export async function POST(request:Request){return run(request)}
