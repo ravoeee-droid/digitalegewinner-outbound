@@ -1,6 +1,6 @@
 import { readState } from "@/lib/db";
 import TrackView from "./TrackView";
-import TrackedCTA from "./TrackedCTA";
+import CalendarEmbed from "./CalendarEmbed";
 
 export const dynamic = "force-dynamic";
 
@@ -69,7 +69,10 @@ export default async function AnalysisPage({params}:{params:Promise<{id:string}>
         ["Vertrauen & Nachweise","Sind Referenzen, Ergebnisse und Kompetenz dort sichtbar, wo die Entscheidung fällt?"],
       ].map(([title,text],index)=><article key={title} style={{border:"1px solid #202d3e",borderRadius:20,padding:22,background:"#0b131d"}}><span style={{display:"grid",placeItems:"center",width:30,height:30,borderRadius:9,background:"#10251c",color:"#64eaaa",fontWeight:900,fontSize:12}}>{index+1}</span><h3 style={{fontSize:19,margin:"16px 0 8px"}}>{title}</h3><p style={{color:"#8997aa",fontSize:13,lineHeight:1.6}}>{text}</p></article>)}</div></section>
 
-      <section style={{marginTop:30,border:"1px solid #28543f",borderRadius:24,padding:"clamp(24px,5vw,38px)",background:"linear-gradient(135deg,#0d1b15,#0b1615)"}}><div style={{display:"grid",gridTemplateColumns:"minmax(0,1fr) auto",gap:24,alignItems:"center"}}><div><div style={{color:"#67e9aa",fontSize:10,fontWeight:900,letterSpacing:".12em"}}>NÄCHSTER SCHRITT</div><h2 style={{fontSize:"clamp(27px,4vw,40px)",margin:"8px 0"}}>15 Minuten für die echte Einordnung</h2><p style={{color:"#9cb8aa",lineHeight:1.65,margin:0,maxWidth:700}}>{sender} zeigt Ihnen die wichtigsten Punkte kurz am Bildschirm. Wenn kein sinnvoller Hebel da ist, wissen wir das danach ebenfalls.</p></div>{settings?.calendarUrl?<TrackedCTA leadId={lead.id} href={settings.calendarUrl}/>:<span style={{display:"inline-block",padding:"12px 14px",border:"1px solid #29523f",borderRadius:11,color:"#68e9aa"}}>Terminlink wird verbunden</span>}</div></section>
+      <section style={{marginTop:30,border:"1px solid #28543f",borderRadius:24,padding:"clamp(24px,5vw,38px)",background:"linear-gradient(135deg,#0d1b15,#0b1615)"}}>
+        <div><div style={{color:"#67e9aa",fontSize:10,fontWeight:900,letterSpacing:".12em"}}>NÄCHSTER SCHRITT</div><h2 style={{fontSize:"clamp(27px,4vw,40px)",margin:"8px 0"}}>15 Minuten für die echte Einordnung</h2><p style={{color:"#9cb8aa",lineHeight:1.65,margin:0,maxWidth:700}}>{sender} zeigt Ihnen die wichtigsten Punkte kurz am Bildschirm. Wenn kein sinnvoller Hebel da ist, wissen wir das danach ebenfalls.</p></div>
+        <div style={{marginTop:22}}>{settings?.calendarUrl?<CalendarEmbed leadId={lead.id} href={settings.calendarUrl}/>:<span style={{display:"inline-block",padding:"12px 14px",border:"1px solid #29523f",borderRadius:11,color:"#68e9aa"}}>Terminlink wird verbunden</span>}</div>
+      </section>
       <p style={{color:"#536074",fontSize:11,lineHeight:1.6,marginTop:24}}>Hinweis: Die Analyse basiert auf öffentlich verfügbaren Informationen und dient als unverbindliche Ersteinschätzung. Aussagen zu Ergebnissen oder Potenzialen werden erst nach Prüfung der tatsächlichen Ausgangslage getroffen.</p>
     </div>
   </main>
