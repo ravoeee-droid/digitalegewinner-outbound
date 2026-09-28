@@ -12,6 +12,7 @@ const outcomeSchema = z.object({
   outcome: z.enum(["not_reached", "callback", "pain", "appointment", "no_fit", "dnc", "website_requested"]),
   note: z.string().max(4000).optional().default(""),
   opener: z.enum(["A", "B", "C", "D"]).optional().default("D"),
+  appointmentAt: z.string().datetime().optional(),
 });
 
 export async function GET() {
@@ -33,13 +34,33 @@ export async function POST(request: Request) {
 
     await query(
       `update sales_outbound_tasks
-       set status='done', payload=payload || jsonb_build_object('callOutcome',$2::text,'callNote',$3::text,'openerTest',$4::text,'callOutcomeAt',now()::text), updated_at=now()
+       set status='done', payload=payload || jsonb_build_object('callOutcome',$2::text,'callNote',$3::text,'openerTest',$4::text,'callOutcomeAt',now()::text,'appointmentAt',$5::text), updated_at=now()
        where id=$1::text and channel='call'`,
-      [input.id, input.outcome, input.note, input.opener],
+      [input.id, input.outcome, input.note, input.opener, input.appointmentAt || null],
     );
 
     let websiteProject = null;
     let integrationWarning = "";
+    let appointment: { opportunityId: string; nextActionAt: string } | null = null;
+    if (input.outcome === "appointment") {
+      try {
+        const opportunityRows = await query<{ id: string }>(
+          `select id from sales_opportunities where workspace='default' and lead_id=$1 and status='open' order by score desc,updated_at desc limit 1`,
+          [task.lead_id],
+        );
+        const opportunity = opportunityRows[0];
+        if (!opportunity) {
+          integrationWarning = "Kein offenes Opportunity-Objekt für diesen Lead gefunden – Termin wurde nur im Call-Task vermerkt.";
+        } else if (!input.appointmentAt) {
+          integrationWarning = "Kein Terminzeitpunkt übermittelt – Pipeline wurde nicht aktualisiert.";
+        } else {
+          await updateRevenueOpportunity(opportunity.id, { outcome: "Termin", nextActionAt: input.appointmentAt, notes: input.note || undefined });
+          appointment = { opportunityId: opportunity.id, nextActionAt: input.appointmentAt };
+        }
+      } catch (integrationError) {
+        integrationWarning = integrationError instanceof Error ? integrationError.message : "Termin konnte nicht automatisch in die Pipeline übernommen werden.";
+      }
+    }
     if (input.outcome === "website_requested") {
       try {
         await addProductOpportunity(task.lead_id, "website");
@@ -55,7 +76,7 @@ export async function POST(request: Request) {
     }
 
     const snapshot = await getOutboundEngineSnapshot();
-    return Response.json({ ok: true, tasks: snapshot.tasks.filter((item) => item.channel === "call"), channels: snapshot.channels, websiteProject, integrationWarning });
+    return Response.json({ ok: true, tasks: snapshot.tasks.filter((item) => item.channel === "call"), channels: snapshot.channels, websiteProject, appointment, integrationWarning });
   } catch (error) {
     return Response.json({ error: error instanceof Error ? error.message : "Call-Ergebnis konnte nicht gespeichert werden." }, { status: 400 });
   }

@@ -1,7 +1,7 @@
 {
   "contractVersion": "1.0.0",
   "instance": "DG-MAIN",
-  "updatedAt": "2026-09-27",
+  "updatedAt": "2026-09-28",
   "policy": "same-task-adapt-both-directions",
   "status": "parity-realignment-in-progress",
   "sharedSurfaces": {
@@ -13,8 +13,8 @@
     "campaignControlPlane": "needs-parity-review",
     "campaignRunTracking": "needs-parity-review",
     "mailboxStatusWorkflow": "peer-mail-cockpit-adapted-with-dg-netcup-imap-smtp",
-    "callerQueue": "local-implementation-exists-review-parity",
-    "leadDetailWorkspace": "local-implementation-exists-review-parity",
+    "callerQueue": "dg-added-inline-appointment-booking-peer-parity-blocked-2026-09-28",
+    "leadDetailWorkspace": "dg-added-embedded-booking-calendar-peer-parity-blocked-2026-09-28",
     "salesBrief": "needs-parity-review",
     "applicationFrame": "single-primary-workspace-no-parallel-pro-ui",
     "studioGenericV3": "peer-webmotion-v3-blocked-no-equivalent-browser-render-seam",
@@ -22,6 +22,20 @@
     "outboundOsV3": "dg-foundation-feature-branch-peer-parity-blocked"
   },
   "blockers": [
+    {
+      "id": "caller-queue-inline-appointment-booking-2026-09-28",
+      "surface": "callerQueue",
+      "peer": "CLIENT-WALKENHORST",
+      "detail": "DG-MAIN's call cockpit (app/ui/CallConsole.tsx, app/api/call-console/route.ts) now captures a real appointment date/time inline when the rep logs a 'Termin' outcome, and writes it straight into the pipeline (sales_opportunities.next_action_at) instead of only logging the outcome text. Peer source was inspected read-only (components/caller-queue.tsx, supabase/migrations/026_call_outcome_rpc.sql): CLIENT-WALKENHORST's energy_record_call_outcome RPC has the same gap today (a 'meeting' outcome only sets lead status + an activity note, no date/time is captured or stored anywhere, no energy_meetings/appointments table exists). This is a new capability, not a divergence from an existing peer feature, and DG-MAIN has no push access to the walkenhorst repo (read-only per AGENTS.md instance isolation). Parity requires a separate reviewed change made directly in CLIENT-WALKENHORST's own repo by whoever operates that instance (e.g. extend energy_record_call_outcome to accept p_meeting_at and persist it), not a push from this session.",
+      "noDataCopied": true
+    },
+    {
+      "id": "lead-detail-embedded-booking-calendar-2026-09-28",
+      "surface": "leadDetailWorkspace",
+      "peer": "CLIENT-WALKENHORST",
+      "detail": "DG-MAIN's personalized microsite (app/a/[id]/CalendarEmbed.tsx) now embeds the booking calendar directly as an iframe instead of only linking out. Peer's lead-facing video/analysis page was not found to have an equivalent booking-calendar embed either (peer only wires a calendar link, same as DG-MAIN did before this change). New capability, same reasoning and same read-only constraint as caller-queue-inline-appointment-booking-2026-09-28: parity is a separate reviewed change for CLIENT-WALKENHORST's own maintainers.",
+      "noDataCopied": true
+    },
     {
       "id": "studio-webmotion-v3-2026-08-27",
       "surface": "studioGenericV3",
