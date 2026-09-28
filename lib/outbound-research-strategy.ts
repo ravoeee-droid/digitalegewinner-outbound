@@ -219,6 +219,41 @@ function extractEvidence(page:{url:string;text:string;title:string|null},company
   return items;
 }
 
+function metadataJobEvidence(company:CompanyRow):Array<Omit<Evidence,"id"|"observedAt">>{
+  const metadata=company.metadata||{};
+  const qualification=metadata.daily_qualification;
+  if(!qualification||typeof qualification!=="object")return [];
+  const jobGrowth=(qualification as Record<string,unknown>).jobGrowth;
+  if(!jobGrowth||typeof jobGrowth!=="object")return [];
+  const growth=jobGrowth as Record<string,unknown>;
+  const roles=Array.isArray(growth.roles)?growth.roles:[];
+  const checkedAt=typeof growth.checkedAt==="string"?growth.checkedAt:"";
+  return roles.slice(0,12).flatMap((raw)=>{
+    if(!raw||typeof raw!=="object")return [];
+    const role=raw as Record<string,unknown>;
+    const title=String(role.title||"").trim();
+    const employer=String(role.employer||company.name||"").trim();
+    const reference=String(role.reference||"").trim();
+    const externalUrl=String(role.externalUrl||"").trim();
+    const city=String(role.city||company.city||"").trim();
+    const publishedAt=String(role.publishedAt||"").trim();
+    if(!title||!reference)return [];
+    const sourceUrl=externalUrl||`https://www.arbeitsagentur.de/jobsuche/jobdetail/${encodeURIComponent(reference)}`;
+    return [{
+      evidenceKey:"active_hiring_signal",
+      evidenceType:"job_signal" as const,
+      claim:"A verified current job listing is associated with this company.",
+      valueText:title,
+      sourceUrl,
+      sourceTitle:"Bundesagentur für Arbeit",
+      confidence:0.98,
+      contentHash:sha(JSON.stringify({employer,title,reference,publishedAt,city})),
+      excerpt:[title,city,publishedAt?`veröffentlicht ${publishedAt}`:"",employer].filter(Boolean).join(" · ").slice(0,800),
+      metadata:{employer,reference,publishedAt,city,checkedAt,source:"daily_qualification.jobGrowth"},
+    }];
+  });
+}
+
 async function persistEvidence(runId:string,company:CompanyRow,leadId:string|null,items:Array<Omit<Evidence,"id"|"observedAt">>){
   const output:Evidence[]=[];
   for(const item of items){
@@ -366,6 +401,14 @@ async function processRun(run:ResearchRun){
       if(evidence.some(item=>item.evidenceKey==="active_hiring_signal")&&sourceUrls.length>=2)break;
     }catch{
       // Research continues with remaining public URLs.
+    }
+  }
+
+  const verifiedJobItems=metadataJobEvidence(company);
+  if(verifiedJobItems.length){
+    evidence.push(...await persistEvidence(run.id,company,lead?.id??null,verifiedJobItems));
+    for(const item of verifiedJobItems){
+      if(item.sourceUrl&&!sourceUrls.includes(item.sourceUrl))sourceUrls.push(item.sourceUrl);
     }
   }
 
