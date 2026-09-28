@@ -54,6 +54,7 @@ export default function OutboundCommandCenter(){
    <div className={styles.system}><i className={online?styles.live:styles.warn}/>{online?"DG CORE LIVE":"API SETUP"}</div>
   </header>
 
+  <div className={styles.scrollArea}>
   <div className={`${styles.welcome} ${premium.welcome}`}><div><span>AI REVENUE OPERATOR</span><h1>{greeting()}</h1></div></div>
 
   <section className={`${styles.stage} ${premium.stage}`}>
@@ -67,6 +68,7 @@ export default function OutboundCommandCenter(){
   </section>
 
   <section className={`${styles.console} ${premium.console} ${expanded?styles.consoleOpen:""}`}><button className={styles.consoleToggle} onClick={()=>setExpanded(v=>!v)}><span>DG CORE // SESSION</span><b>{pending.length?`${pending.length} FREIGABE${pending.length>1?"N":""}`:messages.length?`${messages.length} MESSAGES`:"BEREIT"}</b></button>{expanded&&<div className={styles.consoleBody}><div className={styles.chat}>{!messages.length&&<div className={styles.emptyChat}><b>Ich kann das Sales OS bedienen.</b><span>Leads finden, prüfen, priorisieren, Website-Audits starten, Tagespläne bauen, CRM pflegen und sichere Schritte selbst ausführen.</span></div>}{messages.slice(-8).map((m,i)=><div key={`${m.role}-${i}`} className={`${styles.bubble} ${styles[`chat_${m.role}`]}`}><small>{m.role==="user"?"RAPHAEL":m.role==="assistant"?"DG CORE":"SYSTEM"}</small><p>{m.content}</p></div>)}</div>{pending.length>0&&<div className={styles.approvals}><strong>DEINE FREIGABE IST NÖTIG</strong>{pending.map(a=><div className={styles.approval} key={a.id}><div><b>{a.tool.replaceAll("_"," ")}</b><span>Externe Aktion · ohne Freigabe keine Ausführung</span></div><div><button onClick={()=>void approve(a,"reject")}>Ablehnen</button><button onClick={()=>void approve(a,"approve")}>Freigeben</button></div></div>)}</div>}</div>}</section>
+  </div>
 
   <section className={`${styles.dock} ${premium.dock}`}><div className={styles.agentMeta}><button className={`${styles.voice} ${state==="listening"?styles.voiceActive:""}`} onClick={listen} aria-label="Mit DG Core sprechen"><i/><i/><i/><i/></button><div><b>DG Core</b><small>{providerLabel(provider,model,fallback)}</small></div></div><form onSubmit={submit} className={styles.command}><input value={command} onChange={e=>setCommand(e.target.value)} placeholder="Raphael, was soll ich erledigen?" disabled={state==="thinking"||state==="acting"}/><button disabled={!command.trim()||state==="thinking"||state==="acting"}>↗</button></form><div className={styles.tools}><select value={mode} onChange={e=>setMode(e.target.value as AgentMode)}><option value="auto">Auto</option><option value="fast">Fast</option><option value="smart">Smart</option></select><button className={voice?styles.toolOn:""} onClick={()=>setVoice(v=>!v)} title="Antworten vorlesen">◉</button></div><div className={styles.quick}>{QUICK.map(q=><button key={q} onClick={()=>void send(q)}>{q}</button>)}</div><div className={styles.stats}><span>{done} erledigt</span><span>{ready} bereit</span><span>{callProgress}% Call-Ziel</span></div></section>
 
