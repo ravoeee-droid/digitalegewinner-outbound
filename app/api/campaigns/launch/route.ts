@@ -4,6 +4,7 @@ import { resolveOutboundRuntimeConfig } from "@/lib/outbound-runtime-config";
 import { ensureLegacyWorkflowForLead } from "@/lib/outbound-durable-workflows";
 import { evaluateEmailSendCompliance } from "@/lib/outbound-compliance-runtime";
 import { ensureLegacySequenceExperiment, assignLegacyExperiment } from "@/lib/outbound-experiment-engine";
+import { ensureLegacyCampaignVersionForAttribution } from "@/lib/outbound-revenue-attribution";
 import { z } from "zod";
 
 export const runtime = "nodejs";
@@ -55,6 +56,14 @@ export async function POST(request:Request){
         workspace:"default",
       })
     : null;
+  const attributionCampaignVersion=experimentBundle?.campaignVersion
+    ?? await ensureLegacyCampaignVersionForAttribution({
+      campaignId:input.campaign.id,
+      campaignName:input.campaign.name,
+      audience:input.campaign.audience,
+      steps:input.campaign.steps,
+      workspace:"default",
+    });
 
   let queued=0,skipped=0,index=0,complianceBlocked=0;
   const variants:Record<string,number>={};
@@ -143,7 +152,7 @@ export async function POST(request:Request){
           render(selected.subject,lead,input.senderName,appUrl),
           render(selected.body,lead,input.senderName,appUrl),
           assignedVariant,scheduled,
-          experimentAssignment?.active?experimentBundle?.campaignVersion.id??null:null,
+          attributionCampaignVersion.id,
           experimentAssignment?.active?experimentBundle?.experiment.id??null:null,
           experimentAssignment?.active?assignedVariant:null,
         ],
@@ -171,6 +180,7 @@ export async function POST(request:Request){
       blocked:complianceBlocked,
       reasons:complianceReasons,
     },
+    campaignVersionId:attributionCampaignVersion.id,
     experiment:experimentBundle?{
       id:experimentBundle.experiment.id,
       status:experimentBundle.experiment.status,

@@ -6,6 +6,10 @@ import DeliverabilityControlTower from "@/app/ui/DeliverabilityControlTower";
 import ComplianceControlTower from "@/app/ui/ComplianceControlTower";
 import ConversationControlTower from "@/app/ui/ConversationControlTower";
 import ExperimentControlTower from "@/app/ui/ExperimentControlTower";
+import ResearchStrategyControlTower from "@/app/ui/ResearchStrategyControlTower";
+import CopyEvalControlTower from "@/app/ui/CopyEvalControlTower";
+import RevenueAttributionControlTower from "@/app/ui/RevenueAttributionControlTower";
+import OptimizationControlTower from "@/app/ui/OptimizationControlTower";
 
 export const dynamic = "force-dynamic";
 
@@ -41,6 +45,10 @@ export default function ChannelEnginePage() {
       <ComplianceControlTower />
       <ConversationControlTower />
       <ExperimentControlTower />
+      <ResearchStrategyControlTower />
+      <CopyEvalControlTower />
+      <RevenueAttributionControlTower />
+      <OptimizationControlTower />
       <DeliverabilityControlTower />
       <OutboundEngineRuntime />
     </>

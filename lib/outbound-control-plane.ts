@@ -49,6 +49,10 @@ export const OUTBOUND_V3_CAPABILITIES = {
   conversationIntelligence: true,
   conversationAutopilot: false,
   experimentEngine: true,
+  researchStrategy: true,
+  copyEvals: true,
+  revenueAttribution: true,
+  optimizationEngine: true,
   optimizationAutopilot: false,
 } as const;
 
@@ -133,6 +137,19 @@ export async function getRuntimeControlPlane(workspace="default"){
       "outbound_conversation_escalations",
       "outbound_experiment_exposures",
       "outbound_experiment_evaluations",
+      "outbound_research_runs",
+      "outbound_evidence_items",
+      "outbound_strategy_hypotheses",
+      "outbound_prompt_versions",
+      "outbound_eval_datasets",
+      "outbound_eval_cases",
+      "outbound_eval_runs",
+      "outbound_eval_results",
+      "outbound_copy_candidates",
+      "outbound_attribution_facts",
+      "outbound_optimization_policies",
+      "outbound_optimization_proposals",
+      "outbound_optimization_cycles",
     ]],
   );
 
@@ -317,9 +334,9 @@ export async function getRuntimeControlPlane(workspace="default"){
       updatedAt:raw.updated_at,
     }:null,
     schema:{
-      expectedTables:22,
+      expectedTables:35,
       presentTables:Number(schema?.present||0),
-      ready:Number(schema?.present||0)===22,
+      ready:Number(schema?.present||0)===35,
     },
     capabilities:OUTBOUND_V3_CAPABILITIES,
     parity,
