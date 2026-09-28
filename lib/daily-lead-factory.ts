@@ -86,14 +86,23 @@ function isAmbulatoryBusiness(item: Pick<LeadBusiness, "company" | "industry">) 
 function isCandidateRowTarget(row: CandidateRow) {
   return isStrongAmbulatoryText(`${row.company} ${row.industry}`);
 }
-function seededJobGrowth(metadata: Record<string, unknown>): JobGrowthSignal | null {
+function seededJobGrowth(metadata: Record<string, unknown>, company: string): JobGrowthSignal | null {
   const raw = metadata?.job_growth_seed;
   if (!raw || typeof raw !== "object") return null;
   const seed = raw as Partial<JobGrowthSignal>;
   const checked = Date.parse(String(seed.checkedAt || ""));
   if (!Number.isFinite(checked) || Date.now() - checked > QUALIFICATION_FRESH_DAYS * 86_400_000) return null;
-  if (!Number(seed.relevantOpenJobs || 0)) return null;
-  return seed as JobGrowthSignal;
+
+  const roles=(seed.roles||[]).filter((role)=>companyNamesMatch(company,String(role.employer||"")));
+  if (!roles.length) return null;
+
+  return {
+    ...seed,
+    openJobs:roles.length,
+    relevantOpenJobs:roles.length,
+    roles,
+    confidence:roles.length>=2?"high":"medium",
+  } as JobGrowthSignal;
 }
 
 async function ensureFactorySchema() {
@@ -456,7 +465,7 @@ async function qualify(row: CandidateRow) {
   const website = normalizeWebsite(row.website || "");
   let contact: Partial<ContactEnrichment> = {};
   let audit: WebsiteAuditResult | undefined;
-  const seeded = seededJobGrowth(row.metadata);
+  const seeded = seededJobGrowth(row.metadata,row.company);
   const [contactResult, auditResult, jobResult] = await Promise.allSettled([
     website ? enrichPublicContact(website) : Promise.resolve({} as ContactEnrichment),
     website ? runWebsiteAudit(website, row.company) : Promise.resolve(undefined),
