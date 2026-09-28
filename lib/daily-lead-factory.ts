@@ -63,7 +63,7 @@ const TARGET_NAME_SQL = `(
     lower(c.name) ~ '(pflegedienst|ambulant|sozialstation|diakoniestation|häuslich|haeuslich|krankenpflege|intensivpflege|pflegeteam|home care|home health)'
     or lower(coalesce(c.industry,'')) ~ '(ambulan|intensiv|home care|home health)'
   )
-  and lower(c.name) !~ '(pflegeheim|altenheim|seniorenheim|seniorenzentrum|seniorenresidenz|pflegezentrum|wohn-? und pflege|wohnpark|tagespflege|hospiz|krankenhaus|klinik|universitätsmedizin|universitaetsmedizin|fußpflege|fusspflege|textilpflege|fahrzeugpflege|kosmetik|sanitätshaus|sanitaetshaus|pflegestützpunkt|pflegestuetzpunkt|personalmanagement|personalberatung|personalvermittlung|personaldienst|zeitarbeit|arbeitnehmerüberlass|arbeitnehmerueberlass|recruiting|staffing|recrutio|trova|caritas|arbeiterwohlfahrt|johanniter)'`;
+  and lower(c.name) !~ '(pflegeheim|altenheim|seniorenheim|seniorenzentrum|seniorenresidenz|pflegezentrum|wohn-? und pflege|wohnpark|tagespflege|hospiz|krankenhaus|klinikum|klinik|psychiatr|rehabilitation|reha-|universitätsmedizin|universitaetsmedizin|betreuung und pflege|pflege und betreuung|haus der betreuung|fußpflege|fusspflege|textilpflege|fahrzeugpflege|kosmetik|sanitätshaus|sanitaetshaus|pflegestützpunkt|pflegestuetzpunkt|personalmanagement|personalberatung|personalvermittlung|personaldienst|zeitarbeit|arbeitnehmerüberlass|arbeitnehmerueberlass|recruiting|staffing|recrutio|trova|caritas|arbeiterwohlfahrt|johanniter)'`;
 
 function clamp(value: number) { return Math.max(0, Math.min(100, Math.round(value))); }
 function normalizeWebsite(value = "") {
@@ -75,7 +75,7 @@ function domainFromWebsite(value = "") {
   try { return new URL(normalizeWebsite(value)).hostname.toLowerCase().replace(/^www\./, ""); } catch { return ""; }
 }
 function isExcludedName(value = "") {
-  return /(pflegeheim|altenheim|seniorenheim|seniorenzentrum|seniorenresidenz|pflegezentrum|wohn-? und pflege|wohnpark|tagespflege|hospiz|krankenhaus|klinik|universitätsmedizin|universitaetsmedizin|fußpflege|fusspflege|textilpflege|fahrzeugpflege|kosmetik|sanitätshaus|sanitaetshaus|pflegestützpunkt|pflegestuetzpunkt|personalmanagement|personalberatung|personalvermittlung|personaldienst|zeitarbeit|arbeitnehmerüberlass|arbeitnehmerueberlass|recruiting|staffing|recrutio|trova|caritas|arbeiterwohlfahrt|johanniter|\bawo\b)/i.test(value);
+  return /(pflegeheim|altenheim|seniorenheim|seniorenzentrum|seniorenresidenz|pflegezentrum|wohn-? und pflege|wohnpark|tagespflege|hospiz|krankenhaus|klinikum|klinik|psychiatr|rehabilitation|reha-|universitätsmedizin|universitaetsmedizin|betreuung und pflege|pflege und betreuung|haus der betreuung|fußpflege|fusspflege|textilpflege|fahrzeugpflege|kosmetik|sanitätshaus|sanitaetshaus|pflegestützpunkt|pflegestuetzpunkt|personalmanagement|personalberatung|personalvermittlung|personaldienst|zeitarbeit|arbeitnehmerüberlass|arbeitnehmerueberlass|recruiting|staffing|recrutio|trova|caritas|arbeiterwohlfahrt|johanniter|\bawo\b)/i.test(value);
 }
 function isStrongAmbulatoryText(value = "") {
   return /(pflegedienst|ambulan(?:t|te|ter)|sozialstation|diakoniestation|häuslich|haeuslich|krankenpflege|intensivpflege|pflegeteam|home care|home health|home_care|ambulatory_care|outreach)/i.test(value) && !isExcludedName(value);
