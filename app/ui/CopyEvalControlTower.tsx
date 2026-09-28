@@ -1,0 +1,32 @@
+"use client";
+import {useCallback,useEffect,useState} from "react";
+
+type H={id:string;company_name:string|null;hypothesis:string};
+type C={id:string;company_name:string|null;status:string;subject:string;body:string;quality_score:number|null;critic:any;prompt_version:string};
+type R={id:string;status:string;total_cases:number;passed_cases:number;score:number|null;started_at:string;summary:any};
+type D={aiConfigured:boolean;model:string;criticPolicy:string;counts:{passed:number;failed:number;approved:number;readyHypotheses:number};candidates:C[];hypotheses:H[];evalRuns:R[]};
+
+export default function CopyEvalControlTower(){
+ const [d,setD]=useState<D|null>(null),[busy,setBusy]=useState(""),[err,setErr]=useState(""),[msg,setMsg]=useState("");
+ const load=useCallback(async()=>{try{const r=await fetch("/api/outbound/v3/copy-evals",{cache:"no-store"});const j=await r.json();if(!r.ok)throw new Error(j?.error||"Load failed");setD(j)}catch(e){setErr(e instanceof Error?e.message:"Load failed")}},[]);
+ useEffect(()=>{void load()},[load]);
+ async function post(payload:any,key:string){setBusy(key);setErr("");setMsg("");try{const r=await fetch("/api/outbound/v3/copy-evals",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(payload)});const j=await r.json();if(!r.ok)throw new Error(j?.error||"Action failed");setMsg("Gespeichert.");await load()}catch(e){setErr(e instanceof Error?e.message:"Action failed")}finally{setBusy("")}}
+ async function review(c:C,decision:"approved"|"rejected"){const reason=window.prompt(decision==="approved"?"Warum freigeben?":"Warum ablehnen?","Manuell geprüft");if(reason)await post({action:"review",candidateId:c.id,decision,reason},"review"+c.id)}
+ return <section style={{maxWidth:1540,margin:"0 auto 18px",padding:"0 28px"}}><div style={shell}>
+  <div style={{display:"flex",justifyContent:"space-between",gap:16,flexWrap:"wrap"}}><div><div style={kicker}>M8 · COPY + AI EVALS</div><h2 style={h2}>Prompt-Versionen, Critic & Regression Gates</h2><p style={p}>KI-Copy wird erst freigabefähig, wenn Claims auf Evidence zeigen und Regression-Gates bestehen.</p></div><div style={{display:"flex",gap:8}}><Badge t="AI" v={d?.aiConfigured?"API":"Fallback"}/><Badge t="Critic" v={d?.criticPolicy||"…"}/></div></div>
+  {err&&<N c="#ffb3b3">{err}</N>}{msg&&<N c="#8be9b2">{msg}</N>}
+  <div style={grid4}><S t="Passed" v={d?.counts.passed||0}/><S t="Failed" v={d?.counts.failed||0}/><S t="Approved" v={d?.counts.approved||0}/><S t="Strategien bereit" v={d?.counts.readyHypotheses||0}/></div>
+  <div style={{display:"flex",gap:8,marginTop:14,flexWrap:"wrap"}}><button disabled={!!busy} style={btn(true)} onClick={()=>void post({action:"eval"},"eval")}>Regression Suite starten</button></div>
+  {d?.hypotheses?.length?<Box title="Freigegebene Strategien ohne Copy">{d.hypotheses.map(h=><div key={h.id} style={row}><div><b>{h.company_name||"Firma"}</b><div style={sub}>{h.hypothesis}</div></div><button disabled={!!busy} style={btn(true)} onClick={()=>void post({action:"generate",hypothesisId:h.id},"g"+h.id)}>Copy erzeugen</button></div>)}</Box>:null}
+  <Box title="Copy Candidates">{(d?.candidates||[]).length?(d?.candidates||[]).map(c=><div key={c.id} style={{...row,alignItems:"flex-start"}}><div style={{flex:1}}><div style={{display:"flex",gap:8,alignItems:"center"}}><b>{c.company_name||"Firma"}</b><span style={{fontSize:9,color:c.status==="passed"?"#8be9b2":c.status==="failed"?"#ff9b9b":"#aaa"}}>{c.status.toUpperCase()}</span><span style={sub}>{c.quality_score===null?"—":Math.round(c.quality_score*100)+"%"}</span></div><div style={{fontSize:10,color:"#dfe7df",marginTop:6}}>{c.subject}</div><div style={{fontSize:10,color:"#9aa59d",whiteSpace:"pre-wrap",lineHeight:1.5,marginTop:6}}>{c.body}</div>{Array.isArray(c.critic?.violations)&&c.critic.violations.length?<div style={{fontSize:9,color:"#ffb3b3",marginTop:6}}>{c.critic.violations.map((v:any)=>v.code).join(" · ")}</div>:null}</div><div style={{display:"flex",gap:6}}>{c.status==="passed"&&<button disabled={!!busy} style={btn(true)} onClick={()=>void review(c,"approved")}>Freigeben</button>}{["passed","failed"].includes(c.status)&&<button disabled={!!busy} style={btn(false)} onClick={()=>void review(c,"rejected")}>Ablehnen</button>}</div></div>):<Empty/>}</Box>
+  <Box title="Letzte Eval Runs">{(d?.evalRuns||[]).length?(d?.evalRuns||[]).map(r=><div key={r.id} style={row}><span>{new Date(r.started_at).toLocaleString()}</span><span style={sub}>{r.passed_cases}/{r.total_cases} · {r.score===null?"—":Math.round(r.score*100)+"%"} · {r.status}</span></div>):<Empty/>}</Box>
+ </div></section>
+}
+const shell:React.CSSProperties={border:"1px solid rgba(255,148,89,.18)",background:"rgba(16,11,8,.94)",borderRadius:24,padding:20};
+const kicker:React.CSSProperties={fontSize:10,fontWeight:900,letterSpacing:".13em",color:"#ffad7a"};const h2:React.CSSProperties={fontSize:25,margin:"7px 0 6px"};const p:React.CSSProperties={fontSize:12,color:"#9e948d",margin:0,maxWidth:850};const grid4:React.CSSProperties={display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(170px,1fr))",gap:10,marginTop:18};const row:React.CSSProperties={display:"flex",justifyContent:"space-between",gap:12,padding:"10px 0",borderBottom:"1px solid rgba(255,255,255,.05)",fontSize:10};const sub:React.CSSProperties={fontSize:9,color:"#837a74",lineHeight:1.45,marginTop:3};
+function Box({title,children}:{title:string;children:React.ReactNode}){return <div style={{marginTop:12,border:"1px solid rgba(255,255,255,.07)",borderRadius:14,padding:12}}><div style={{fontSize:9,fontWeight:900,color:"#82766e",marginBottom:6}}>{title.toUpperCase()}</div>{children}</div>}
+function S({t,v}:{t:string;v:number}){return <div style={{padding:12,border:"1px solid rgba(255,255,255,.06)",borderRadius:12}}><div style={sub}>{t.toUpperCase()}</div><div style={{fontSize:20,fontWeight:900}}>{v}</div></div>}
+function Badge({t,v}:{t:string;v:string}){return <span style={{fontSize:9,padding:"7px 9px",border:"1px solid rgba(255,255,255,.08)",borderRadius:999,color:"#c7b6aa"}}>{t}: {v}</span>}
+function N({c,children}:{c:string;children:React.ReactNode}){return <div style={{marginTop:10,fontSize:10,color:c}}>{children}</div>}
+function Empty(){return <div style={sub}>Noch keine Einträge.</div>}
+function btn(primary:boolean):React.CSSProperties{return {border:"1px solid rgba(255,255,255,.1)",background:primary?"rgba(255,148,89,.1)":"rgba(255,255,255,.04)",color:primary?"#ffc09a":"#aaa",borderRadius:9,padding:"8px 10px",fontSize:9,fontWeight:850,cursor:"pointer"}}

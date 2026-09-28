@@ -63,6 +63,21 @@ export const outboundEventTypes = [
   "workflow_failed",
   "workflow_cancelled",
   "workflow_recovered",
+  "research_completed",
+  "strategy_hypothesis_proposed",
+  "strategy_hypothesis_approved",
+  "strategy_hypothesis_rejected",
+  "copy_candidate_created",
+  "copy_critic_passed",
+  "copy_critic_failed",
+  "copy_candidate_approved",
+  "copy_candidate_rejected",
+  "prompt_eval_completed",
+  "optimization_proposal_created",
+  "new_experiment_proposed",
+  "experiment_traffic_reallocated",
+  "new_experiment_draft_created",
+  "optimization_policy_changed",
 ] as const;
 
 export const outboundEventTypeSchema = z.enum(outboundEventTypes);

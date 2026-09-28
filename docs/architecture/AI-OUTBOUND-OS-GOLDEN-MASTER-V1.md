@@ -1,6 +1,6 @@
 # DG Outbound OS — Golden Architecture V1
 
-Status: **Architecture Freeze / M0**
+Status: **Implemented through M10 / Production target L2**
 Instance: **DG-MAIN**
 Date: 2026-09-27
 
@@ -228,16 +228,16 @@ Persist conversation threads/messages, classify replies asynchronously with dete
 Version legacy A/B/n sequences into durable company-level experiments, persist deterministic assignments, count only provider-accepted first exposures, evaluate primary/guardrail metrics with SRM and multiplicity controls, auto-pause only for safety/validity failures, and require human approval for any performance-driven traffic change.
 
 ### M7 — Research + Strategy Agents
-Evidence-backed research and hypothesis generation.
+Evidence-first public-page research with SSRF protection, source/time/confidence/hash persistence, bounded workers, deterministic fallback and human-approved strategy hypotheses.
 
 ### M8 — Copy + AI Evals
-Versioned prompts, datasets, regression tests and critic gates.
+Versioned prompts, evidence-mapped claims, critic gates, seeded regression datasets and append-only eval runs. Unsupported guarantees, percentages, timelines, price/result claims and fake personalization fail closed for AI-generated copy.
 
 ### M9 — Revenue Attribution
-Meetings, opportunities, wins and revenue tied to campaign version and experiment arm.
+Immutable campaign versions for all future launches plus meetings, opportunities, wins/losses and revenue attributed to the latest valid pre-conversion company exposure. Unmatched facts remain unattributed.
 
 ### M10 — Optimization Autopilot
-Controlled traffic allocation and experiment generation under explicit policies.
+Policy-gated traffic and experiment proposals. L2 recommends only. L4 traffic execution requires a human-approved active policy, evidence signal, clean guardrails, sample minimums, cooldown and bounded shifts. L5 may create draft experiments but never bypass permission/compliance/send gates.
 
 ## Definition of done for M0
 
@@ -250,3 +250,16 @@ M0 is complete only when:
 - DB migration is additive/reviewable
 - preview build passes
 - production remains unchanged
+
+
+## Implementation state — 2026-09-27
+
+- M0–M6: implemented.
+- M7 Research + Strategy: implemented with public-URL evidence controls and deterministic fallback.
+- M8 Copy + AI Evals: implemented with prompt/dataset versioning and critic regression gates.
+- M9 Revenue Attribution: implemented with 180-day pre-conversion last-company-exposure attribution.
+- M10 Optimization: implemented behind explicit policy/autonomy gates.
+- Current production autonomy target remains L2.
+- L3 external conversation auto-replies remain disabled.
+- L4 traffic allocation and L5 experiment-draft execution remain non-executable until the required autonomy level and human-approved policy are explicitly enabled.
+- OPENAI_API_KEY is optional; without it, deterministic fallbacks remain active.
