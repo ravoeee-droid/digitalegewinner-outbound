@@ -144,6 +144,7 @@ const NAV: NavGroup[] = [
     { id: "proposals", label: "Proposals", mark: "◇" },
     { id: "intelligence", label: "Intelligence", mark: "◈" },
     { id: "analytics", label: "Analytics", mark: "⌁" },
+    { label: "Engine", mark: "⚡", href: "/outbound/engine", badge: "V3" },
   ] },
   { label: "System", items: [{ id: "system", label: "Integrationen", mark: "⚙" }] },
 ];
