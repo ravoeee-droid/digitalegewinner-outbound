@@ -131,16 +131,33 @@ function normalizeName(value: string) {
     .trim();
 }
 
+const GENERIC_EMPLOYER_TOKENS = new Set([
+  "pflege", "pflegen", "pflegedienst", "pflegedienste", "pflegebetrieb",
+  "ambulant", "ambulante", "ambulanter", "ambulanten",
+  "sozialstation", "diakoniestation", "krankenpflege", "intensivpflege",
+  "betreuung", "betreuungsdienst", "gesundheit", "gesundheitsdienst",
+  "service", "dienste", "dienst", "team", "home", "care",
+]);
+
+function distinctiveEmployerTokens(value: string) {
+  return value
+    .split(" ")
+    .filter((token) => token.length >= 4 && !GENERIC_EMPLOYER_TOKENS.has(token));
+}
+
 export function companyNamesMatch(expected: string, actual: string) {
   const a = normalizeName(expected);
   const b = normalizeName(actual);
   if (!a || !b) return false;
   if (a === b || a.includes(b) || b.includes(a)) return true;
-  const aTokens = new Set(a.split(" ").filter((token) => token.length >= 4));
-  const bTokens = b.split(" ").filter((token) => token.length >= 4);
-  if (!aTokens.size || !bTokens.length) return false;
-  const overlap = bTokens.filter((token) => aTokens.has(token)).length;
-  return overlap >= Math.min(2, Math.min(aTokens.size, bTokens.length));
+
+  const aDistinct = new Set(distinctiveEmployerTokens(a));
+  const bDistinct = distinctiveEmployerTokens(b);
+  if (!aDistinct.size || !bDistinct.length) return false;
+
+  const overlap = [...new Set(bDistinct.filter((token) => aDistinct.has(token)))].length;
+  const required = Math.min(2, Math.min(aDistinct.size, new Set(bDistinct).size));
+  return overlap >= required;
 }
 
 function portalFromUrl(raw: string) {
