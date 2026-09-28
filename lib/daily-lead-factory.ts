@@ -9,6 +9,9 @@ import { runWebsiteAudit, type WebsiteAuditResult } from "./website-audit";
 export const DAILY_CALL_TARGET = 120;
 export const A_PLUS_BUFFER_TARGET = 160;
 export const QUALIFICATION_FRESH_DAYS = 7;
+export const MIN_A_PLUS_OPEN_JOBS = 2;
+
+const PORTAL_EMAIL_DOMAIN = /(arbeitsagentur\.de|indeed\.|stepstone\.|xing\.com|linkedin\.com|valmedi\.de|joblift\.|jobrapido\.|meinestadt\.)$/i;
 
 type CandidateRow = {
   lead_id: string;
@@ -56,8 +59,11 @@ type JobTask = { state: string; code: string; sector: string; queryKey: string }
 type LeadBusiness = Omit<DiscoveredBusiness, "source"> & { source: string };
 type ResolvedJobLead = { business: LeadBusiness; seed: HiringEmployerSignal };
 
-const TARGET_NAME_SQL = `(c.metadata->>'pflege_icp_verified'='true' or lower(c.name) ~ '(pflegedienst|ambulant|sozialstation|diakoniestation|häuslich|haeuslich|krankenpflege|intensivpflege|pflegeteam|home care|home health)')
-  and lower(c.name) !~ '(pflegeheim|altenheim|seniorenheim|seniorenzentrum|seniorenresidenz|pflegezentrum|wohn-? und pflege|wohnpark|tagespflege|hospiz|krankenhaus|klinik|fußpflege|fusspflege|textilpflege|fahrzeugpflege|kosmetik|sanitätshaus|sanitaetshaus)'`;
+const TARGET_NAME_SQL = `(
+    lower(c.name) ~ '(pflegedienst|ambulant|sozialstation|diakoniestation|häuslich|haeuslich|krankenpflege|intensivpflege|pflegeteam|home care|home health)'
+    or lower(coalesce(c.industry,'')) ~ '(ambulan|intensiv|home care|home health)'
+  )
+  and lower(c.name) !~ '(pflegeheim|altenheim|seniorenheim|seniorenzentrum|seniorenresidenz|pflegezentrum|wohn-? und pflege|wohnpark|tagespflege|hospiz|krankenhaus|klinik|universitätsmedizin|universitaetsmedizin|fußpflege|fusspflege|textilpflege|fahrzeugpflege|kosmetik|sanitätshaus|sanitaetshaus|pflegestützpunkt|pflegestuetzpunkt|personalmanagement|personalberatung|personalvermittlung|personaldienst|zeitarbeit|arbeitnehmerüberlass|arbeitnehmerueberlass|recruiting|staffing|recrutio|trova|caritas|arbeiterwohlfahrt|johanniter)'`;
 
 function clamp(value: number) { return Math.max(0, Math.min(100, Math.round(value))); }
 function normalizeWebsite(value = "") {
@@ -69,7 +75,7 @@ function domainFromWebsite(value = "") {
   try { return new URL(normalizeWebsite(value)).hostname.toLowerCase().replace(/^www\./, ""); } catch { return ""; }
 }
 function isExcludedName(value = "") {
-  return /(pflegeheim|altenheim|seniorenheim|seniorenzentrum|seniorenresidenz|pflegezentrum|wohn-? und pflege|wohnpark|tagespflege|hospiz|krankenhaus|klinik|fußpflege|fusspflege|textilpflege|fahrzeugpflege|kosmetik|sanitätshaus|sanitaetshaus|pflegestützpunkt|pflegestuetzpunkt)/i.test(value);
+  return /(pflegeheim|altenheim|seniorenheim|seniorenzentrum|seniorenresidenz|pflegezentrum|wohn-? und pflege|wohnpark|tagespflege|hospiz|krankenhaus|klinik|universitätsmedizin|universitaetsmedizin|fußpflege|fusspflege|textilpflege|fahrzeugpflege|kosmetik|sanitätshaus|sanitaetshaus|pflegestützpunkt|pflegestuetzpunkt|personalmanagement|personalberatung|personalvermittlung|personaldienst|zeitarbeit|arbeitnehmerüberlass|arbeitnehmerueberlass|recruiting|staffing|recrutio|trova|caritas|arbeiterwohlfahrt|johanniter|\bawo\b)/i.test(value);
 }
 function isStrongAmbulatoryText(value = "") {
   return /(pflegedienst|ambulan(?:t|te|ter)|sozialstation|diakoniestation|häuslich|haeuslich|krankenpflege|intensivpflege|pflegeteam|home care|home health|home_care|ambulatory_care|outreach)/i.test(value) && !isExcludedName(value);
@@ -78,7 +84,7 @@ function isAmbulatoryBusiness(item: Pick<LeadBusiness, "company" | "industry">) 
   return isStrongAmbulatoryText(`${item.company} ${item.industry}`);
 }
 function isCandidateRowTarget(row: CandidateRow) {
-  return row.metadata?.pflege_icp_verified === true || isStrongAmbulatoryText(`${row.company} ${row.industry}`);
+  return isStrongAmbulatoryText(`${row.company} ${row.industry}`);
 }
 function seededJobGrowth(metadata: Record<string, unknown>): JobGrowthSignal | null {
   const raw = metadata?.job_growth_seed;
@@ -126,6 +132,7 @@ export async function getLeadFactoryStats(): Promise<FactoryStats> {
     select
       count(*) filter(where
         c.metadata->'daily_qualification'->>'tier'='A+'
+        and coalesce((c.metadata->'daily_qualification'->'jobGrowth'->>'relevantOpenJobs')::int,0) >= ${MIN_A_PLUS_OPEN_JOBS}
         and (c.metadata->'daily_qualification'->>'checkedAt')::timestamptz >= now() - interval '${QUALIFICATION_FRESH_DAYS} days'
         and l.last_contact_at is null and l.stage in ('Neu','Research','Bereit')
         and coalesce(ct.phone,c.phone,'')<>'' and not l.do_not_contact and l.phone_status<>'invalid'
@@ -456,6 +463,7 @@ async function qualify(row: CandidateRow) {
     seeded ? Promise.resolve(seeded) : inspectJobGrowth(row.company, row.city),
   ]);
   if (contactResult.status === "fulfilled") contact = contactResult.value;
+  if (contact.email && PORTAL_EMAIL_DOMAIN.test(contact.email.split("@")[1] || "")) contact.email = "";
   if (auditResult.status === "fulfilled") audit = auditResult.value;
   const jobGrowth = jobResult.status === "fulfilled" ? jobResult.value : {
     source: "arbeitsagentur-jobsuche", checkedAt: new Date().toISOString(), openJobs: 0, relevantOpenJobs: 0,
@@ -474,7 +482,7 @@ async function qualify(row: CandidateRow) {
   const callReady = Boolean(phone);
 
   let tier: Qualification["tier"] = "C";
-  if (callReady && weakness.weak && jobGrowth.relevantOpenJobs >= 1 && priorityScore >= 72) tier = "A+";
+  if (callReady && weakness.weak && jobGrowth.relevantOpenJobs >= MIN_A_PLUS_OPEN_JOBS && priorityScore >= 72) tier = "A+";
   else if (callReady && jobGrowth.relevantOpenJobs >= 1 && priorityScore >= 62) tier = "A";
   else if (callReady && weakness.weak) tier = "B";
 
@@ -485,7 +493,7 @@ async function qualify(row: CandidateRow) {
     ...(jobGrowth.externalPortals.length ? [`Extern: ${jobGrowth.externalPortals.join(", ")}`] : []),
   ];
   const qualification: Qualification = {
-    version: 2,
+    version: 3,
     checkedAt: new Date().toISOString(),
     tier,
     callReady,
