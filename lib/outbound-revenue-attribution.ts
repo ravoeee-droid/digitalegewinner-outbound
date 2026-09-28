@@ -182,7 +182,17 @@ async function upsertFact(input:AttributionInput){
   return {id:row?.id??null,attributed:Boolean(exposure?.campaign_version_id),campaignVersionId:exposure?.campaign_version_id||null};
 }
 
+// Each fact is its own upsert round trip, and a full backlog can mean hundreds of
+// them sequentially - easily 60s+ against Neon's per-query latency, which Vercel
+// then hard-kills mid-loop instead of returning a clean response. The unprocessed-only
+// queries below already make this safe to resume (a killed run just leaves fewer facts
+// written; the next cron tick picks up exactly where it left off), so this budget just
+// stops before the platform does and returns cleanly instead of crashing.
+const SYNC_BUDGET_MS=42_000;
+
 export async function syncRevenueAttribution(){
+  const startedAt=Date.now();
+  const withinBudget=()=>Date.now()-startedAt<SYNC_BUDGET_MS;
   const events=await query<{
     id:string;event_type:string;lead_id:string|null;company_id:string|null;occurred_at:Date;payload:Record<string,unknown>
   }>(
@@ -202,6 +212,7 @@ export async function syncRevenueAttribution(){
   );
   let eventFacts=0;
   for(const event of events){
+    if(!withinBudget())break;
     const factType=event.event_type==="revenue_recorded"?"revenue":event.event_type as AttributionInput["factType"];
     const amountRaw=event.payload?.amount;
     const amount=typeof amountRaw==="number"?amountRaw:typeof amountRaw==="string"&&Number.isFinite(Number(amountRaw))?Number(amountRaw):null;
@@ -215,7 +226,7 @@ export async function syncRevenueAttribution(){
     eventFacts++;
   }
 
-  const opportunities=await query<{
+  const opportunities=!withinBudget()?[]:await query<{
     id:string;lead_id:string|null;company_id:string|null;stage:string|null;status:string|null;
     setup_value:number|null;monthly_value:number|null;created_at:Date;updated_at:Date
   }>(
@@ -232,6 +243,7 @@ export async function syncRevenueAttribution(){
   );
   let opportunityFacts=0,wonFacts=0,revenueFacts=0,lostFacts=0;
   for(const opportunity of opportunities){
+    if(!withinBudget())break;
     await upsertFact({
       factKey:`opportunity:${opportunity.id}:created`,factType:"opportunity_created",
       sourceKind:"sales_opportunity",sourceId:opportunity.id,leadId:opportunity.lead_id,
