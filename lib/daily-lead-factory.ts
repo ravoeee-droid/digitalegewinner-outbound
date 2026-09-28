@@ -435,6 +435,7 @@ async function candidatesForQualification(limit: number) {
     join sales_leads l on l.company_id=c.id and l.workspace=c.workspace and l.status='active'
     left join sales_contacts ct on ct.id=l.contact_id
     where c.workspace='default'
+      and ${TARGET_NAME_SQL}
       and l.last_contact_at is null and l.stage in ('Neu','Research','Bereit')
       and not l.do_not_contact and l.phone_status<>'invalid'
       and (
@@ -447,7 +448,7 @@ async function candidatesForQualification(limit: number) {
              l.intent_score desc,c.updated_at asc
     limit $1
   `, [Math.max(limit * 5, 25)]);
-  return rows.filter(isCandidateRowTarget).slice(0, limit);
+  return rows.slice(0, limit);
 }
 
 function websiteWeakness(audit: WebsiteAuditResult | undefined, contact: Partial<ContactEnrichment>, website: string) {
