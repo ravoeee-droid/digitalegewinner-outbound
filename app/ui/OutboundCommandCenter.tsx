@@ -50,11 +50,11 @@ export default function OutboundCommandCenter(){
   <div className={styles.ambient}/>
   <header className={`${styles.topbar} ${premium.topbar}`}>
    <Link href="/" className={styles.brand}><span className={styles.brandMark}>DG</span><span><strong>DIGITALE GEWINNER</strong><small>Revenue Intelligence OS</small></span></Link>
-   <nav className={styles.nav}><span className={styles.active}>Command</span><Link href="/outbound/engine">Engine</Link><Link href="/call">Call Mode</Link><Link href="/websites">Websites</Link><button onClick={()=>setDetailOpen(true)}>CRM / Pipeline</button></nav>
+   <nav className={styles.nav}><span className={styles.active}>Command</span><Link href="/outbound/engine">Engine</Link><button onClick={()=>setDetailOpen(true)}>CRM / Pipeline</button></nav>
    <div className={styles.system}><i className={online?styles.live:styles.warn}/>{online?"DG CORE LIVE":"API SETUP"}</div>
   </header>
 
-  <div className={`${styles.welcome} ${premium.welcome}`}><div><span>AI REVENUE OPERATOR</span><h1>{greeting()}</h1></div><div className={styles.providers}><span className={providerStatus?.experiential?styles.on:""}>Experiential</span><span className={providerStatus?.groq?styles.on:""}>Groq fallback</span><span>{providerLabel(provider,model,fallback)}</span></div></div>
+  <div className={`${styles.welcome} ${premium.welcome}`}><div><span>AI REVENUE OPERATOR</span><h1>{greeting()}</h1></div></div>
 
   <section className={`${styles.stage} ${premium.stage}`}>
    <aside className={`${styles.panel} ${premium.panel} ${styles.leftTop}`}><small className={styles.eyebrow}>HEUTE</small><h2>Outbound Flow</h2><div className={styles.flow}>{(["call","video","email","linkedin"] as const).map(k=>{const r=channels[k]||{target:0,ready:0,done:0,total:0};const p=Math.min(100,Math.round(Number(r.done||0)/Math.max(1,Number(r.target||1))*100));return <div className={styles.flowRow} key={k}><div><span>{label(k)}</span><b>{r.done}/{r.target}</b></div><div className={styles.bar}><i style={{width:`${p}%`}}/></div><small>{r.ready} bereit</small></div>})}</div></aside>
