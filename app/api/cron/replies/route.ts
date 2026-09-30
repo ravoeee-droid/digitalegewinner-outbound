@@ -15,14 +15,19 @@ function auth(request:Request){const s=process.env.CRON_SECRET;return Boolean(s&
 function fromHeader(value:string){const m=value.match(/<([^>]+)>/);return (m?.[1]||value).trim().toLowerCase()}
 async function recordReply(messageId:string,from:string,subject:string,mailboxId:string,bodyText=""){
  const existing=await query<{id:number}>("select id from er_events where workspace='default' and type='reply' and meta->>'providerMessageId'=$1 limit 1",[messageId]);if(existing.length)return false;
- const row=await readState();const state=row?.payload as State|undefined;
- // Prefer the relational CRM as source of truth. Fall back to the legacy JSON mirror only
- // for older imported leads that have not been normalized yet.
+ // Prefer the relational CRM as source of truth. Only touch the legacy JSON mirror
+ // when a reply belongs to an older lead that has not been normalized yet.
  const dbLead=await query<{id:string}>(
   "select l.id from sales_leads l join sales_contacts c on c.id=l.contact_id where l.workspace='default' and lower(c.email)=lower($1) order by l.updated_at desc limit 1",
   [from],
  );
- const legacyLead=state?.leads?.find(l=>String(l.email||"").toLowerCase()===from);
+ let state:State|undefined;
+ let legacyLead:Record<string,unknown>|undefined;
+ if(!dbLead[0]?.id){
+  const row=await readState().catch(()=>null);
+  state=row?.payload as State|undefined;
+  legacyLead=state?.leads?.find(l=>String(l.email||"").toLowerCase()===from);
+ }
  const leadId=dbLead[0]?.id||String(legacyLead?.id||"");
  if(!leadId)return false;
  const attribution=await query<{id:string;campaign_id:string|null;variant:string}>(
@@ -110,6 +115,7 @@ async function recordReply(messageId:string,from:string,subject:string,mailboxId
  }
  await query("update er_outbox set status='stopped' where workspace='default' and lead_id=$1 and status='queued'",[leadId]);
  if(!optOut.matched){
+  await query("update pflege_email_outreach set status='replied',updated_at=now() where lower(email)=lower($1) and status in ('approved','sent')",[from]);
   await query("update sales_leads set intent_score=least(100,intent_score+30),stage=case when stage in ('Neu','Kontaktiert') then 'Engaged' else stage end,last_contact_at=now(),updated_at=now() where id=$1 and workspace='default'",[leadId]);
   if(state?.leads){
    const leads=state.leads.map(l=>String(l.id)===leadId?{...l,intentScore:Math.min(100,Number(l.intentScore||0)+30),stage:String(l.stage)==="Neu"||String(l.stage)==="Kontaktiert"?"Engaged":l.stage}:l);
@@ -122,12 +128,12 @@ async function recordReply(messageId:string,from:string,subject:string,mailboxId
 }
 async function syncGmail(c:Credential){
  const token=await getMailboxAccessToken(c);
- const list=await fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=50&q=in%3Ainbox%20newer_than%3A2d",{headers:{Authorization:`Bearer ${token}`}});
+ const list=await fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=25&q=in%3Ainbox%20newer_than%3A2d",{headers:{Authorization:`Bearer ${token}`},signal:AbortSignal.timeout(12000)});
  if(!list.ok)throw new Error(`Gmail Inbox Sync ${list.status}`);
  const data=await list.json() as {messages?:Array<{id:string}>};
  let replies=0,unsubscribes=0;
  for(const m of data.messages||[]){
-  const r=await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${m.id}?format=metadata&metadataHeaders=From&metadataHeaders=Subject`,{headers:{Authorization:`Bearer ${token}`}});
+  const r=await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${m.id}?format=metadata&metadataHeaders=From&metadataHeaders=Subject`,{headers:{Authorization:`Bearer ${token}`},signal:AbortSignal.timeout(12000)});
   if(!r.ok)continue;
   const msg=await r.json() as {id:string;snippet?:string;payload?:{headers?:Array<{name:string;value:string}>}};
   const headers=msg.payload?.headers||[];
@@ -143,8 +149,8 @@ async function syncGmail(c:Credential){
 async function syncMicrosoft(c:Credential){
  const token=await getMailboxAccessToken(c);
  const since=new Date(Date.now()-2*86400000).toISOString();
- const endpoint=`https://graph.microsoft.com/v1.0/me/mailFolders/inbox/messages?$top=50&$select=id,subject,from,receivedDateTime,bodyPreview&$filter=receivedDateTime%20ge%20${encodeURIComponent(since)}`;
- const r=await fetch(endpoint,{headers:{Authorization:`Bearer ${token}`}});
+ const endpoint=`https://graph.microsoft.com/v1.0/me/mailFolders/inbox/messages?$top=25&$select=id,subject,from,receivedDateTime,bodyPreview&$filter=receivedDateTime%20ge%20${encodeURIComponent(since)}`;
+ const r=await fetch(endpoint,{headers:{Authorization:`Bearer ${token}`},signal:AbortSignal.timeout(12000)});
  if(!r.ok)throw new Error(`Microsoft Inbox Sync ${r.status}`);
  const data=await r.json() as {value?:Array<{id:string;subject?:string;bodyPreview?:string;from?:{emailAddress?:{address?:string}}}>};
  let replies=0,unsubscribes=0;
@@ -252,16 +258,20 @@ async function run(request:Request){
  try{credentials=await loadMailboxCredentials()}catch{return Response.json({error:"Mailbox Credentials JSON ungültig."},{status:503})}
  let replies=0,bounces=0,unsubscribes=0;
  const errors:string[]=[];
- for(const c of credentials){
-  try{
-   if(c.provider==="gmail"){
-    const r=await syncGmail(c);replies+=r.replies;unsubscribes+=r.unsubscribes;
-   }else if(c.provider==="microsoft"){
-    const r=await syncMicrosoft(c);replies+=r.replies;unsubscribes+=r.unsubscribes;
-   }else if(c.provider==="smtp"&&(c as ImapMailboxCredential).imapHost){
-    const r=await syncImap(c);replies+=r.replies;bounces+=r.bounces;unsubscribes+=r.unsubscribes;
-   }
-  }catch(e){errors.push(`${c.id}: ${e instanceof Error?e.message:"Sync Fehler"}`)}
- }
+ const results=await Promise.allSettled(credentials.map(async c=>{
+  if(c.provider==="gmail")return {id:c.id,...await syncGmail(c)};
+  if(c.provider==="microsoft")return {id:c.id,...await syncMicrosoft(c)};
+  if(c.provider==="smtp"&&(c as ImapMailboxCredential).imapHost)return {id:c.id,...await syncImap(c)};
+  return {id:c.id,replies:0,bounces:0,unsubscribes:0};
+ }));
+ results.forEach((result,index)=>{
+  if(result.status==="rejected"){
+   errors.push(`${credentials[index]?.id||"mailbox"}: ${result.reason instanceof Error?result.reason.message:"Sync Fehler"}`);
+   return;
+  }
+  replies+=Number(result.value.replies||0);
+  bounces+=Number("bounces" in result.value?result.value.bounces||0:0);
+  unsubscribes+=Number(result.value.unsubscribes||0);
+ });
  return Response.json({ok:true,mailboxes:credentials.length,newReplies:replies,newBounces:bounces,newUnsubscribes:unsubscribes,errors})}
 export async function GET(request:Request){return run(request)}export async function POST(request:Request){return run(request)}
