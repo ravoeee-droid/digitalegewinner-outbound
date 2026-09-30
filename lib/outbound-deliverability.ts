@@ -482,7 +482,8 @@ async function persistHealth(input:{
 }
 
 
-const MAILBOX_RAMP_TARGET=40;
+const MAILBOX_MIN_DAILY_LIMIT=30;
+const MAILBOX_RAMP_TARGET=30;
 
 function berlinDay(){
   return new Intl.DateTimeFormat("en-CA",{timeZone:"Europe/Berlin"}).format(new Date());
@@ -526,7 +527,23 @@ async function autoRampMailboxLimits(input:{
     if(mailbox.enabled===false)continue;
     const health=healthById.get(mailbox.id);
     if(!health||health.healthStatus!=="healthy")continue;
-    const current=clamp(Number(mailbox.dailyLimit||5),1,100);
+    const stored=clamp(Number(mailbox.dailyLimit||5),1,100);
+    if(stored<MAILBOX_MIN_DAILY_LIMIT){
+      mailbox.dailyLimit=MAILBOX_MIN_DAILY_LIMIT;
+      mailbox.rampTarget=MAILBOX_RAMP_TARGET;
+      mailbox.lastRampDay=today;
+      ramps.push({mailboxId:mailbox.id,from:stored,to:MAILBOX_MIN_DAILY_LIMIT,target:MAILBOX_RAMP_TARGET,forcedBaseline:true});
+      await recordOutboundEventByMode({
+        workspace:input.workspace,
+        type:"sender_capacity_restored",
+        actorType:"agent",
+        actorId:"deliverability-control-tower",
+        idempotencyKey:`sender-baseline:${mailbox.id}:${today}:${MAILBOX_MIN_DAILY_LIMIT}`,
+        payload:{mailboxId:mailbox.id,automaticRamp:false,forcedBaseline:true,previousDailyLimit:stored,newDailyLimit:MAILBOX_MIN_DAILY_LIMIT,rampTarget:MAILBOX_RAMP_TARGET,healthStatus:health.healthStatus,policyVersion:DELIVERABILITY_POLICY_VERSION},
+      });
+      continue;
+    }
+    const current=clamp(stored,1,100);
     const target=clamp(Number(mailbox.rampTarget||MAILBOX_RAMP_TARGET),current,MAILBOX_RAMP_TARGET);
     if(current>=target||mailbox.lastRampDay===today)continue;
 
@@ -580,7 +597,7 @@ export async function runDeliverabilityHealthCheck(workspace="default"){
   const settingFor=(credential:StoredMailboxCredential)=>
     settingsById.get(credential.id)||settingsByEmail.get(credential.email.toLowerCase());
   const baseLimitFor=(credential:StoredMailboxCredential)=>
-    clamp(Number(settingFor(credential)?.dailyLimit||5),1,100);
+    clamp(Math.max(MAILBOX_MIN_DAILY_LIMIT,Number(settingFor(credential)?.dailyLimit||MAILBOX_MIN_DAILY_LIMIT)),1,100);
   const activeCredentials=credentials.filter(credential=>settingFor(credential)?.enabled!==false);
 
   const groups=new Map<string,StoredMailboxCredential[]>();

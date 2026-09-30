@@ -8,6 +8,7 @@ export const APPOINTMENT_GOAL_PER_DAY = 4;
 export const LEAD_BUFFER_TARGET = 200;
 const FALLBACK_APPOINTMENT_RATE = 0.025;
 const MAX_RECOMMENDED_SENDS = 240;
+const MIN_DAILY_SENDS_PER_MAILBOX = 30;
 
 type CampaignStep = { waitDays:number; subject:string; body:string };
 type Campaign = {
@@ -82,8 +83,11 @@ export async function getAppointmentGoalSnapshot(workspace="default") {
   const safeCapacity = active.reduce((sum,m) => {
     const h = healthById.get(m.id);
     if (h?.health_status === "paused") return sum;
-    const recommended = Number(h?.recommended_daily_limit ?? m.dailyLimit ?? 0);
-    return sum + Math.max(0, Math.min(Number(m.dailyLimit || 0), recommended || Number(m.dailyLimit || 0)));
+    const configured=Math.max(MIN_DAILY_SENDS_PER_MAILBOX,Number(m.dailyLimit||0));
+    const recommended=h?.health_status==="healthy"
+      ?Math.max(MIN_DAILY_SENDS_PER_MAILBOX,Number(h?.recommended_daily_limit??configured))
+      :Number(h?.recommended_daily_limit??configured);
+    return sum + Math.max(0,Math.min(configured,recommended));
   }, 0);
 
   const sent14 = Number(history?.sent || 0);
@@ -125,7 +129,7 @@ export async function ensureAppointmentGoalQueue(workspace="default") {
     return { ok:false, skipped:true, reason:"no_ready_campaign", snapshot:await getAppointmentGoalSnapshot(workspace) };
   }
 
-  const mailboxes = (state?.mailboxes || []).filter(m => m.enabled && Number(m.dailyLimit || 0) > 0);
+  const mailboxes = (state?.mailboxes || []).filter(m => m.enabled);
   if (!mailboxes.length) {
     return { ok:false, skipped:true, reason:"no_active_mailboxes", snapshot:await getAppointmentGoalSnapshot(workspace) };
   }
@@ -158,10 +162,11 @@ export async function ensureAppointmentGoalQueue(workspace="default") {
   const remainingByMailbox = new Map<string,number>();
   for (const m of mailboxes) {
     const h = healthById.get(m.id);
-    const safe = h?.health_status === "paused" ? 0 : Math.max(
-      0,
-      Math.min(Number(m.dailyLimit || 0), Number(h?.recommended_daily_limit ?? m.dailyLimit ?? 0)),
-    );
+    const configured=Math.max(MIN_DAILY_SENDS_PER_MAILBOX,Number(m.dailyLimit||0));
+    const healthLimit=h?.health_status==="healthy"
+      ?Math.max(MIN_DAILY_SENDS_PER_MAILBOX,Number(h?.recommended_daily_limit??configured))
+      :Number(h?.recommended_daily_limit??configured);
+    const safe=h?.health_status==="paused"?0:Math.max(0,Math.min(configured,healthLimit));
     remainingByMailbox.set(m.id,Math.max(0,safe-(used.get(m.id)||0)));
   }
   let remainingCapacity = [...remainingByMailbox.values()].reduce((a,b)=>a+b,0);

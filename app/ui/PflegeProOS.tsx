@@ -206,11 +206,19 @@ export default function PflegeProOS() {
   const pitchVideoInputRef = useRef<HTMLInputElement | null>(null);
 
   function notify(message: string) { setToast(message); window.setTimeout(() => setToast(""), 3200); }
+  async function loadAnalytics() {
+    try {
+      const response=await fetch("/api/analytics/email",{cache:"no-store"});
+      const json=await response.json() as Pick<Payload,"emailAnalytics"|"leadPool"> & {error?:string};
+      if(!response.ok)throw new Error(json.error||"Analytics konnten nicht geladen werden.");
+      setData(current=>({...current,...json}));
+    } catch {}
+  }
   async function loadCrm() {
     const response = await fetch("/api/crm/launch", { cache: "no-store" });
     const json = await response.json() as Payload & { error?: string };
     if (!response.ok) throw new Error(json.error || "CRM konnte nicht geladen werden.");
-    setData(json);
+    setData(current=>({...current,...json,emailAnalytics:current.emailAnalytics,leadPool:current.leadPool}));
     setCallId((current) => current && json.leads.some((lead) => lead.id === current) ? current : json.leads.filter(isCallReady).sort((a, b) => callPriority(b) - callPriority(a))[0]?.id || null);
   }
   async function loadState() {
@@ -243,9 +251,10 @@ export default function PflegeProOS() {
     } catch (e) { notify(e instanceof Error ? e.message : "Research konnte nicht geladen werden."); setDetail(null); }
     finally { setDetailLoading(false); }
   }
-  async function refresh() { setBusy("refresh"); setError(""); try { await Promise.all([loadCrm(), loadState(), loadMailConfig()]); } catch (e) { setError(e instanceof Error ? e.message : "Systemfehler"); } finally { setBusy(""); } }
+  async function refresh() { setBusy("refresh"); setError(""); try { await Promise.all([loadCrm(), loadAnalytics(), loadState(), loadMailConfig()]); } catch (e) { setError(e instanceof Error ? e.message : "Systemfehler"); } finally { setBusy(""); } }
 
   useEffect(() => { void refresh(); }, []);
+  useEffect(() => { if(view!=="analytics")return; void loadAnalytics(); const timer=window.setInterval(()=>void loadAnalytics(),30000); return()=>window.clearInterval(timer); }, [view]);
   useEffect(() => { if (view === "inbox") void loadInbox().catch((e: unknown) => notify(e instanceof Error ? e.message : "Inbox Fehler")); }, [view]);
   useEffect(() => { if (inspectorId) void loadDetail(inspectorId); else setDetail(null); }, [inspectorId]);
   useEffect(() => {

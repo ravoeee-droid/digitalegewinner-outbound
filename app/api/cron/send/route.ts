@@ -28,6 +28,8 @@ type OutboxRow = {
 };
 type Credential = StoredMailboxCredential;
 type State = { mailboxes?: Array<{id:string;email?:string;enabled:boolean;dailyLimit:number}>; campaigns?: Array<{id:string;status?:string;dailyLimit?:number}> };
+const MIN_DAILY_SENDS_PER_MAILBOX=30;
+const PFLEGE_CAMPAIGN_DAILY_TARGET=120;
 
 function authorized(request: Request) {
   const expected = process.env.CRON_SECRET;
@@ -78,7 +80,7 @@ async function run(request: Request) {
     credentials
       .map((c) => ({ id: c.id, known: mailboxSettingsByEmail.get(c.email?.toLowerCase()) }))
       .filter(({ known }) => known?.enabled ?? true)
-      .map(({ id, known }) => [id, Math.max(1, Math.min(100, Number(known?.dailyLimit || 5)))] as const),
+      .map(({ id, known }) => [id, Math.max(MIN_DAILY_SENDS_PER_MAILBOX, Math.min(100, Number(known?.dailyLimit || MIN_DAILY_SENDS_PER_MAILBOX)))] as const),
   );
   const campaignLimits = new Map((state?.campaigns || []).map((c) => [c.id, Math.max(1, Math.min(500, Number(c.dailyLimit || 150)))]));
   const healthMap = runtimeConfig.deliverabilityMode==="off"
@@ -88,11 +90,11 @@ async function run(request: Request) {
   await query("update er_outbox set status='queued',scheduled_at=now()+interval '5 minutes',error='Stale send claim recovered' where workspace='default' and status='sending' and scheduled_at<now()-interval '15 minutes'");
 
   const sentTodayRows = await query<{mailbox_id:string;count:string}>(
-    `select mailbox_id,count(*)::text as count from er_outbox where workspace='default' and status='sent' and sent_at>=date_trunc('day',now()) group by mailbox_id`
+    `select mailbox_id,count(*)::text as count from er_outbox where workspace='default' and status='sent' and (sent_at at time zone 'Europe/Berlin')::date=(now() at time zone 'Europe/Berlin')::date group by mailbox_id`
   );
   const sentToday = new Map(sentTodayRows.map((r) => [r.mailbox_id, Number(r.count)]));
   const campaignTodayRows = await query<{campaign_id:string;count:string}>(
-    `select campaign_id,count(*)::text as count from er_outbox where workspace='default' and status='sent' and campaign_id is not null and sent_at>=date_trunc('day',now()) group by campaign_id`
+    `select campaign_id,count(*)::text as count from er_outbox where workspace='default' and status='sent' and campaign_id is not null and (sent_at at time zone 'Europe/Berlin')::date=(now() at time zone 'Europe/Berlin')::date group by campaign_id`
   );
   const campaignToday = new Map(campaignTodayRows.map((r) => [r.campaign_id, Number(r.count)]));
 
@@ -147,7 +149,7 @@ async function run(request: Request) {
       });
       failed++; continue;
     }
-    const configuredMailboxLimit = mailboxLimits.get(row.mailbox_id) ?? 30;
+    const configuredMailboxLimit = Math.max(MIN_DAILY_SENDS_PER_MAILBOX, mailboxLimits.get(row.mailbox_id) ?? MIN_DAILY_SENDS_PER_MAILBOX);
     const health = healthMap.get(row.mailbox_id) as {
       health_status?:string;
       recommended_daily_limit?:number|null;
@@ -171,10 +173,10 @@ async function run(request: Request) {
         deliverabilityLimited++;
         continue;
       }
-      mailboxLimit=Math.min(
-        configuredMailboxLimit,
-        Math.max(1,Number(health.enforced_daily_limit??configuredMailboxLimit)),
-      );
+      const healthLimit=health.health_status==="healthy"
+        ?Math.max(MIN_DAILY_SENDS_PER_MAILBOX,Number(health.enforced_daily_limit??configuredMailboxLimit))
+        :Math.max(1,Number(health.enforced_daily_limit??configuredMailboxLimit));
+      mailboxLimit=Math.min(configuredMailboxLimit,healthLimit);
     }else if(runtimeConfig.deliverabilityMode==="shadow"&&health){
       const recommended=Number(health.recommended_daily_limit??configuredMailboxLimit);
       if(recommended<configuredMailboxLimit)deliverabilityWouldLimit++;
@@ -188,7 +190,7 @@ async function run(request: Request) {
       limited++;
       continue;
     }
-    const campaignLimit = row.campaign_id && !row.campaign_id.startsWith("noshow:") ? (campaignLimits.get(row.campaign_id) ?? 150) : undefined;
+    const campaignLimit = row.campaign_id && !row.campaign_id.startsWith("noshow:") ? (row.campaign_id==="pflege-starter-v2" ? Math.max(PFLEGE_CAMPAIGN_DAILY_TARGET,campaignLimits.get(row.campaign_id) ?? PFLEGE_CAMPAIGN_DAILY_TARGET) : (campaignLimits.get(row.campaign_id) ?? 150)) : undefined;
     const campaignCurrent = row.campaign_id ? campaignToday.get(row.campaign_id) ?? 0 : 0;
     if (mailboxCurrent >= mailboxLimit || (campaignLimit !== undefined && campaignCurrent >= campaignLimit)) {
       await query("update er_outbox set status='queued',attempts=greatest(attempts-1,0),scheduled_at=now()+interval '60 minutes',error=null where id=$1 and status='sending'", [row.id]);
