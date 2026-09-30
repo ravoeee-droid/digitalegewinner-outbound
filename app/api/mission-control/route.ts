@@ -3,6 +3,7 @@ import { getCallSummary } from "@/lib/telephony";
 import { query } from "@/lib/db";
 import { listWebsiteProjects } from "@/lib/website-projects";
 import { ensureRevenueOpportunitySchema } from "@/lib/revenue-opportunities";
+import { getAppointmentGoalSnapshot } from "@/lib/outbound-appointment-goal";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -16,7 +17,7 @@ export async function GET(request: Request) {
     const workspace = workspaceOf(request);
     await ensureRevenueOpportunitySchema();
 
-    const [engine, callSummary, projects, pipelineRows, dueRows, dueCountRows] = await Promise.all([
+    const [engine, callSummary, projects, pipelineRows, dueRows, dueCountRows, appointmentGoal] = await Promise.all([
       buildDailyOutboundPlan(workspace),
       getCallSummary(workspace),
       listWebsiteProjects(workspace),
@@ -44,6 +45,7 @@ export async function GET(request: Request) {
         from sales_opportunities
         where workspace=$1 and status='open' and next_action_at is not null and next_action_at<=now()
       `, [workspace]),
+      getAppointmentGoalSnapshot(workspace),
     ]);
 
     const activeProjects = projects.filter((item) => item.status === "active" && item.progress < 100);
@@ -128,6 +130,12 @@ export async function GET(request: Request) {
         dueFollowups: Number(dueCountRows[0]?.count || 0),
         weightedPipeline: Number(pipelineRows[0]?.weighted || 0),
         openOpportunities: Number(pipelineRows[0]?.open_count || 0),
+        appointmentsToday: appointmentGoal.appointmentsToday,
+        appointmentGoal: appointmentGoal.goal,
+        appointmentGap: appointmentGoal.remainingAppointments,
+        recommendedDailyEmailSends: appointmentGoal.recommendedDailySends,
+        safeDailyEmailCapacity: appointmentGoal.safeDailyCapacity,
+        emailCapacityGap: appointmentGoal.capacityGap,
       },
     });
   } catch (error) {
