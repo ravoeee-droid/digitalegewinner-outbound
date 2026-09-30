@@ -245,6 +245,7 @@ async function run(request: Request) {
       });
       const result = await sendMail({ ...credential, to:row.recipient, subject:row.subject, text:row.body });
       await query("update er_outbox set status='sent',sent_at=now(),provider_message_id=$2,error=null where id=$1 and status='sending'", [row.id,result.id]);
+      await query("update pflege_email_outreach set status='sent',updated_at=now() where lower(email)=lower($1) and status='approved'", [row.recipient]);
       await query("insert into er_events(workspace,lead_id,type,meta) values('default',$1,'email_sent',$2::jsonb)", [row.lead_id,JSON.stringify({ outboxId:row.id, mailboxId:row.mailbox_id, campaignId:row.campaign_id, variant:row.variant })]);
       await recordOutboundEventByMode({
         workspace:"default",

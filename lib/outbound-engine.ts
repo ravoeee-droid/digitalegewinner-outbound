@@ -3,7 +3,7 @@ import { ensureSalesOsSchema } from "./sales-os";
 
 export const OUTBOUND_TARGETS = {
   call: 120,
-  email: 100,
+  email: 200,
   video: 30,
   linkedin: 30,
 } as const;
