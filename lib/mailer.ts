@@ -52,14 +52,15 @@ export async function getMailboxAccessToken(input: MailboxConfig) {
 
 async function sendGmail(input: SendInput) {
   const accessToken = await googleToken(input);
+  const content=input.html||input.text;
   const raw = [
     `From: ${mimeHeader(input.name || input.email)} <${input.email}>`,
     `To: ${mimeHeader(input.to)}`,
     `Subject: ${mimeHeader(input.subject)}`,
     "MIME-Version: 1.0",
-    "Content-Type: text/plain; charset=UTF-8",
+    `Content-Type: ${input.html ? "text/html" : "text/plain"}; charset=UTF-8`,
     "",
-    input.text,
+    content,
   ].join("\r\n");
   const encoded = Buffer.from(raw).toString("base64url");
   const response = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages/send", {

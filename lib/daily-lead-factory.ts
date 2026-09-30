@@ -534,6 +534,22 @@ async function qualify(row: CandidateRow) {
       [contactId, row.company_id, contact.email || "", phone, contact.linkedin || "", contact.instagram || "", JSON.stringify({ careersPage: contact.careersPage || "", jobsPage: contact.jobsPage || "", atsProviders: contact.atsProviders || [] })],
     );
     await query(`update sales_leads set contact_id=$2 where id=$1 and workspace='default'`, [row.lead_id, contactId]);
+
+    const secondaryEmails=[...new Set((contact.emails||[]).map(value=>value.trim().toLowerCase()).filter(Boolean))]
+      .filter(value=>value!==(contact.email||"").trim().toLowerCase())
+      .slice(0,4);
+    for(const email of secondaryEmails){
+      const [duplicate]=await query<{id:string}>(
+        "select id from sales_contacts where workspace='default' and company_id=$1 and lower(email)=lower($2) limit 1",
+        [row.company_id,email],
+      );
+      if(duplicate)continue;
+      await query(
+        `insert into sales_contacts(id,workspace,company_id,name,email,phone,is_primary,source,metadata)
+         values($1,'default',$2,'',$3,'',false,'public-website-secondary',$4::jsonb)`,
+        [crypto.randomUUID(),row.company_id,email,JSON.stringify({source:"contact-enrichment",discoveredAt:new Date().toISOString()})],
+      );
+    }
   }
 
   const nextStage = tier === "A+" || tier === "A" ? "Bereit" : row.stage;

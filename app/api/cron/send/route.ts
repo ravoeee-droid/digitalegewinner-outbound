@@ -7,6 +7,7 @@ import { evaluateEmailSendCompliance } from "@/lib/outbound-compliance-runtime";
 import { getMailboxHealthMap } from "@/lib/outbound-deliverability";
 import { recordOutboundConversationMessage } from "@/lib/outbound-conversation-intelligence";
 import { recordExperimentExposureForSend } from "@/lib/outbound-experiment-engine";
+import { trackedEmailHtml } from "@/lib/email-tracking";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -273,7 +274,7 @@ async function run(request: Request) {
           attempt:row.attempts,
         },
       });
-      const result = await sendMail({ ...credential, to:row.recipient, subject:row.subject, text:row.body });
+      const origin=new URL(request.url).origin;\n      const html=trackedEmailHtml(row.body,origin,row.id,row.lead_id);\n      const result = await sendMail({ ...credential, to:row.recipient, subject:row.subject, text:row.body, html });
       await query("update er_outbox set status='sent',sent_at=now(),provider_message_id=$2,error=null where id=$1 and status='sending'", [row.id,result.id]);
       await query("update pflege_email_outreach set status='sent',updated_at=now() where lower(email)=lower($1) and status='approved'", [row.recipient]);
       await query("insert into er_events(workspace,lead_id,type,meta) values('default',$1,'email_sent',$2::jsonb)", [row.lead_id,JSON.stringify({ outboxId:row.id, mailboxId:row.mailbox_id, campaignId:row.campaign_id, variant:row.variant })]);
