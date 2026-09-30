@@ -165,6 +165,7 @@ export async function ensureAppointmentGoalQueue(workspace="default") {
     remainingByMailbox.set(m.id,Math.max(0,safe-(used.get(m.id)||0)));
   }
   let remainingCapacity = [...remainingByMailbox.values()].reduce((a,b)=>a+b,0);
+  const enrollmentCapacity=remainingCapacity;
   if (remainingCapacity <= 0) {
     return { ok:true, queuedLeads:0, queuedMessages:0, reason:"safe_capacity_used", snapshot:await getAppointmentGoalSnapshot(workspace) };
   }
@@ -234,8 +235,10 @@ export async function ensureAppointmentGoalQueue(workspace="default") {
     }
     if (!mailbox) break;
 
+    const spreadMinutes=enrollmentCapacity<=1?0:Math.floor((queuedLeads*360)/Math.max(1,enrollmentCapacity-1));
+    const firstTouchAt=Date.now()+spreadMinutes*60_000;
     for (const step of campaign.steps) {
-      const scheduled = new Date(Date.now()+Math.max(0,step.waitDays)*86400000);
+      const scheduled = new Date(firstTouchAt+Math.max(0,step.waitDays)*86400000);
       await query(`
         insert into er_outbox(
           id,workspace,campaign_id,lead_id,mailbox_id,recipient,subject,body,variant,scheduled_at,campaign_version_id
@@ -255,7 +258,7 @@ export async function ensureAppointmentGoalQueue(workspace="default") {
       leadId:lead.lead_id,
       campaignVersionId:version.id,
       idempotencyKey:`appointment-goal-enroll:${campaign.id}:${lead.lead_id}`,
-      payload:{legacyCampaignId:campaign.id,mailboxId:mailbox.id,source:"pflege_email_outreach"},
+      payload:{legacyCampaignId:campaign.id,mailboxId:mailbox.id,source:"pflege_email_outreach",spreadMinutes},
     });
 
     remainingByMailbox.set(mailbox.id,(remainingByMailbox.get(mailbox.id)||0)-1);
