@@ -33,8 +33,30 @@ function authorized(request: Request) {
   return Boolean(expected && (request.headers.get("authorization") || "") === `Bearer ${expected}`);
 }
 
+function berlinClock(){
+  const parts=new Intl.DateTimeFormat("en-GB",{
+    timeZone:"Europe/Berlin",
+    weekday:"short",
+    hour:"2-digit",
+    minute:"2-digit",
+    hour12:false,
+  }).formatToParts(new Date());
+  const value=(type:string)=>parts.find(part=>part.type===type)?.value||"";
+  return {weekday:value("weekday"),hour:Number(value("hour")),minute:Number(value("minute"))};
+}
+
+function insideBusinessSendWindow(){
+  const now=berlinClock();
+  if(["Sat","Sun"].includes(now.weekday))return false;
+  const minutes=now.hour*60+now.minute;
+  return minutes>=8*60+30&&minutes<=17*60+30;
+}
+
 async function run(request: Request) {
   if (!authorized(request)) return Response.json({ error:"Unauthorized" }, { status:401 });
+  if(!insideBusinessSendWindow()){
+    return Response.json({ok:true,skipped:true,reason:"outside_berlin_business_window",window:"08:30-17:30 Europe/Berlin"});
+  }
   const runtimeConfig=await resolveOutboundRuntimeConfig();
   if (runtimeConfig.v3Mode === "active") {
     return Response.json(
@@ -103,6 +125,7 @@ async function run(request: Request) {
   );
 
   let sent=0, failed=0, limited=0, skipped=0, deliverabilityLimited=0, deliverabilityWouldLimit=0;
+  const sentThisCycle=new Map<string,number>();
   for (const row of due) {
     const credential = credMap.get(row.mailbox_id);
     if (!credential) {
@@ -157,6 +180,13 @@ async function run(request: Request) {
     }
 
     const mailboxCurrent = sentToday.get(row.mailbox_id) ?? 0;
+    const cycleCurrent=sentThisCycle.get(row.mailbox_id)??0;
+    const cycleLimit=2;
+    if(cycleCurrent>=cycleLimit){
+      await query("update er_outbox set status='queued',attempts=greatest(attempts-1,0),scheduled_at=now()+interval '10 minutes',error=null where id=$1 and status='sending'", [row.id]);
+      limited++;
+      continue;
+    }
     const campaignLimit = row.campaign_id && !row.campaign_id.startsWith("noshow:") ? (campaignLimits.get(row.campaign_id) ?? 150) : undefined;
     const campaignCurrent = row.campaign_id ? campaignToday.get(row.campaign_id) ?? 0 : 0;
     if (mailboxCurrent >= mailboxLimit || (campaignLimit !== undefined && campaignCurrent >= campaignLimit)) {
@@ -298,6 +328,7 @@ async function run(request: Request) {
         console.error("[conversation-outbound-mirror] failed",conversationError instanceof Error?conversationError.message:"unknown error");
       }
       sentToday.set(row.mailbox_id,mailboxCurrent+1);
+      sentThisCycle.set(row.mailbox_id,cycleCurrent+1);
       if(row.campaign_id)campaignToday.set(row.campaign_id,campaignCurrent+1);
       sent++;
     } catch (error) {
