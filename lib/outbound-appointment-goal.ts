@@ -182,17 +182,20 @@ export async function ensureAppointmentGoalQueue(workspace="default") {
   }>(`
     select q.id::text queue_id,l.id lead_id,ct.email,c.name company,coalesce(ct.name,'') contact,coalesce(c.city,'') city
     from pflege_email_outreach q
-    join sales_contacts ct on lower(ct.email)=lower(q.email)
+    join sales_contacts ct on lower(ct.email)=lower(q.email) and ct.workspace=$1
     join sales_leads l on l.contact_id=ct.id and l.workspace=$1
     join sales_companies c on c.id=l.company_id and c.workspace=l.workspace
-    where q.lead_date=(now() at time zone 'Europe/Berlin')::date
-      and q.status in ('draft','approved')
+    where q.status in ('draft','approved')
+      and q.lead_date >= (now() at time zone 'Europe/Berlin')::date - 30
       and l.status='active'
       and l.stage in ('Neu','Research','Bereit')
       and coalesce(l.do_not_contact,false)=false
       and not exists(select 1 from er_suppressions s where s.workspace=$1 and lower(s.email)=lower(q.email))
       and not exists(select 1 from er_outbox o where o.workspace=$1 and o.campaign_id=$2 and o.lead_id=l.id and o.status not in ('failed','suppressed'))
-    order by q.rank asc
+    order by
+      case when q.lead_date=(now() at time zone 'Europe/Berlin')::date then 0 else 1 end,
+      q.lead_date desc,
+      q.rank asc
     limit 250
   `, [workspace,campaign.id]);
 
@@ -247,7 +250,7 @@ export async function ensureAppointmentGoalQueue(workspace="default") {
     await query("update pflege_email_outreach set status='approved',updated_at=now() where id=$1::uuid",[lead.queue_id]);
     await recordOutboundEventByMode({
       workspace,
-      type:"lead_enrolled",
+      type:"send_planned",
       actorType:"workflow",
       leadId:lead.lead_id,
       campaignVersionId:version.id,
