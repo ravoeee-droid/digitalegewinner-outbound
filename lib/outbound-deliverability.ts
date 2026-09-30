@@ -1,6 +1,6 @@
 import { promises as dns } from "node:dns";
 import nodemailer from "nodemailer";
-import { query, readState } from "@/lib/db";
+import { query, readState, writeState } from "@/lib/db";
 import { loadMailboxCredentials, type StoredMailboxCredential } from "@/lib/mailbox-credentials";
 import { testImapConnection, type ImapMailboxCredential } from "@/lib/imap-client";
 import { getMailboxAccessToken } from "@/lib/mailer";
@@ -10,8 +10,15 @@ import { resolveOutboundRuntimeConfig } from "@/lib/outbound-runtime-config";
 export const DELIVERABILITY_POLICY_VERSION="dg-deliverability-2026-09-27-v1";
 
 type HealthStatus="healthy"|"watch"|"degraded"|"paused";
-type StateMailbox={id:string;email?:string;enabled?:boolean;dailyLimit:number};
-type StatePayload={mailboxes?:StateMailbox[]};
+type StateMailbox={
+  id:string;
+  email?:string;
+  enabled?:boolean;
+  dailyLimit:number;
+  rampTarget?:number;
+  lastRampDay?:string;
+};
+type StatePayload={mailboxes?:StateMailbox[];[key:string]:unknown};
 
 type SenderHealthStateRow={
   target_type:"mailbox"|"domain";
@@ -179,7 +186,8 @@ async function loadMailboxMetrics(mailboxId:string,workspace="default"):Promise<
      where workspace=$1
        and type='bounce'
        and created_at>=now()-interval '7 days'
-       and meta->>'mailboxId'=$2`,
+       and meta->>'mailboxId'=$2
+       and coalesce(meta->>'outboxId','')<>''`,
     [workspace,mailboxId],
   );
   const sent24h=Number(outbox?.sent24h||0);
@@ -229,7 +237,8 @@ async function loadDomainMetrics(mailboxIds:string[],workspace="default"):Promis
      where workspace=$1
        and type='bounce'
        and created_at>=now()-interval '7 days'
-       and meta->>'mailboxId'=any($2::text[])`,
+       and meta->>'mailboxId'=any($2::text[])
+       and coalesce(meta->>'outboxId','')<>''`,
     [workspace,mailboxIds],
   );
   const sent24h=Number(outbox?.sent24h||0);
@@ -472,6 +481,91 @@ async function persistHealth(input:{
   };
 }
 
+
+const MAILBOX_RAMP_TARGET=40;
+
+function berlinDay(){
+  return new Intl.DateTimeFormat("en-CA",{timeZone:"Europe/Berlin"}).format(new Date());
+}
+
+function nextRampLimit(current:number,target:number){
+  if(current>=target)return current;
+  const step=current<10?5:current<25?5:5;
+  return Math.min(target,current+step);
+}
+
+async function previousBerlinDaySent(mailboxId:string,workspace:string){
+  const [row]=await query<{count:string}>(
+    `select count(*)::text as count
+     from er_outbox
+     where workspace=$1 and mailbox_id=$2 and status='sent'
+       and (sent_at at time zone 'Europe/Berlin')::date=((now() at time zone 'Europe/Berlin')::date-1)`,
+    [workspace,mailboxId],
+  );
+  return Number(row?.count||0);
+}
+
+async function autoRampMailboxLimits(input:{
+  workspace:string;
+  state:StatePayload|undefined;
+  mailboxResults:Array<{
+    targetId:string;
+    healthStatus:HealthStatus;
+    baseDailyLimit:number;
+    recommendedDailyLimit:number;
+    reasons:string[];
+  }>;
+}){
+  if(!input.state?.mailboxes?.length)return {changed:false,ramps:[] as Array<Record<string,unknown>>};
+  const today=berlinDay();
+  const healthById=new Map(input.mailboxResults.map(item=>[item.targetId,item]));
+  const updated=input.state.mailboxes.map(item=>({...item}));
+  const ramps:Array<Record<string,unknown>>=[];
+
+  for(const mailbox of updated){
+    if(mailbox.enabled===false)continue;
+    const health=healthById.get(mailbox.id);
+    if(!health||health.healthStatus!=="healthy")continue;
+    const current=clamp(Number(mailbox.dailyLimit||5),1,100);
+    const target=clamp(Number(mailbox.rampTarget||MAILBOX_RAMP_TARGET),current,MAILBOX_RAMP_TARGET);
+    if(current>=target||mailbox.lastRampDay===today)continue;
+
+    const sentYesterday=await previousBerlinDaySent(mailbox.id,input.workspace);
+    const utilization=current>0?sentYesterday/current:0;
+    if(sentYesterday<Math.max(3,Math.ceil(current*0.8)))continue;
+
+    const next=nextRampLimit(current,target);
+    if(next<=current)continue;
+    mailbox.dailyLimit=next;
+    mailbox.rampTarget=target;
+    mailbox.lastRampDay=today;
+    ramps.push({mailboxId:mailbox.id,from:current,to:next,target,sentYesterday,utilization});
+
+    await recordOutboundEventByMode({
+      workspace:input.workspace,
+      type:"sender_capacity_restored",
+      actorType:"agent",
+      actorId:"deliverability-control-tower",
+      idempotencyKey:`sender-ramp:${mailbox.id}:${today}:${next}`,
+      payload:{
+        mailboxId:mailbox.id,
+        automaticRamp:true,
+        previousDailyLimit:current,
+        newDailyLimit:next,
+        rampTarget:target,
+        sentYesterday,
+        utilization,
+        healthStatus:health.healthStatus,
+        policyVersion:DELIVERABILITY_POLICY_VERSION,
+      },
+    });
+  }
+
+  if(!ramps.length)return {changed:false,ramps};
+  await writeState({...input.state,mailboxes:updated},input.workspace);
+  return {changed:true,ramps};
+}
+
 export async function runDeliverabilityHealthCheck(workspace="default"){
   const runtime=await resolveOutboundRuntimeConfig(workspace);
   if(runtime.deliverabilityMode==="off"){
@@ -551,12 +645,25 @@ export async function runDeliverabilityHealthCheck(workspace="default"){
     }));
   }
 
+  const ramp=await autoRampMailboxLimits({
+    workspace,
+    state,
+    mailboxResults:mailboxResults.map(item=>({
+      targetId:item.targetId,
+      healthStatus:item.healthStatus,
+      baseDailyLimit:item.baseDailyLimit,
+      recommendedDailyLimit:item.recommendedDailyLimit,
+      reasons:item.reasons,
+    })),
+  });
+
   return {
     enabled:true,
     mode:runtime.deliverabilityMode,
     policyVersion:DELIVERABILITY_POLICY_VERSION,
     domains:domainResults,
     mailboxes:mailboxResults,
+    ramp,
   };
 }
 
