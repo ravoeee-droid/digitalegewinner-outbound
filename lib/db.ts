@@ -4,10 +4,26 @@ let pool: Pool | null = null;
 let initialized = process.env.NODE_ENV === "production";
 let initPromise: Promise<void> | null = null;
 
+function productionConnectionString(raw: string) {
+  if (process.env.NODE_ENV !== "production") return raw;
+  try {
+    const url = new URL(raw);
+    const match = url.hostname.match(/^db\.([a-z0-9]+)\.supabase\.co$/i);
+    if (!match) return raw;
+    const projectRef = match[1];
+    url.hostname = process.env.SUPABASE_POOLER_HOST || "aws-0-eu-central-1.pooler.supabase.com";
+    url.port = "6543";
+    url.username = `postgres.${projectRef}`;
+    return url.toString();
+  } catch {
+    return raw;
+  }
+}
+
 function getPool() {
   if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL fehlt.");
   if (!pool) pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
+    connectionString: productionConnectionString(process.env.DATABASE_URL),
     ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : undefined,
     max: 1,
     idleTimeoutMillis: 10_000,
