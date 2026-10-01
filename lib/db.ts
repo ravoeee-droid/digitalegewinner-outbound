@@ -1,18 +1,28 @@
 import { Pool } from "pg";
 
 let pool: Pool | null = null;
-let initialized = false;
+let initialized = process.env.NODE_ENV === "production";
+let initPromise: Promise<void> | null = null;
 
 function getPool() {
   if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL fehlt.");
-  if (!pool) pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : undefined, max: 5 });
+  if (!pool) pool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : undefined,
+    max: 1,
+    idleTimeoutMillis: 10_000,
+    connectionTimeoutMillis: 5_000,
+    allowExitOnIdle: true,
+  });
   return pool;
 }
 
 export async function ensureSchema() {
   if (initialized) return;
+  if (initPromise) return initPromise;
   const db = getPool();
-  await db.query(`
+  initPromise = (async () => {
+    await db.query(`
     create table if not exists er_state (
       workspace text primary key,
       payload jsonb not null default '{}'::jsonb,
@@ -62,8 +72,12 @@ export async function ensureSchema() {
       updated_at timestamptz not null default now(),
       primary key(workspace,key)
     );
-  `);
-  initialized = true;
+    `);
+    initialized = true;
+  })().finally(() => {
+    if (!initialized) initPromise = null;
+  });
+  return initPromise;
 }
 
 export async function readState(workspace = "default") {
