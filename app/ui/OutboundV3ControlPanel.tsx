@@ -176,10 +176,10 @@ export default function OutboundV3ControlPanel(){
             <strong style={metricStyle}>{snapshot?.capabilities.nativeV3Execution?"READY":"LOCKED"}</strong>
             <span style={subStyle}>Cutover erst nach Shadow-Parität</span>
           </Card>
-          <Card title="Permission Gate">
+          <Card title="Compliance Shadow">
             <strong style={metricStyle}>{snapshot?snapshot.complianceShadow.evaluated:"—"}</strong>
             <span style={subStyle}>
-              {snapshot?(snapshot.complianceShadow.allowed+" allow · "+snapshot.complianceShadow.denied+" deny"):"24h Shadow-Auswertung"}
+              {snapshot?(snapshot.complianceShadow.allowed+" verifiziert · "+snapshot.complianceShadow.denied+" ohne Nachweis"):"24h Shadow-Auswertung"}
             </span>
           </Card>
           <Card title="Durable Workflows">
@@ -266,7 +266,7 @@ export default function OutboundV3ControlPanel(){
             </p>
             {snapshot&&snapshot.complianceShadow.denied>0&&
               <div style={{marginTop:10,paddingTop:10,borderTop:"1px solid rgba(255,255,255,.06)",fontSize:9,color:"#89958e",lineHeight:1.6}}>
-                Deny-Gründe: {Object.entries(snapshot.complianceShadow.reasons).map(([reason,count])=>reason+" "+count).join(" · ")}
+                Compliance-Shadow בלבד — blockiert den aktuellen Versand nicht. Hinweise: {Object.entries(snapshot.complianceShadow.reasons).map(([reason,count])=>reason+" "+count).join(" · ")}
               </div>}
             {snapshot&&
               <div style={{marginTop:10,paddingTop:10,borderTop:"1px solid rgba(255,255,255,.06)",fontSize:9,color:"#89958e",lineHeight:1.6}}>
