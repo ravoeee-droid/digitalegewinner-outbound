@@ -115,11 +115,11 @@ const PIPELINE: Stage[] = ["Neu", "Kontaktiert", "Engaged", "Qualifiziert", "Ter
 const OUTCOMES = ["Nicht erreicht", "Erreicht", "Interesse", "Termin", "Rückruf", "Angebot senden", "Kein Interesse", "Falsche Nummer"] as const;
 const EMPTY: Payload = { stats: { companies: 0, leads: 0, hot: 0, appointments: 0, won: 0, pipeline: 0, weighted_pipeline: 0, due_actions: 0 }, calls: { today: 0, connected: 0, meetings: 0, interested: 0, talk_seconds: 0, history: [] }, leads: [], activities: [], system: { campaigns: 0, mailboxes: 0, activeMailboxes: 0 } };
 const STARTER: Campaign = {
-  id: "pflege-launch-2026",
+  id: "pflege-starter-v2",
   name: "Pflege Recruiting · Entscheider Outreach",
   audience: "Pflegedienste mit akutem Personalbedarf",
-  status: "Entwurf",
-  dailyLimit: 30,
+  status: "Aktiv",
+  dailyLimit: 120,
   sent: 0,
   replies: 0,
   positive: 0,
@@ -560,7 +560,7 @@ export default function PflegeProOS() {
         {view === "proposals" && <><div className={styles.pageHead}><div><span>PROPOSALS</span><h2>Angebote & Verhandlung.</h2><p>Offene Deals nach Wert, Probability und Next Action.</p></div></div><section className={styles.panel}><LeadTable rows={data.leads.filter((lead) => ["Angebot", "Verhandlung"].includes(lead.stage))} selectable={false} /></section></>}
 
         {view === "campaigns" && <><div className={styles.pageHead}><div><span>CAMPAIGNS</span><h2>Outbound-Sequenzen.</h2><p>Mailboxen, Versandlimit, Replies und Meetings ohne übergroße Cards.</p></div><div className={styles.pageHeadActions}><span className={styles.softBadge}>{activeMailboxes.length} active mailboxes</span><button className={styles.primaryButton} type="button" onClick={() => setCampaignGenOpen(true)}>+ Neue Kampagne</button></div></div><section className={styles.panel}><div className={styles.tableWrap}><table className={styles.campaignTable}><thead><tr><th>Campaign</th><th>Audience</th><th>Status</th><th>Sequence</th><th>Sent</th><th>Replies</th><th>Positive</th><th>Meetings</th><th></th></tr></thead><tbody>{store.campaigns.map((campaign) => { const live = data.campaignStats?.[campaign.id]; const variants = data.campaignVariantStats?.[campaign.id] || []; return [
-          <tr key={campaign.id}><td><strong>{campaign.name}</strong></td><td>{campaign.audience}</td><td><span className={styles.softBadge}>{campaign.status}</span></td><td>{campaign.steps.length} steps · {campaign.dailyLimit}/d</td><td>{live?.sent ?? campaign.sent ?? 0}</td><td>{live?.replies ?? campaign.replies ?? 0}</td><td>{live?.positive ?? campaign.positive ?? 0}</td><td>{live?.appointments ?? campaign.appointments ?? 0}</td><td><button className={styles.primaryTiny} type="button" onClick={() => void launchCampaign(campaign)} disabled={busy === campaign.id} title={campaign.status === "Aktiv" ? "Bereits enrollte Leads werden übersprungen - nur neue Leads werden ergänzt." : undefined}>{busy === campaign.id ? "Startet…" : campaign.status === "Aktiv" ? "Neue Leads ergänzen" : "Launch"}</button></td></tr>,
+          <tr key={campaign.id}><td><strong>{campaign.name}</strong></td><td>{campaign.audience}</td><td><span className={styles.softBadge}>{campaign.status}</span></td><td>{campaign.steps.length} steps · {campaign.dailyLimit}/d</td><td>{live?.sent ?? (campaign.id === "pflege-starter-v2" ? data.emailAnalytics?.sent_today : undefined) ?? campaign.sent ?? 0}</td><td>{live?.replies ?? (campaign.id === "pflege-starter-v2" ? data.emailAnalytics?.replied_today : undefined) ?? campaign.replies ?? 0}</td><td>{live?.positive ?? campaign.positive ?? 0}</td><td>{live?.appointments ?? (campaign.id === "pflege-starter-v2" ? data.emailAnalytics?.meetings_today : undefined) ?? campaign.appointments ?? 0}</td><td><button className={styles.primaryTiny} type="button" onClick={() => void launchCampaign(campaign)} disabled={busy === campaign.id} title={campaign.status === "Aktiv" ? "Bereits enrollte Leads werden übersprungen - nur neue Leads werden ergänzt." : undefined}>{busy === campaign.id ? "Startet…" : campaign.status === "Aktiv" ? "Neue Leads ergänzen" : "Launch"}</button></td></tr>,
           variants.length > 1 && <tr key={`${campaign.id}-variants`}><td colSpan={9} style={{ padding: "6px 10px", fontSize: 11, color: "#6b7280", background: "rgba(0,0,0,.02)" }}>A/B Betreffzeile: {variants.map((v) => `${v.variant} ${v.sent} gesendet · ${v.replies} Antworten${v.sent ? ` (${Math.round(v.replies / v.sent * 100)}%)` : ""}`).join("  ·  ")}</td></tr>,
         ]; })}</tbody></table></div></section></>}
 
