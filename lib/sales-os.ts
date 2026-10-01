@@ -2,7 +2,8 @@ import { query } from "./db";
 import type { ContactEnrichment } from "./contact-enrichment";
 import type { WebsiteAuditResult } from "./website-audit";
 
-let salesSchemaReady = false;
+let salesSchemaReady = process.env.NODE_ENV === "production";
+let salesSchemaPromise: Promise<void> | null = null;
 
 export type RadarCandidate = {
   id: string;
@@ -92,7 +93,9 @@ export function scoreResearch(candidate: RadarCandidate, contact: Partial<Contac
 
 export async function ensureSalesOsSchema() {
   if (salesSchemaReady) return;
-  await query(`
+  if (salesSchemaPromise) return salesSchemaPromise;
+  salesSchemaPromise = (async () => {
+    await query(`
     create table if not exists sales_workspaces (
       id text primary key,
       name text not null,
@@ -200,13 +203,17 @@ export async function ensureSalesOsSchema() {
       created_at timestamptz not null default now()
     );
     create index if not exists sales_research_company_idx on sales_research_runs(workspace, company_id, created_at desc);
-  `);
-  await query(
-    `insert into sales_workspaces(id,name,vertical) values($1,$2,$3)
-     on conflict(id) do update set name=excluded.name, updated_at=now()`,
-    ["default", "Digitale Gewinner", "general"],
-  );
-  salesSchemaReady = true;
+    `);
+    await query(
+      `insert into sales_workspaces(id,name,vertical) values($1,$2,$3)
+       on conflict(id) do update set name=excluded.name, updated_at=now()`,
+      ["default", "Digitale Gewinner", "general"],
+    );
+    salesSchemaReady = true;
+  })().finally(() => {
+    if (!salesSchemaReady) salesSchemaPromise = null;
+  });
+  return salesSchemaPromise;
 }
 
 export async function persistRadarLead(candidate: RadarCandidate, contact: Partial<ContactEnrichment>, audit?: WebsiteAuditResult, workspace = "default") {
