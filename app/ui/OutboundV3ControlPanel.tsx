@@ -266,7 +266,7 @@ export default function OutboundV3ControlPanel(){
             </p>
             {snapshot&&snapshot.complianceShadow.denied>0&&
               <div style={{marginTop:10,paddingTop:10,borderTop:"1px solid rgba(255,255,255,.06)",fontSize:9,color:"#89958e",lineHeight:1.6}}>
-                Compliance-Shadow בלבד — blockiert den aktuellen Versand nicht. Hinweise: {Object.entries(snapshot.complianceShadow.reasons).map(([reason,count])=>reason+" "+count).join(" · ")}
+                Compliance-Shadow — blockiert den aktuellen Versand nicht. Hinweise: {Object.entries(snapshot.complianceShadow.reasons).map(([reason,count])=>reason+" "+count).join(" · ")}
               </div>}
             {snapshot&&
               <div style={{marginTop:10,paddingTop:10,borderTop:"1px solid rgba(255,255,255,.06)",fontSize:9,color:"#89958e",lineHeight:1.6}}>
