@@ -79,7 +79,7 @@ type LegacyState = {
   [key: string]: unknown;
 };
 
-const pflegeFilter = `(lower(coalesce(c.industry,'')) like '%pflege%' or lower(c.name) like '%pflege%' or c.source like 'pflege%' or coalesce(c.metadata->>'campaign','') like 'pflege%')`;
+const pflegeFilter = `true`; // Shared CRM: show all active sales leads; filter in UI when needed.
 
 function parseDate(value?: string | null) {
   if (!value) return null;
