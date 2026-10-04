@@ -50,7 +50,7 @@ export default function CallConsole() {
   const website = value(p, "website");
   const contact = value(p, "contactName");
   const campaign = value(p, "campaign");
-  const isPflegeRecruiting = /pflege website recruiting/i.test(campaign);
+  const isPflegeRecruiting = true; // Sales focus: Pflege only
   const hook = value(p, "message") || value(p, "reasons") || (isPflegeRecruiting
     ? "Kurz den aktuellen Recruiting-Bedarf und den Bewerberweg über die Website prüfen."
     : "Im Gespräch kurz prüfen, was mit verpassten oder parallelen Anrufen passiert.");
@@ -114,8 +114,8 @@ export default function CallConsole() {
       <style>{css}</style>
       <a className="skip-link" href="#call-script">Direkt zum Gesprächsskript</a>
       <header className="rapid-head">
-        <div><span>{isPflegeRecruiting ? "PFLEGE · WEBSITE CALL" : "SHK · RAPID CALL"}</span><strong aria-live="polite">{pending.length} offen</strong></div>
-        <div className="rapid-keys" aria-label="Tastaturkürzel">ENTER = CALL · 1–7 = ERGEBNIS → NÄCHSTER</div>
+        <div><span>PFLEGE · CALL COCKPIT</span><strong aria-live="polite">{pending.length} offen</strong></div>
+        <div className="rapid-keys" aria-label="Tastaturkürzel">1–7 = ERGEBNIS → NÄCHSTER</div>
       </header>
       {error && <div className="rapid-error" role="alert">{error}</div>}
       {toast && <div className="rapid-toast" role="status">{toast}</div>}
