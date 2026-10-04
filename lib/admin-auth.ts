@@ -32,3 +32,5 @@ export function sessionRole(value?:string|null):AppRole|null{
  return null;
 }
 export function validSession(value?:string|null){return sessionRole(value)!==null}
+
+// Sales credentials are injected via Vercel environment variables.
