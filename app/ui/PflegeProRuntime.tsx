@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import PflegeProOS from "./PflegeProOS";
 
 const SESSION_KEY = "dg.pflege.auto-research.v4";
@@ -70,10 +70,7 @@ function AutoResearchBridge() {
 }
 
 export default function PflegeProRuntime() {
-  return (
-    <>
-      <PflegeProOS />
-      <AutoResearchBridge />
-    </>
-  );
+  const [sales,setSales]=useState(false);
+  useEffect(()=>{ fetch("/api/auth/me",{cache:"no-store"}).then(r=>r.ok?r.json():null).then(j=>setSales(j?.role==="sales")).catch(()=>{}); },[]);
+  return (<><PflegeProOS />{!sales&&<AutoResearchBridge />}</>);
 }
