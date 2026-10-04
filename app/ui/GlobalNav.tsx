@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 import styles from "./GlobalNav.module.css";
 
 const SECTIONS = [
@@ -19,16 +20,18 @@ const HIDDEN_PREFIXES = ["/a/", "/login"];
 
 export default function GlobalNav() {
   const pathname = usePathname() || "/";
+  const [role,setRole]=useState<"admin"|"sales"|null>(null);
+  useEffect(()=>{ fetch("/api/auth/me",{cache:"no-store"}).then(r=>r.ok?r.json():null).then(j=>setRole(j?.role||null)).catch(()=>setRole(null)); },[]);
   if (HIDDEN_PREFIXES.some((prefix) => pathname.startsWith(prefix))) return null;
 
   return (
     <div className={styles.bar}>
-      <Link href="/outbound" className={styles.brand}>
+      <Link href={role==="sales"?"/pflege":"/outbound"} className={styles.brand}>
         <span className={styles.mark}>DG</span>
         <span>DIGITALE GEWINNER</span>
       </Link>
       <nav className={styles.nav} aria-label="Hauptnavigation">
-        {SECTIONS.map((section) => {
+        {SECTIONS.filter((section)=>role!=="sales" || ["/pflege","/call"].includes(section.href)).map((section) => {
           const isActive = pathname === section.href || pathname.startsWith(`${section.href}/`);
           return (
             <Link key={section.href} href={section.href} className={isActive ? styles.active : undefined}>
