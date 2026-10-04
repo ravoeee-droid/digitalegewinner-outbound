@@ -251,7 +251,11 @@ export default function PflegeProOS() {
     } catch (e) { notify(e instanceof Error ? e.message : "Research konnte nicht geladen werden."); setDetail(null); }
     finally { setDetailLoading(false); }
   }
-  async function refresh() { setBusy("refresh"); setError(""); try { await Promise.all([loadCrm(), loadAnalytics(), loadState(), loadMailConfig()]); } catch (e) { setError(e instanceof Error ? e.message : "Systemfehler"); } finally { setBusy(""); } }
+  async function refresh() { setBusy("refresh"); setError(""); try {
+    const me=await fetch("/api/auth/me",{cache:"no-store"}).then(r=>r.ok?r.json():null).catch(()=>null);
+    if(me?.role==="sales"){ await loadCrm(); }
+    else { await Promise.all([loadCrm(), loadAnalytics(), loadState(), loadMailConfig()]); }
+  } catch (e) { setError(e instanceof Error ? e.message : "Systemfehler"); } finally { setBusy(""); } }
 
   useEffect(() => { void refresh(); }, []);
   useEffect(() => { if(view!=="analytics")return; void loadAnalytics(); const timer=window.setInterval(()=>void loadAnalytics(),30000); return()=>window.clearInterval(timer); }, [view]);
