@@ -4,14 +4,18 @@ import CloudTalkPhone from "../ui/CloudTalkPhone";
 import DomainMailCenter from "../ui/DomainMailCenter";
 import DomainMailBridge from "../ui/DomainMailBridge";
 import "./build-stream-theme.css";
+import { cookies } from "next/headers";
+import { adminCookieName, sessionRole } from "@/lib/admin-auth";
 
 export const dynamic = "force-dynamic";
 
-export default function PflegePage() {
+export default async function PflegePage() {
+  const jar=await cookies();
+  const isSales=sessionRole(jar.get(adminCookieName())?.value)==="sales";
   return (
     <>
       <a className="wcag-skip-link" href="#pflege-sales-os">Zum Hauptinhalt springen</a>
-      <Link
+      {!isSales && <Link
         className="dg-revenue-launcher"
         href="/outbound"
         style={{
@@ -35,13 +39,13 @@ export default function PflegePage() {
         }}
       >
         ⚡ Revenue Outbound OS
-      </Link>
+      </Link>}
       <div id="pflege-sales-os">
         <PflegeUnifiedRuntime />
       </div>
-      <CloudTalkPhone />
-      <DomainMailCenter />
-      <DomainMailBridge />
+      {!isSales && <CloudTalkPhone />}
+      {!isSales && <DomainMailCenter />}
+      {!isSales && <DomainMailBridge />}
     </>
   );
 }
