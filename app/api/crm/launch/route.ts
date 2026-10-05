@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { query, readState, writeState } from "@/lib/db";
-import { getCallSummary } from "@/lib/telephony";
+import { ensureTelephonySchema, getCallSummary } from "@/lib/telephony";
 import { ensureSalesOsSchema } from "@/lib/sales-os";
 
 export const runtime = "nodejs";
@@ -182,7 +182,7 @@ function outcomeUpdates(outcome: string, callbackAt: string) {
 }
 
 async function loadPayload(workspace: string) {
-  await ensureSalesOsSchema();
+  await Promise.all([ensureSalesOsSchema(), ensureTelephonySchema()]);
   const leads = await loadLeads(workspace);
   await mirrorToLegacy(leads);
 
