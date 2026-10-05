@@ -29,7 +29,7 @@ type OutboxRow = {
 type Credential = StoredMailboxCredential;
 type State = { mailboxes?: Array<{id:string;email?:string;enabled:boolean;dailyLimit:number}>; campaigns?: Array<{id:string;status?:string;dailyLimit?:number}> };
 const MIN_DAILY_SENDS_PER_MAILBOX=30;
-const PFLEGE_CAMPAIGN_DAILY_TARGET=120;
+const PFLEGE_CAMPAIGN_DAILY_TARGET=150;
 
 function authorized(request: Request) {
   const expected = process.env.CRON_SECRET;
