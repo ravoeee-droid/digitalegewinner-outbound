@@ -24,6 +24,11 @@ export default function GlobalNav() {
   useEffect(()=>{ fetch("/api/auth/me",{cache:"no-store"}).then(r=>r.ok?r.json():null).then(j=>setRole(j?.role||null)).catch(()=>setRole(null)); },[]);
   if (HIDDEN_PREFIXES.some((prefix) => pathname.startsWith(prefix))) return null;
 
+  async function logout(){
+    await fetch("/api/auth/logout",{method:"POST"}).catch(()=>undefined);
+    window.location.href="/login";
+  }
+
   return (
     <div className={styles.bar}>
       <Link href={role==="sales"?"/pflege":"/outbound"} className={styles.brand}>
@@ -40,6 +45,7 @@ export default function GlobalNav() {
           );
         })}
       </nav>
+      {role && <button className={styles.logout} type="button" onClick={()=>void logout()}>Logout</button>}
     </div>
   );
 }
