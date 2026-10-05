@@ -43,7 +43,7 @@ export default async function PflegePage() {
       <div id="pflege-sales-os">
         <PflegeUnifiedRuntime />
       </div>
-      {!isSales && <CloudTalkPhone />}
+      <CloudTalkPhone />
       {!isSales && <DomainMailCenter />}
       {!isSales && <DomainMailBridge />}
     </>
