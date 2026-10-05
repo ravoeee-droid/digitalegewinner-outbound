@@ -145,7 +145,9 @@ function fallbackBrief(company: string, contact: Partial<ContactEnrichment>, aud
     callOpening: audit?.sales?.opener || `Guten Tag, Raphael Hermann hier. Ich habe mir ${company} und Ihren aktuellen Recruiting-Auftritt kurz angesehen. Darf ich Ihnen in zwei Minuten sagen, welcher Hebel mir dabei aufgefallen ist?`,
     emailHook: audit?.sales?.emailHook || `Ich habe mir den Recruiting-Auftritt von ${company} angesehen und dabei einen konkreten Hebel für einen einfacheren Bewerberweg gefunden.`,
     personalizationPoints: signals.slice(0, 5),
-    likelyDecisionMaker: "Pflegedienstleitung, Einrichtungsleitung, Geschäftsführung oder Personalverantwortliche",
+    likelyDecisionMaker: contact.decisionMakerName
+      ? [contact.decisionMakerName, contact.decisionMakerRole].filter(Boolean).join(" · ")
+      : "Pflegedienstleitung, Einrichtungsleitung, Geschäftsführung oder Personalverantwortliche",
     nextResearchStep: contact.teamPage ? "Ansprechpartner auf Team-/Über-uns-Seite prüfen." : "PDL / Einrichtungsleitung / Geschäftsführung als konkreten Ansprechpartner ergänzen.",
   };
 }
@@ -234,6 +236,7 @@ async function enrichLead(leadId: string, useAi: boolean) {
     contact: lead.contact_name,
     email: contact.email || lead.contact_email,
     phone: contact.phone || companyPhone,
+    contact: contact.decisionMakerName || lead.contact_name,
     website,
     city,
     industry: lead.industry || "Pflege",
@@ -278,6 +281,9 @@ async function enrichLead(leadId: string, useAi: boolean) {
       careersPage: contact.careersPage || "",
       jobsPage: contact.jobsPage || "",
       teamPage: contact.teamPage || "",
+      decisionMakerName: contact.decisionMakerName || "",
+      decisionMakerRole: contact.decisionMakerRole || "",
+      jobTitles: contact.jobTitles || [],
     },
   };
   await query(
@@ -290,7 +296,7 @@ async function enrichLead(leadId: string, useAi: boolean) {
        linkedin=case when excluded.linkedin<>'' then excluded.linkedin else sales_contacts.linkedin end,
        instagram=case when excluded.instagram<>'' then excluded.instagram else sales_contacts.instagram end,
        is_primary=true,source='public-research',metadata=excluded.metadata,updated_at=now()`,
-    [contactId, lead.company_id, lead.contact_name, contact.email || lead.contact_email, contact.phone || lead.contact_phone || companyPhone, contact.linkedin || "", contact.instagram || "", JSON.stringify(contactMeta)],
+    [contactId, lead.company_id, contact.decisionMakerName || lead.contact_name, contact.email || lead.contact_email, contact.phone || lead.contact_phone || companyPhone, contact.linkedin || "", contact.instagram || "", JSON.stringify(contactMeta)],
   );
 
   const enrichment = {
