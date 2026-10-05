@@ -77,10 +77,7 @@ export async function getAppointmentGoalSnapshot(workspace="default") {
       select lead_id from er_events
       where workspace=$1 and type in ('appointment','appointment_attended')
         and ${berlinDaySql("created_at")}
-      union
-      select lead_id from outbound_events
-      where workspace=$1 and event_type='meeting_booked'
-        and ${berlinDaySql("occurred_at")}
+
     )
     select count(distinct lead_id)::int appointments from booked where lead_id is not null
   `, [workspace]);
@@ -95,10 +92,7 @@ export async function getAppointmentGoalSnapshot(workspace="default") {
       select distinct lead_id from er_events
       where workspace=$1 and type in ('appointment','appointment_attended')
         and created_at>=now()-interval '14 days'
-      union
-      select distinct lead_id from outbound_events
-      where workspace=$1 and event_type='meeting_booked'
-        and occurred_at>=now()-interval '14 days'
+
     )
     select
       (select count(*)::int from sent) sent,
