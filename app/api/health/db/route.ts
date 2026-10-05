@@ -3,6 +3,7 @@ import { query } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 // Runs in the project's configured data region.
+// fra1 rebuild marker
 
 export async function GET() {
   const started = Date.now();
