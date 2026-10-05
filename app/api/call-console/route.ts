@@ -16,6 +16,15 @@ const outcomeSchema = z.object({
   opener: z.enum(["A", "B", "C", "D"]).optional().default("D"),
 });
 
+const postSchema = z.union([
+  outcomeSchema,
+  z.object({
+    id: z.string().min(3),
+    action: z.literal("extreme_hot"),
+    value: z.boolean().optional().default(true),
+  }),
+]);
+
 
 async function currentOwner() {
   const store = await cookies();
@@ -27,11 +36,39 @@ function ownerTasks(tasks: Array<{ channel: string; payload: Record<string, unkn
   return tasks.filter((task) => task.channel === "call" && String(task.payload?.owner || "") === owner);
 }
 
+async function hydrateContacts<T extends { lead_id: string; payload: Record<string, unknown> }>(tasks: T[]) {
+  const leadIds = [...new Set(tasks.map((task) => task.lead_id).filter(Boolean))];
+  if (!leadIds.length) return tasks;
+  const contacts = await query<{ lead_id: string; contact_name: string; contact_email: string; contact_phone: string; extreme_hot: boolean }>(`
+    select l.id lead_id,coalesce(ct.name,'') contact_name,coalesce(ct.email,'') contact_email,
+           coalesce(ct.phone,'') contact_phone,coalesce(l.extreme_hot,false) extreme_hot
+    from sales_leads l
+    left join sales_contacts ct on ct.id=l.contact_id
+    where l.id=any($1::text[])
+  `, [leadIds]);
+  const byLead = new Map(contacts.map((row) => [row.lead_id, row]));
+  return tasks.map((task) => {
+    const contact = byLead.get(task.lead_id);
+    if (!contact) return task;
+    return {
+      ...task,
+      payload: {
+        ...task.payload,
+        contactName: String(task.payload?.contactName || contact.contact_name || ""),
+        contactEmail: String(task.payload?.contactEmail || contact.contact_email || ""),
+        contactPhone: String(task.payload?.contactPhone || contact.contact_phone || ""),
+        extremeHot: contact.extreme_hot,
+      },
+    };
+  });
+}
+
 export async function GET() {
   try {
     const snapshot = await buildDailyOutboundPlan();
     const owner = await currentOwner();
-    return Response.json({ date: snapshot.date, channels: snapshot.channels, owner, tasks: ownerTasks(snapshot.tasks, owner) });
+    const tasks = await hydrateContacts(ownerTasks(snapshot.tasks, owner));
+    return Response.json({ date: snapshot.date, channels: snapshot.channels, owner, tasks });
   } catch (error) {
     return Response.json({ error: error instanceof Error ? error.message : "Call Console konnte nicht geladen werden." }, { status: 500 });
   }
@@ -39,11 +76,25 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const input = outcomeSchema.parse(await request.json());
+    const input = postSchema.parse(await request.json());
     await buildDailyOutboundPlan();
     const taskRows = await query<{ lead_id: string; company_id: string }>(`select lead_id,company_id from sales_outbound_tasks where id=$1::text and channel='call' limit 1`, [input.id]);
     const task = taskRows[0];
     if (!task) return Response.json({ error: "Call-Task nicht gefunden." }, { status: 404 });
+
+    if ("action" in input && input.action === "extreme_hot") {
+      await query(`update sales_leads set extreme_hot=$2,updated_at=now() where id=$1`, [task.lead_id, input.value]);
+      await query(
+        `insert into sales_activities(workspace,lead_id,company_id,type,summary,meta)
+         select workspace,id,company_id,'lead.extreme_hot',$2::text,jsonb_build_object('extremeHot',$3::boolean)
+         from sales_leads where id=$1`,
+        [task.lead_id, input.value ? "🔥 Extrem Hot markiert" : "Extrem Hot entfernt", input.value],
+      );
+      const snapshot = await getOutboundEngineSnapshot();
+      const owner = await currentOwner();
+      const tasks = await hydrateContacts(ownerTasks(snapshot.tasks, owner));
+      return Response.json({ ok: true, owner, tasks, channels: snapshot.channels, extremeHot: input.value });
+    }
 
     await query(
       `update sales_outbound_tasks
@@ -70,7 +121,8 @@ export async function POST(request: Request) {
 
     const snapshot = await getOutboundEngineSnapshot();
     const owner = await currentOwner();
-    return Response.json({ ok: true, owner, tasks: ownerTasks(snapshot.tasks, owner), channels: snapshot.channels, websiteProject, integrationWarning });
+    const tasks = await hydrateContacts(ownerTasks(snapshot.tasks, owner));
+    return Response.json({ ok: true, owner, tasks, channels: snapshot.channels, websiteProject, integrationWarning });
   } catch (error) {
     return Response.json({ error: error instanceof Error ? error.message : "Call-Ergebnis konnte nicht gespeichert werden." }, { status: 400 });
   }
