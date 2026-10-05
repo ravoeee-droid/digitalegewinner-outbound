@@ -83,7 +83,7 @@ function contactFromText(text: string) {
 }
 function roleClass(title: string) {
   if (/(pflegefachkraft|pflegefachmann|pflegefachfrau|altenpfleger|gesundheits- und krankenpfleger|examiniert)/i.test(title)) return "Pflegefachkraft";
-  if (/(pflegedienstleitung|\bpdl\b|wohnber eichsleitung|teamleitung pflege)/i.test(title)) return "Pflegedienstleitung";
+  if (/(pflegedienstleitung|\bpdl\b|wohnbereichsleitung|teamleitung pflege)/i.test(title)) return "Pflegedienstleitung";
   if (/(pflegehelfer|pflegeassist|pflegefachassist|pflegehilfskraft)/i.test(title)) return "Pflegeassistenz";
   return "Pflege";
 }
@@ -288,7 +288,14 @@ async function runSync() {
 
 export async function GET(request: Request) {
   if (!authorized(request)) return Response.json({error:"Unauthorized"},{status:401});
-  try { return Response.json(await runSync()); }
-  catch(error){ return Response.json({ok:false,error:error instanceof Error?error.message:"Sync failed"},{status:500}); }
+  try {
+    const result=await runSync();
+    console.log("[pflege-source-sync]",JSON.stringify(result));
+    return Response.json(result);
+  }
+  catch(error){
+    console.error("[pflege-source-sync-error]",error);
+    return Response.json({ok:false,error:error instanceof Error?error.message:"Sync failed"},{status:500});
+  }
 }
 export async function POST(request: Request) { return GET(request); }
