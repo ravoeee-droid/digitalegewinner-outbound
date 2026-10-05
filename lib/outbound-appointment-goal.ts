@@ -22,6 +22,20 @@ type Campaign = {
 type Mailbox = { id:string; email?:string; enabled:boolean; dailyLimit:number };
 type State = { campaigns?:Campaign[]; mailboxes?:Mailbox[] };
 
+async function loadSenderHealth(workspace:string) {
+  try {
+    return await query<{
+      target_id:string;health_status:string;recommended_daily_limit:number|null;enforced_daily_limit?:number|null
+    }>(`
+      select target_id,health_status,recommended_daily_limit,enforced_daily_limit
+      from outbound_sender_health_state
+      where workspace=$1 and target_type='mailbox'
+    `,[workspace]);
+  } catch {
+    return [];
+  }
+}
+
 function berlinDaySql(column:string) {
   return `(${column} at time zone 'Europe/Berlin')::date=(now() at time zone 'Europe/Berlin')::date`;
 }
@@ -99,13 +113,7 @@ export async function getAppointmentGoalSnapshot(workspace="default") {
       (select count(*)::int from booked b join sent s using(lead_id)) appointments
   `, [workspace]);
 
-  const health = await query<{
-    target_id:string;health_status:string;recommended_daily_limit:number|null;enforced_daily_limit:number|null
-  }>(`
-    select target_id,health_status,recommended_daily_limit,enforced_daily_limit
-    from outbound_sender_health_state
-    where workspace=$1 and target_type='mailbox'
-  `, [workspace]);
+  const health = await loadSenderHealth(workspace);
 
   const state = (await readState(workspace).catch(() => null))?.payload as State | undefined;
   const active = (state?.mailboxes || []).filter(m => m.enabled);
@@ -164,13 +172,7 @@ export async function ensureAppointmentGoalQueue(workspace="default") {
     return { ok:false, skipped:true, reason:"no_active_mailboxes", snapshot:await getAppointmentGoalSnapshot(workspace) };
   }
 
-  const health = await query<{
-    target_id:string;health_status:string;recommended_daily_limit:number|null
-  }>(`
-    select target_id,health_status,recommended_daily_limit
-    from outbound_sender_health_state
-    where workspace=$1 and target_type='mailbox'
-  `, [workspace]);
+  const health = await loadSenderHealth(workspace);
   const healthById = new Map(health.map(h => [h.target_id,h]));
 
   const sentRows = await query<{mailbox_id:string;count:number}>(`
