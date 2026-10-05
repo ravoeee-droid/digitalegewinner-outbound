@@ -8,8 +8,14 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   const started = Date.now();
   try {
-    const rows = await query<{ ok: number }>("select 1 as ok");
-    return NextResponse.json({ ok: rows[0]?.ok === 1, latencyMs: Date.now() - started });
+    const rows = await query<{ ok: number; sales_leads: string | null }>(
+      "select 1 as ok, to_regclass('public.sales_leads')::text as sales_leads",
+    );
+    return NextResponse.json({
+      ok: rows[0]?.ok === 1,
+      latencyMs: Date.now() - started,
+      salesSchema: Boolean(rows[0]?.sales_leads),
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Database connection failed";
     return NextResponse.json(
