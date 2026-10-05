@@ -227,12 +227,24 @@ async function loadPayload(workspace: string) {
      from sales_activities where workspace=$1 and type='call.outcome' and created_at>=date_trunc('day',now())`,
     [workspace],
   );
+  const [callCockpitStats] = await query<{ today: number; connected: number; meetings: number; interested: number }>(
+    `select
+       count(*) filter(where coalesce(payload->>'callOutcomeAt','')<>'')::int today,
+       count(*) filter(where coalesce(payload->>'callOutcome','') not in ('','not_reached','no_fit','dnc'))::int connected,
+       count(*) filter(where payload->>'callOutcome'='appointment')::int meetings,
+       count(*) filter(where payload->>'callOutcome' in ('pain','appointment','website_requested'))::int interested
+     from sales_outbound_tasks
+     where workspace=$1
+       and channel='call'
+       and task_date=(now() at time zone 'Europe/Berlin')::date`,
+    [workspace],
+  );
   const telephony = await getCallSummary(workspace);
   const calls = {
-    today: Math.max(Number(outcomeStats?.today || 0), Number(telephony.today || 0)),
-    connected: Math.max(Number(outcomeStats?.connected || 0), Number(telephony.connected || 0)),
-    meetings: Number(outcomeStats?.meetings || 0),
-    interested: Number(outcomeStats?.interested || 0),
+    today: Math.max(Number(outcomeStats?.today || 0), Number(telephony.today || 0), Number(callCockpitStats?.today || 0)),
+    connected: Math.max(Number(outcomeStats?.connected || 0), Number(telephony.connected || 0), Number(callCockpitStats?.connected || 0)),
+    meetings: Math.max(Number(outcomeStats?.meetings || 0), Number(callCockpitStats?.meetings || 0)),
+    interested: Math.max(Number(outcomeStats?.interested || 0), Number(callCockpitStats?.interested || 0)),
     talk_seconds: Number(telephony.talk_seconds || 0),
     history: callHistory,
   };
