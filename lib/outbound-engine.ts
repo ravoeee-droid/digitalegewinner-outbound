@@ -2,7 +2,7 @@ import { query } from "./db";
 import { ensureSalesOsSchema } from "./sales-os";
 
 export const OUTBOUND_TARGETS = {
-  call: 120,
+  call: 100,
   email: 200,
   video: 30,
   linkedin: 30,
@@ -63,6 +63,7 @@ const baseCandidateSql = `
     coalesce(ct.phone,c.phone,'') phone,
     coalesce(ct.linkedin,'') linkedin,
     l.priority_score score,
+    l.owner,
     coalesce(c.metadata->'daily_qualification'->>'tier','') tier,
     coalesce(c.metadata->'daily_qualification'->'reasons','[]'::jsonb) reasons,
     coalesce(c.metadata->'daily_qualification'->>'websiteWeak','false') website_weak,
@@ -114,7 +115,8 @@ function insertChannelSql(channel: OutboundChannel, extraWhere: string, target: 
         'tier',tier,
         'reasons',reasons,
         'websiteWeak',website_weak,
-        'jobCount',job_count
+        'jobCount',job_count,
+        'owner',owner
       )
     from ranked
     where rn <= ${target}
@@ -126,10 +128,63 @@ function insertChannelSql(channel: OutboundChannel, extraWhere: string, target: 
   `;
 }
 
+function insertCallChannelSql() {
+  return `
+    with candidates as (
+      ${baseCandidateSql}
+      and coalesce(ct.phone,c.phone,'')<>''
+      and l.owner in ('Raphael','Mattias')
+    ), ranked as (
+      select *, row_number() over (
+        partition by owner
+        order by
+          case tier when 'A+' then 0 when 'A' then 1 when 'B' then 2 else 3 end,
+          score desc,
+          job_count desc,
+          company asc
+      )::int as rn
+      from candidates
+    )
+    insert into sales_outbound_tasks(
+      id,workspace,task_date,lead_id,company_id,channel,rank,score,status,payload
+    )
+    select
+      lead_id || ':call:' || ((now() at time zone 'Europe/Berlin')::date)::text,
+      $1,
+      (now() at time zone 'Europe/Berlin')::date,
+      lead_id,
+      company_id,
+      'call',
+      rn,
+      score,
+      'ready',
+      jsonb_build_object(
+        'company',company,
+        'city',city,
+        'website',website,
+        'email',email,
+        'phone',phone,
+        'linkedin',linkedin,
+        'tier',tier,
+        'reasons',reasons,
+        'websiteWeak',website_weak,
+        'jobCount',job_count,
+        'owner',owner
+      )
+    from ranked
+    where rn <= 50
+    on conflict(workspace,task_date,lead_id,channel) do update set
+      rank=excluded.rank,
+      score=excluded.score,
+      payload=excluded.payload,
+      updated_at=now()
+  `;
+}
+
 export async function buildDailyOutboundPlan(workspace = "default") {
   await ensureOutboundEngineSchema();
 
-  await query(insertChannelSql("call", "coalesce(ct.phone,c.phone,'')<>''", OUTBOUND_TARGETS.call), [workspace]);
+  await query(insertCallChannelSql(), [workspace]);
   await query(insertChannelSql("email", "coalesce(ct.email,'')<>''", OUTBOUND_TARGETS.email), [workspace]);
   await query(insertChannelSql("video", "coalesce(ct.email,'')<>'' and coalesce(c.website,'')<>''", OUTBOUND_TARGETS.video), [workspace]);
   await query(insertChannelSql("linkedin", "coalesce(ct.linkedin,'')<>''", OUTBOUND_TARGETS.linkedin), [workspace]);
