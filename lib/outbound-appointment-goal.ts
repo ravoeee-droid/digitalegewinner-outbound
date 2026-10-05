@@ -333,7 +333,7 @@ export async function ensureAppointmentGoalQueue(workspace="default") {
     }
     if (!mailbox) break;
 
-    const spreadMinutes=enrollmentCapacity<=1?0:Math.floor((queuedLeads*360)/Math.max(1,enrollmentCapacity-1));
+    const spreadMinutes=enrollmentCapacity<=1?0:Math.floor((queuedLeads*90)/Math.max(1,enrollmentCapacity-1));
     const firstTouchAt=Date.now()+spreadMinutes*60_000;
     const firstTouch=personalizedFirstTouch(lead);
     for (let stepIndex=0;stepIndex<campaign.steps.length;stepIndex++) {
@@ -370,6 +370,20 @@ export async function ensureAppointmentGoalQueue(workspace="default") {
     remainingCapacity--;
     queuedLeads++;
   }
+
+  // Compress today's already queued first touches so the current batch finishes inside today's send window.
+  await query(`
+    with todays as (
+      select id,row_number() over(order by scheduled_at,id)-1 rn,
+             greatest(1,count(*) over()-1) denom
+      from er_outbox
+      where workspace=$1 and campaign_id=$2 and status='queued'
+        and scheduled_at>now() and scheduled_at<now()+interval '8 hours'
+    )
+    update er_outbox o
+    set scheduled_at=now()+((t.rn::numeric/t.denom::numeric)*interval '90 minutes')
+    from todays t where o.id=t.id
+  `,[workspace,campaign.id]).catch(()=>undefined);
 
   return {
     ok:true,
