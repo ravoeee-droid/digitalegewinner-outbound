@@ -70,6 +70,9 @@ export async function ensureSchema() {
       created_at timestamptz not null default now()
     );
     alter table er_outbox add column if not exists variant text not null default 'A';
+    alter table er_outbox add column if not exists campaign_version_id uuid;
+    alter table er_outbox add column if not exists experiment_id uuid;
+    alter table er_outbox add column if not exists experiment_arm_key text;
     create index if not exists er_outbox_due_idx on er_outbox(status, scheduled_at);
     create index if not exists er_outbox_campaign_idx on er_outbox(campaign_id, variant, status);
     create table if not exists er_suppressions (
