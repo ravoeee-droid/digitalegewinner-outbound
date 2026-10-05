@@ -2,7 +2,7 @@ import { query } from "./db";
 import type { ContactEnrichment } from "./contact-enrichment";
 import type { WebsiteAuditResult } from "./website-audit";
 
-let salesSchemaReady = process.env.NODE_ENV === "production";
+let salesSchemaReady = false;
 let salesSchemaPromise: Promise<void> | null = null;
 
 export type RadarCandidate = {
