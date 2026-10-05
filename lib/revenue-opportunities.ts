@@ -110,6 +110,7 @@ type OpportunityRow = {
   email: string;
   lead_priority: number;
   lead_opportunity: number;
+  extreme_hot: boolean;
   company_metadata: JsonObject;
   website_score: number;
   seo_score: number;
@@ -415,7 +416,7 @@ async function loadOpportunityRows(workspace: string) {
            o.setup_value::float8 setup_value,o.monthly_value::float8 monthly_value,
            o.probability,o.score,o.next_action,o.next_action_at,o.notes,o.created_at,o.updated_at,
            c.name company,c.city,c.industry,c.website,coalesce(ct.phone,c.phone,'') phone,coalesce(ct.email,'') email,
-           l.priority_score lead_priority,l.opportunity_score lead_opportunity,c.metadata company_metadata,
+           l.priority_score lead_priority,l.opportunity_score lead_opportunity,l.extreme_hot,c.metadata company_metadata,
            coalesce(rr.website_score,0)::int website_score,
            ${seoScoreSql("rr")} seo_score
     from sales_opportunities o
