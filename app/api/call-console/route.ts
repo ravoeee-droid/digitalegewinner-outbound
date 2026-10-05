@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { cookies } from "next/headers";
+import { adminCookieName, sessionRole } from "@/lib/admin-auth";
 import { buildDailyOutboundPlan, getOutboundEngineSnapshot } from "@/lib/outbound-engine";
 import { query } from "@/lib/db";
 import { addProductOpportunity, updateRevenueOpportunity } from "@/lib/revenue-opportunities";
@@ -14,10 +16,22 @@ const outcomeSchema = z.object({
   opener: z.enum(["A", "B", "C", "D"]).optional().default("D"),
 });
 
+
+async function currentOwner() {
+  const store = await cookies();
+  const role = sessionRole(store.get(adminCookieName())?.value);
+  return role === "sales" ? "Mattias" : "Raphael";
+}
+
+function ownerTasks(tasks: Array<{ channel: string; payload: Record<string, unknown> }>, owner: string) {
+  return tasks.filter((task) => task.channel === "call" && String(task.payload?.owner || "") === owner);
+}
+
 export async function GET() {
   try {
     const snapshot = await buildDailyOutboundPlan();
-    return Response.json({ date: snapshot.date, channels: snapshot.channels, tasks: snapshot.tasks.filter((task) => task.channel === "call") });
+    const owner = await currentOwner();
+    return Response.json({ date: snapshot.date, channels: snapshot.channels, owner, tasks: ownerTasks(snapshot.tasks, owner) });
   } catch (error) {
     return Response.json({ error: error instanceof Error ? error.message : "Call Console konnte nicht geladen werden." }, { status: 500 });
   }
@@ -55,7 +69,8 @@ export async function POST(request: Request) {
     }
 
     const snapshot = await getOutboundEngineSnapshot();
-    return Response.json({ ok: true, tasks: snapshot.tasks.filter((item) => item.channel === "call"), channels: snapshot.channels, websiteProject, integrationWarning });
+    const owner = await currentOwner();
+    return Response.json({ ok: true, owner, tasks: ownerTasks(snapshot.tasks, owner), channels: snapshot.channels, websiteProject, integrationWarning });
   } catch (error) {
     return Response.json({ error: error instanceof Error ? error.message : "Call-Ergebnis konnte nicht gespeichert werden." }, { status: 400 });
   }
