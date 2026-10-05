@@ -252,13 +252,14 @@ export default function MailWorkspace() {
           {activeMailbox && <select aria-label="Postfach auswählen" value={activeId} onChange={(event) => void changeMailbox(event.target.value)}>
             {mailboxes.map((mailbox) => <option key={mailbox.id} value={mailbox.id}>{mailbox.configured ? "" : "⚠ "}{mailbox.email}{mailbox.configured ? "" : " (nicht verbunden)"}</option>)}
           </select>}
-          <button className={styles.secondary} onClick={() => setSetupOpen(true)}>⚙ Postfach</button>
+          {activeMailbox && <button className={styles.secondary} onClick={() => { setSetupMode("edit"); setSetupOpen(true); }}>⚙ Bearbeiten</button>}
+          <button className={styles.secondary} onClick={() => { setSetupMode("add"); setSetupOpen(true); }}>＋ Postfach hinzufügen</button>
           <button className={styles.primary} disabled={!activeMailbox} onClick={() => setCompose({ open: true, to: "", subject: "" })}>＋ Neue E-Mail</button>
         </div>
       </div>
     </header>
 
-    {error && <div className={styles.error}><strong>Mail-Verbindung</strong><span>{error}</span><button onClick={() => setSetupOpen(true)}>Einstellungen öffnen</button></div>}
+    {error && <div className={styles.error}><strong>Mail-Verbindung</strong><span>{error}</span><button onClick={() => { setSetupMode(activeMailbox ? "edit" : "add"); setSetupOpen(true); }}>Einstellungen öffnen</button></div>}
 
     {warmup && (warmup.active
       ? <div className={styles.warmup}>
@@ -288,7 +289,7 @@ export default function MailWorkspace() {
           <div className={styles.emptyIcon}>✉</div>
           <h2>Netcup-Postfach verbinden</h2>
           <p>Einmal E-Mail-Adresse und Passwort eintragen. Die Server erkennen wir automatisch; bei Bedarf kannst du sie manuell angeben.</p>
-          <button className={styles.primary} onClick={() => setSetupOpen(true)}>Postfach verbinden</button>
+          <button className={styles.primary} onClick={() => { setSetupMode("add"); setSetupOpen(true); }}>Postfach verbinden</button>
         </div> : loading ? <div className={styles.loading}>Postfach wird synchronisiert …</div> : messages.length ? <div className={styles.messageList}>
           {messages.map((message) => <button key={message.uid} onClick={() => setSelectedUid(message.uid)} className={`${styles.messageRow} ${selectedUid === message.uid ? styles.selected : ""} ${message.unread ? styles.unread : ""}`}>
             <span className={styles.unreadDot}>{message.unread ? "●" : ""}</span>
