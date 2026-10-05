@@ -220,10 +220,18 @@ export default function PflegeProOS() {
   const [busy, setBusy] = useState("");
   const [toast, setToast] = useState("");
   const [error, setError] = useState("");
+  const [userName, setUserName] = useState("Raphael");
   const searchRef = useRef<HTMLInputElement | null>(null);
   const pitchVideoInputRef = useRef<HTMLInputElement | null>(null);
 
   function notify(message: string) { setToast(message); window.setTimeout(() => setToast(""), 3200); }
+
+  useEffect(() => {
+    fetch("/api/auth/me", { cache: "no-store" })
+      .then((response) => response.ok ? response.json() : null)
+      .then((json) => setUserName(json?.role === "sales" ? "Mattias" : "Raphael"))
+      .catch(() => undefined);
+  }, []);
   async function loadAnalytics() {
     try {
       const response=await fetch("/api/analytics/email",{cache:"no-store"});
@@ -516,7 +524,7 @@ export default function PflegeProOS() {
     finally { setBusy(""); }
   }
 
-  const titleMap: Record<View, string> = { command: "Command", crm: "CRM", finder: "Lead Finder", calls: "Calls", pipeline: "Pipeline", followups: "Follow-ups", meetings: "Meetings", proposals: "Proposals", campaigns: "Campaigns", inbox: "Inbox", intelligence: "Intelligence", analytics: "Analytics", system: "Integrationen" };
+  const titleMap: Record<View, string> = { command: "Übersicht", crm: "CRM", finder: "Lead Finder", calls: "Calls", pipeline: "Pipeline", followups: "Nachfassen", meetings: "Termine", proposals: "Angebote", campaigns: "Kampagnen", inbox: "Posteingang", intelligence: "Lead Intelligence", analytics: "Auswertung", system: "Integrationen" };
   function selectView(next: View) { setView(next); setMobileNav(false); }
 
   function StagePill({ stage }: { stage: Stage }) { return <span className={`${styles.stage} ${["Engaged", "Qualifiziert", "Termin", "Angebot", "Verhandlung"].includes(stage) ? styles.stageHot : ""} ${stage === "Gewonnen" ? styles.stageWon : ""} ${stage === "Verloren" ? styles.stageLost : ""}`}>{stage}</span>; }
@@ -538,7 +546,7 @@ export default function PflegeProOS() {
 
   function MetricStrip() {
     const connectRate = data.calls.today ? Math.round(data.calls.connected / data.calls.today * 100) : 0;
-    return <div className={styles.metricStrip}><div><span>Pipeline</span><strong>{euro(data.stats.pipeline)}</strong><small>{euro(data.stats.weighted_pipeline)} weighted</small></div><div><span>Fällige Actions</span><strong>{data.stats.due_actions}</strong><small>{dueLeads.length} heute/überfällig</small></div><div><span>Calls heute</span><strong>{data.calls.today}</strong><small>{connectRate}% Connect</small></div><div><span>Meetings</span><strong>{data.calls.meetings}</strong><small>{data.calls.interested} Interesse+</small></div><div><span>Research</span><strong>{enrichmentCoverage}%</strong><small>{strongResearch} stark angereichert</small></div><div><span>Hot Leads</span><strong>{data.stats.hot}</strong><small>Priority ≥ 70</small></div></div>;
+    return <div className={styles.metricStrip}><div><span>Pipeline</span><strong>{euro(data.stats.pipeline)}</strong><small>{euro(data.stats.weighted_pipeline)} realistisch gewichtet</small></div><div><span>Heute fällig</span><strong>{data.stats.due_actions}</strong><small>{dueLeads.length} brauchen Aufmerksamkeit</small></div><div><span>Calls heute</span><strong>{data.calls.today}</strong><small>{connectRate}% erreicht</small></div><div><span>Termine</span><strong>{data.calls.meetings}</strong><small>{data.calls.interested} Leads mit Interesse</small></div><div><span>Lead-Qualität</span><strong>{enrichmentCoverage}%</strong><small>{strongResearch} vollständig vorbereitet</small></div><div><span>Heiße Chancen</span><strong>{data.stats.hot}</strong><small>mit hoher Abschlusschance</small></div></div>;
   }
 
   function Funnel() {
@@ -567,7 +575,36 @@ export default function PflegeProOS() {
       <main className={styles.content} id="main-sales-os">
         {error && <div className={styles.error}>{error}</div>}
 
-        {view === "command" && <><div className={styles.pageHead}><div><span>DAILY COMMAND CENTER</span><h2>Die nächste sinnvolle Aktion, nicht mehr Dashboard.</h2><p>Research, Follow-ups, Calls und Pipeline in einer kompakten Arbeitsansicht.</p></div><button className={styles.primaryButton} type="button" onClick={() => selectView("calls")}>Start call session</button></div><MetricStrip /><div className={styles.commandGrid}><section className={styles.panel}><div className={styles.panelHead}><div><span>NEXT BEST ACTION</span><h3>Priorisierte Leads</h3></div><button type="button" onClick={() => selectView("crm")}>Open CRM</button></div><LeadTable rows={opportunities.slice(0, 10)} selectable={false} /></section><aside className={styles.sideStack}><section className={styles.panel}><div className={styles.panelHead}><div><span>DUE NOW</span><h3>Follow-ups</h3></div><b>{dueLeads.length}</b></div><div className={styles.compactList}>{dueLeads.slice(0, 9).map((lead) => <button type="button" key={lead.id} onClick={() => openInspector(lead.id)}><div><strong>{lead.company}</strong><small>{lead.next_action || "Follow-up"} · {fmtDate(lead.next_action_at, true)}</small></div><span>{lead.phone ? "◉" : "›"}</span></button>)}{!dueLeads.length && <div className={styles.empty}>Alles sauber.</div>}</div></section><section className={styles.panel}><div className={styles.panelHead}><div><span>RESEARCH COVERAGE</span><h3>{enrichmentCoverage}% angereichert</h3></div><button type="button" onClick={() => selectView("intelligence")}>Details</button></div><div className={styles.coverageBar}><i style={{ width: `${enrichmentCoverage}%` }} /></div><p className={styles.panelNote}>{data.leads.filter((lead) => !isEnriched(lead)).length} Leads ohne vollständigen Research-Lauf.</p></section></aside></div><div className={styles.twoPanels}><section className={styles.panel}><div className={styles.panelHead}><div><span>FUNNEL</span><h3>Pipeline movement</h3></div></div><Funnel /></section><section className={styles.panel}><div className={styles.panelHead}><div><span>ACTIVITY</span><h3>Live feed</h3></div></div><ActivityList items={data.activities.slice(0, 12)} /></section></div></>}
+        {view === "command" && <>
+          <section className={styles.welcomeHero}>
+            <div className={styles.welcomeGlow} />
+            <div className={styles.welcomeOrb}><i /><i /><i /></div>
+            <div className={styles.welcomeCopy}>
+              <span>DEIN VERTRIEBSTAG</span>
+              <h2>Willkommen zurück, {userName}.</h2>
+              <p>Die wichtigsten Chancen sind vorbereitet. Konzentrier dich auf Gespräche, Rückrufe und Abschlüsse — der Rest läuft im Hintergrund.</p>
+              <div className={styles.welcomeActions}>
+                <button className={styles.heroPrimary} type="button" onClick={() => selectView("calls")}>☎ Call-Session starten</button>
+                <button className={styles.heroSecondary} type="button" onClick={() => selectView("followups")}>{dueLeads.length} fällige Rückrufe ansehen</button>
+              </div>
+            </div>
+            <div className={styles.welcomePulse}>
+              <span>HEUTE</span>
+              <strong>{data.calls.today}</strong>
+              <small>Calls geführt</small>
+              <div><i style={{ width: `${Math.min(100, data.calls.today * 2)}%` }} /></div>
+            </div>
+          </section>
+          <MetricStrip />
+          <div className={styles.commandGrid}>
+            <section className={styles.panel}><div className={styles.panelHead}><div><span>BESTE CHANCEN JETZT</span><h3>Priorisierte Leads</h3></div><button type="button" onClick={() => selectView("crm")}>Alle Leads</button></div><LeadTable rows={opportunities.slice(0, 10)} selectable={false} /></section>
+            <aside className={styles.sideStack}>
+              <section className={styles.panel}><div className={styles.panelHead}><div><span>JETZT NACHFASSEN</span><h3>Fällige Rückrufe</h3></div><b>{dueLeads.length}</b></div><div className={styles.compactList}>{dueLeads.slice(0, 9).map((lead) => <button type="button" key={lead.id} onClick={() => openInspector(lead.id)}><div><strong>{lead.company}</strong><small>{lead.next_action || "Nachfassen"} · {fmtDate(lead.next_action_at, true)}</small></div><span>{lead.phone ? "◉" : "›"}</span></button>)}{!dueLeads.length && <div className={styles.empty}>Keine Rückrufe offen.</div>}</div></section>
+              <section className={styles.panel}><div className={styles.panelHead}><div><span>VORBEREITUNGSSTAND</span><h3>{enrichmentCoverage}% der Leads vorbereitet</h3></div><button type="button" onClick={() => selectView("intelligence")}>Ansehen</button></div><div className={styles.coverageBar}><i style={{ width: `${enrichmentCoverage}%` }} /></div><p className={styles.panelNote}>{data.leads.filter((lead) => !isEnriched(lead)).length} Leads benötigen noch zusätzliche Daten.</p></section>
+            </aside>
+          </div>
+          <div className={styles.twoPanels}><section className={styles.panel}><div className={styles.panelHead}><div><span>VERTRIEBSTRICHTER</span><h3>Von der Chance zum Abschluss</h3></div></div><Funnel /></section><section className={styles.panel}><div className={styles.panelHead}><div><span>LIVE-AKTIVITÄT</span><h3>Was gerade passiert</h3></div></div><ActivityList items={data.activities.slice(0, 12)} /></section></div>
+        </>}
 
         {view === "crm" && <><div className={styles.pageHead}><div><span>CRM</span><h2>Research-first Sales CRM.</h2><p>Firma, Kontakte, Socials, Karriere, ATS, Website-Audit, Scores und nächste Aktion direkt in einer Zeile.</p></div><div className={styles.pageHeadActions}><button className={styles.quietButton} type="button" onClick={() => void enrich(filtered.filter((lead) => !isEnriched(lead)).slice(0, 5).map((lead) => lead.id))} disabled={busy === "enrich"}>Enrich next 5</button></div></div><section className={styles.panel}><div className={styles.crmToolbar}><div className={styles.searchBox}>⌕<input ref={searchRef} value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Firma, Kontakt, Ort, Signal, Social …" /></div><select value={stageFilter} onChange={(e) => setStageFilter(e.target.value as "all" | Stage)}><option value="all">All stages</option>{STAGES.map((stage) => <option key={stage}>{stage}</option>)}</select><select value={researchFilter} onChange={(e) => setResearchFilter(e.target.value as typeof researchFilter)}><option value="all">All research</option><option value="enriched">Enriched</option><option value="missing">Missing research</option><option value="weak">Weak coverage</option></select><span className={styles.resultCount}>{filtered.length}</span></div>{selectedIds.size > 0 && <div className={styles.bulkBar}><strong>{selectedIds.size} selected</strong><button type="button" onClick={() => void enrich([...selectedIds])} disabled={busy === "enrich"}>◈ Enrich</button><select defaultValue="" onChange={(e) => { const stage = e.target.value as Stage; if (stage) void bulkStage(stage); e.currentTarget.value = ""; }}><option value="">Set stage…</option>{STAGES.map((stage) => <option key={stage}>{stage}</option>)}</select><button type="button" onClick={() => setSelectedIds(new Set())}>Clear</button></div>}<LeadTable /></section></>}
 
