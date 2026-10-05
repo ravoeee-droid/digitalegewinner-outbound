@@ -15,7 +15,7 @@ export default async function CallPage() {
     <>
       {!isSales && <RevenueCommandDeck />}
       <CallConsole />
-      {!isSales && <CloudTalkPhone />}
+      <CloudTalkPhone />
     </>
   );
 }
