@@ -23,6 +23,7 @@ export type ContactEnrichment = {
   decisionMakerName: string;
   decisionMakerRole: string;
   jobTitles: string[];
+  jobOpenings: Array<{ title: string; datePosted: string; sourceUrl: string }>;
   source: "public-website";
 };
 
@@ -53,6 +54,36 @@ function normalize(raw: string) { const value = raw.trim(); if (!value) throw ne
 function decode(value: string) { return value.replace(/&amp;/gi, "&").replace(/&#64;|&#x40;/gi, "@").replace(/&nbsp;/gi, " ").replace(/\s+/g, " "); }
 function clean(value: string) { return decode(value.replace(/<script\b[\s\S]*?<\/script>/gi, " ").replace(/<style\b[\s\S]*?<\/style>/gi, " ").replace(/<[^>]+>/g, " ")).replace(/\s+/g, " ").trim(); }
 function unique(values: string[]) { return [...new Set(values.filter(Boolean))]; }
+
+function structuredJobOpenings(html: string, sourceUrl: string) {
+  const openings: Array<{ title: string; datePosted: string; sourceUrl: string }> = [];
+  const visit = (value: unknown) => {
+    if (Array.isArray(value)) { value.forEach(visit); return; }
+    if (!value || typeof value !== "object") return;
+    const item = value as Record<string, unknown>;
+    const type = item["@type"];
+    const types = Array.isArray(type) ? type.map(String) : [String(type || "")];
+    if (types.some((entry) => entry.toLowerCase() === "jobposting")) {
+      const title = typeof item.title === "string" ? clean(item.title) : "";
+      const rawDate = typeof item.datePosted === "string" ? item.datePosted.trim() : "";
+      const parsed = rawDate ? new Date(rawDate) : null;
+      const datePosted = parsed && !Number.isNaN(parsed.getTime()) ? parsed.toISOString() : "";
+      if (title) openings.push({ title, datePosted, sourceUrl });
+    }
+    Object.values(item).forEach(visit);
+  };
+  for (const match of html.matchAll(/<script\b[^>]*type\s*=\s*["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi)) {
+    try { visit(JSON.parse(match[1])); } catch {}
+  }
+  const seen = new Set<string>();
+  return openings.filter((opening) => {
+    const key = `${opening.title.toLowerCase()}|${opening.datePosted}|${opening.sourceUrl}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  }).slice(0, 20);
+}
+
 function emailScore(email: string) {
   const local = email.split("@")[0].toLowerCase();
   const preferred = ["personal", "bewerbung", "karriere", "jobs", "hr", "recruiting", "info", "kontakt", "contact", "office", "leitung", "pdl", "team", "service"];
@@ -111,6 +142,7 @@ type Extracted = {
   decisionMakerName: string;
   decisionMakerRole: string;
   jobTitles: string[];
+  jobOpenings: Array<{ title: string; datePosted: string; sourceUrl: string }>;
 };
 
 function extract(html: string, base: URL): Extracted {
@@ -148,9 +180,11 @@ function extract(html: string, base: URL): Extracted {
   const atsProviders = ATS.filter(([pattern]) => pattern.test(decoded)).map(([, name]) => name);
   const trackingTools = TRACKING.filter(([pattern]) => pattern.test(decoded)).map(([, name]) => name);
   const recruitingSignals: string[] = [];
+  const jobOpenings = structuredJobOpenings(html, base.toString());
   const jobTitles = unique(
     [...body.matchAll(/\b(Pflegefachkraft|Pflegefachmann|Pflegefachfrau|Altenpfleger(?:in)?|Gesundheits- und Krankenpfleger(?:in)?|Pflegehelfer(?:in)?|Pflegeassistenz|Pflegeassistent(?:in)?|Wohnbereichsleitung|Pflegedienstleitung|PDL|Betreuungskraft|Heilerziehungspfleger(?:in)?|Praxisanleiter(?:in)?|Nachtwache|Hauswirtschaftskraft|Alltagsbegleiter(?:in)?)\b/gi)]
       .map((match) => match[1].trim())
+      .concat(jobOpenings.map((opening) => opening.title))
   ).slice(0, 12);
   let decisionMakerName = "";
   let decisionMakerRole = "";
@@ -188,6 +222,7 @@ function extract(html: string, base: URL): Extracted {
     decisionMakerName,
     decisionMakerRole,
     jobTitles,
+    jobOpenings,
   };
 }
 
@@ -231,6 +266,7 @@ export async function enrichPublicContact(rawUrl: string): Promise<ContactEnrich
   let contactPage = "", careersPage = "", jobsPage = "", teamPage = "";
   let atsProviders: string[] = [], trackingTools: string[] = [], recruitingSignals: string[] = [];
   let decisionMakerName = "", decisionMakerRole = "", jobTitles: string[] = [];
+  let jobOpenings: Array<{ title: string; datePosted: string; sourceUrl: string }> = [];
 
   while (queue.length && visited.size < MAX_PAGES) {
     const raw = queue.shift()!;
@@ -257,6 +293,9 @@ export async function enrichPublicContact(rawUrl: string): Promise<ContactEnrich
       decisionMakerName = decisionMakerName || found.decisionMakerName;
       decisionMakerRole = decisionMakerRole || found.decisionMakerRole;
       jobTitles = unique([...jobTitles, ...found.jobTitles]).slice(0, 12);
+      jobOpenings = [...jobOpenings, ...found.jobOpenings]
+        .filter((opening, index, all) => all.findIndex((item) => item.title.toLowerCase() === opening.title.toLowerCase() && item.datePosted === opening.datePosted) === index)
+        .slice(0, 20);
       contactPage = contactPage || found.contactLinks[0] || "";
       careersPage = careersPage || found.careerLinks[0] || "";
       jobsPage = jobsPage || found.jobsLinks[0] || "";
@@ -291,6 +330,7 @@ export async function enrichPublicContact(rawUrl: string): Promise<ContactEnrich
     decisionMakerName,
     decisionMakerRole,
     jobTitles,
+    jobOpenings,
     source: "public-website",
   };
 }
