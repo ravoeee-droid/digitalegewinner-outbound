@@ -199,7 +199,9 @@ export async function POST(request: Request) {
     await query(`
       update sales_leads
       set last_contact_at=now(),last_outcome=$2,updated_at=now(),
-          next_action=case when $2='info_mail' then 'Info-Mail senden' when $3::text<>'' then 'Rückruf' else next_action end,
+          stage=case when $2='appointment' then 'Termin' when $2 in ('pain','website_requested') and stage in ('Neu','Research','Bereit','Kontaktiert') then 'Engaged' else stage end,
+          probability=case when $2='appointment' then greatest(probability,55) when $2 in ('pain','website_requested') then greatest(probability,35) else probability end,
+          next_action=case when $2='appointment' then 'Termin vorbereiten' when $2='info_mail' then 'Info-Mail senden' when $3::text<>'' then 'Rückruf' else next_action end,
           next_action_at=case when $2='info_mail' then now() when $3::text<>'' then $3::timestamptz else next_action_at end
       where id=$1
     `, [task.lead_id, outcomeInput.outcome, callbackAt || ""]);
