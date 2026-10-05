@@ -38,6 +38,6 @@ export const config={
   "/studio/:path*",
   "/ui/:path*",
   "/websites/:path*",
-  "/api/((?!auth/login|track|t/|events/inbound|cron/|oauth/google/callback|oauth/microsoft/callback|video/callback).*)"
+  "/api/((?!auth/login|track|t/|events/inbound|cron/|oauth/google/callback|oauth/microsoft/callback|video/callback|health/db).*)"
  ]
 };
