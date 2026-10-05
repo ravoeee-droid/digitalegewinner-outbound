@@ -238,7 +238,7 @@ export async function ensureAppointmentGoalQueue(workspace="default") {
     audience:campaign.audience,
     steps:campaign.steps,
     workspace,
-  });
+  }).catch(() => ({ id:null as string|null }));
 
   const candidates = await query<{
     queue_id:string;lead_id:string;email:string;company:string;contact:string;city:string;lead_payload:PflegeLeadPayload|null
