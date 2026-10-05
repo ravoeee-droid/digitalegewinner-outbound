@@ -40,7 +40,12 @@ async function run(request: Request) {
           c.metadata->>'call_enrichment_attempt_at' is null
           or (c.metadata->>'call_enrichment_attempt_at')::timestamptz < now() - interval '12 hours'
         )
-      order by l.priority_score desc, l.updated_at desc
+      order by
+        case when coalesce(ct.phone,c.phone,'')='' then 0 else 1 end,
+        case when coalesce(ct.name,'')='' then 0 else 1 end,
+        case when coalesce(jsonb_array_length(coalesce(c.metadata->'enrichment'->'jobTitles','[]'::jsonb)),0)=0 then 0 else 1 end,
+        l.priority_score desc,
+        l.updated_at desc
       limit 12
     `);
 
