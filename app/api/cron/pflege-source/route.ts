@@ -267,7 +267,7 @@ async function runSync() {
     runId=prepared.runId;
   }
 
-  const jobs=await query<{url:string}>(`select url from pflege_source_jobs where run_id=$1 and status='pending' order by url limit 36`,[runId]);
+  const jobs=await query<{url:string}>(`select url from pflege_source_jobs where run_id=$1 and status='pending' order by url limit 72`,[runId]);
   if (!jobs.length) return {ok:true,status:"complete",runId,counts:await finalize(runId)};
 
   const results:string[]=[];
