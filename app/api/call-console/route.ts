@@ -32,7 +32,7 @@ async function currentOwner() {
   return role === "sales" ? "Mattias" : "Raphael";
 }
 
-function ownerTasks(tasks: Array<{ channel: string; payload: Record<string, unknown> }>, owner: string) {
+function ownerTasks(tasks: Array<{ channel: string; lead_id: string; payload: Record<string, unknown> }>, owner: string) {
   return tasks.filter((task) => task.channel === "call" && String(task.payload?.owner || "") === owner);
 }
 
@@ -96,22 +96,24 @@ export async function POST(request: Request) {
       return Response.json({ ok: true, owner, tasks, channels: snapshot.channels, extremeHot: input.value });
     }
 
+    const outcomeInput = outcomeSchema.parse(input);
+
     await query(
       `update sales_outbound_tasks
        set status='done', payload=payload || jsonb_build_object('callOutcome',$2::text,'callNote',$3::text,'openerTest',$4::text,'callOutcomeAt',now()::text), updated_at=now()
        where id=$1::text and channel='call'`,
-      [input.id, input.outcome, input.note, input.opener],
+      [input.id, outcomeInput.outcome, outcomeInput.note, outcomeInput.opener],
     );
 
     let websiteProject = null;
     let integrationWarning = "";
-    if (input.outcome === "website_requested") {
+    if (outcomeInput.outcome === "website_requested") {
       try {
         await addProductOpportunity(task.lead_id, "website");
         const opportunityRows = await query<{ id: string }>(`select id from sales_opportunities where workspace='default' and lead_id=$1 and product_key='website' order by case when status='open' then 0 else 1 end,updated_at desc limit 1`, [task.lead_id]);
         const opportunity = opportunityRows[0];
         if (opportunity) {
-          await updateRevenueOpportunity(opportunity.id, { outcome: "Interesse", nextAction: "Website-Entwurf erstellen und Preview vorbereiten", notes: input.note || undefined });
+          await updateRevenueOpportunity(opportunity.id, { outcome: "Interesse", nextAction: "Website-Entwurf erstellen und Preview vorbereiten", notes: outcomeInput.note || undefined });
         }
         websiteProject = await createWebsiteProjectFromLead(task.lead_id, "default", "rapid-call");
       } catch (integrationError) {
