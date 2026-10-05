@@ -14,6 +14,7 @@ async function run(request:Request){
     const result=await ensureAppointmentGoalQueue("default");
     return Response.json(result,{status:result.ok?200:503});
   }catch(error){
+    console.error("[appointment-goal] worker failed", error);
     return Response.json({ok:false,error:error instanceof Error?error.message:"Appointment goal worker failed"},{status:500});
   }
 }
