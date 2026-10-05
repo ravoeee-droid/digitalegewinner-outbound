@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
 
 const outcomeSchema = z.object({
   id: z.string().min(3),
-  outcome: z.enum(["not_reached", "callback", "pain", "appointment", "no_fit", "dnc", "website_requested"]),
+  outcome: z.enum(["not_reached", "callback", "pain", "appointment", "no_fit", "dnc", "website_requested", "info_mail"]),
   note: z.string().max(4000).optional().default(""),
   opener: z.enum(["A", "B", "C", "D"]).optional().default("D"),
   callbackPreset: z.enum(["30m", "afternoon", "time"]).optional(),
@@ -144,6 +144,7 @@ export async function POST(request: Request) {
       outcomeInput.outcome === "not_reached" ? "Nicht erreicht" :
       outcomeInput.outcome === "appointment" ? "Termin" :
       outcomeInput.outcome === "pain" || outcomeInput.outcome === "website_requested" ? "Interesse" :
+      outcomeInput.outcome === "info_mail" ? "Info-Mail" :
       "Erreicht";
 
     await query(`
@@ -198,8 +199,8 @@ export async function POST(request: Request) {
     await query(`
       update sales_leads
       set last_contact_at=now(),last_outcome=$2,updated_at=now(),
-          next_action=case when $3::text<>'' then 'Rückruf' else next_action end,
-          next_action_at=case when $3::text<>'' then $3::timestamptz else next_action_at end
+          next_action=case when $2='info_mail' then 'Info-Mail senden' when $3::text<>'' then 'Rückruf' else next_action end,
+          next_action_at=case when $2='info_mail' then now() when $3::text<>'' then $3::timestamptz else next_action_at end
       where id=$1
     `, [task.lead_id, outcomeInput.outcome, callbackAt || ""]);
 
