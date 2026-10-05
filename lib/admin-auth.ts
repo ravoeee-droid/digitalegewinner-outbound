@@ -34,3 +34,4 @@ export function sessionRole(value?:string|null):AppRole|null{
 export function validSession(value?:string|null){return sessionRole(value)!==null}
 
 // Sales credentials are injected via Vercel environment variables.
+// Sales login email is configured via SALES_USER_EMAIL.
