@@ -20,6 +20,9 @@ export type ContactEnrichment = {
   atsProviders: string[];
   trackingTools: string[];
   recruitingSignals: string[];
+  decisionMakerName: string;
+  decisionMakerRole: string;
+  jobTitles: string[];
   source: "public-website";
 };
 
@@ -105,6 +108,9 @@ type Extracted = {
   atsProviders: string[];
   trackingTools: string[];
   recruitingSignals: string[];
+  decisionMakerName: string;
+  decisionMakerRole: string;
+  jobTitles: string[];
 };
 
 function extract(html: string, base: URL): Extracted {
@@ -142,6 +148,16 @@ function extract(html: string, base: URL): Extracted {
   const atsProviders = ATS.filter(([pattern]) => pattern.test(decoded)).map(([, name]) => name);
   const trackingTools = TRACKING.filter(([pattern]) => pattern.test(decoded)).map(([, name]) => name);
   const recruitingSignals: string[] = [];
+  const jobTitles = unique(
+    [...body.matchAll(/\b(Pflegefachkraft|Pflegefachmann|Pflegefachfrau|Altenpfleger(?:in)?|Gesundheits- und Krankenpfleger(?:in)?|Pflegehelfer(?:in)?|Pflegeassistenz|Pflegeassistent(?:in)?|Wohnbereichsleitung|Pflegedienstleitung|PDL|Betreuungskraft|Heilerziehungspfleger(?:in)?|Praxisanleiter(?:in)?|Nachtwache|Hauswirtschaftskraft|Alltagsbegleiter(?:in)?)\b/gi)]
+      .map((match) => match[1].trim())
+  ).slice(0, 12);
+  let decisionMakerName = "";
+  let decisionMakerRole = "";
+  const roleFirst = body.match(/\b(Geschäftsführer(?:in)?|Einrichtungsleitung|Pflegedienstleitung|PDL|Heimleitung|Personal(?:leitung|verantwortliche[rn]?))\b\s*[:\-–]?\s*((?:[A-ZÄÖÜ][a-zäöüß]+\s+){1,3}[A-ZÄÖÜ][a-zäöüß]+)/);
+  const nameFirst = body.match(/((?:[A-ZÄÖÜ][a-zäöüß]+\s+){1,3}[A-ZÄÖÜ][a-zäöüß]+)\s*[,|·\-–]?\s*\b(Geschäftsführer(?:in)?|Einrichtungsleitung|Pflegedienstleitung|PDL|Heimleitung|Personal(?:leitung|verantwortliche[rn]?))\b/);
+  if (roleFirst) { decisionMakerRole = roleFirst[1]; decisionMakerName = roleFirst[2]; }
+  else if (nameFirst) { decisionMakerName = nameFirst[1]; decisionMakerRole = nameFirst[2]; }
   if (/pflegefachkraft|pflegefachkräfte|examiniert|altenpfleger|gesundheits- und krankenpfleg|pflegehelfer/i.test(body)) recruitingSignals.push("Pflege-Recruiting-Inhalt erkannt");
   if (/karriere|stellenangebot|offene stellen|wir suchen|jetzt bewerben|bewerben sie sich|komm ins team/i.test(body)) recruitingSignals.push("Aktive Karriere-/Bewerberansprache erkannt");
   if (/benefits|vorteile|arbeitgeber|mitarbeiterbenefits|betriebliche altersvorsorge|jobrad|fortbildung|weiterbildung/i.test(body)) recruitingSignals.push("Employer-Branding-/Benefit-Inhalte erkannt");
@@ -169,6 +185,9 @@ function extract(html: string, base: URL): Extracted {
     atsProviders: unique(atsProviders),
     trackingTools: unique(trackingTools),
     recruitingSignals: unique(recruitingSignals),
+    decisionMakerName,
+    decisionMakerRole,
+    jobTitles,
   };
 }
 
@@ -211,6 +230,7 @@ export async function enrichPublicContact(rawUrl: string): Promise<ContactEnrich
   let linkedin = "", instagram = "", facebook = "", tiktok = "", youtube = "", xing = "";
   let contactPage = "", careersPage = "", jobsPage = "", teamPage = "";
   let atsProviders: string[] = [], trackingTools: string[] = [], recruitingSignals: string[] = [];
+  let decisionMakerName = "", decisionMakerRole = "", jobTitles: string[] = [];
 
   while (queue.length && visited.size < MAX_PAGES) {
     const raw = queue.shift()!;
@@ -234,6 +254,9 @@ export async function enrichPublicContact(rawUrl: string): Promise<ContactEnrich
       atsProviders = unique([...atsProviders, ...found.atsProviders]);
       trackingTools = unique([...trackingTools, ...found.trackingTools]);
       recruitingSignals = unique([...recruitingSignals, ...found.recruitingSignals]);
+      decisionMakerName = decisionMakerName || found.decisionMakerName;
+      decisionMakerRole = decisionMakerRole || found.decisionMakerRole;
+      jobTitles = unique([...jobTitles, ...found.jobTitles]).slice(0, 12);
       contactPage = contactPage || found.contactLinks[0] || "";
       careersPage = careersPage || found.careerLinks[0] || "";
       jobsPage = jobsPage || found.jobsLinks[0] || "";
@@ -265,6 +288,9 @@ export async function enrichPublicContact(rawUrl: string): Promise<ContactEnrich
     atsProviders,
     trackingTools,
     recruitingSignals,
+    decisionMakerName,
+    decisionMakerRole,
+    jobTitles,
     source: "public-website",
   };
 }
