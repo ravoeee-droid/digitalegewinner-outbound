@@ -11,10 +11,10 @@ function productionConnectionString(raw: string) {
     const match = url.hostname.match(/^db\.([a-z0-9]+)\.supabase\.co$/i);
     if (!match) return raw;
     const projectRef = match[1];
-    // Supabase project is in eu-central-1. The transaction pooler endpoint for
-    // newer projects uses the aws-1 host. Allow an explicit override, but use
-    // the correct regional default instead of the stale aws-0 endpoint.
-    url.hostname = process.env.SUPABASE_POOLER_HOST || "aws-1-eu-central-1.pooler.supabase.com";
+    // Vercel is IPv4-only for this database path, so production must use
+    // Supavisor transaction mode. This project's Frankfurt pooler is on the
+    // aws-0 cluster; an explicit env override still takes precedence.
+    url.hostname = process.env.SUPABASE_POOLER_HOST || "aws-0-eu-central-1.pooler.supabase.com";
     url.port = "6543";
     url.username = `postgres.${projectRef}`;
     return url.toString();
