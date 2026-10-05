@@ -12,6 +12,10 @@
     {
       "path": "/api/cron/replies",
       "schedule": "*/10 * * * *"
+    },
+    {
+      "path": "/api/cron/enrich-call-leads",
+      "schedule": "*/2 * * * *"
     }
   ],
   "regions": [
