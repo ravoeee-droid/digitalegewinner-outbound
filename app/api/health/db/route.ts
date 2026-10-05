@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { query } from "@/lib/db";
+import { ensureSalesOsSchema } from "@/lib/sales-os";
 
 export const dynamic = "force-dynamic";
 // Runs in the project's configured data region.
@@ -8,6 +9,7 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   const started = Date.now();
   try {
+    await ensureSalesOsSchema();
     const rows = await query<{ ok: number; sales_leads: string | null }>(
       "select 1 as ok, to_regclass('public.sales_leads')::text as sales_leads",
     );
