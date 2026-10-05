@@ -14,6 +14,8 @@ const outcomeSchema = z.object({
   outcome: z.enum(["not_reached", "callback", "pain", "appointment", "no_fit", "dnc", "website_requested"]),
   note: z.string().max(4000).optional().default(""),
   opener: z.enum(["A", "B", "C", "D"]).optional().default("D"),
+  callbackPreset: z.enum(["30m", "afternoon", "time"]).optional(),
+  callbackTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).optional(),
 });
 
 const postSchema = z.union([
@@ -98,12 +100,79 @@ export async function POST(request: Request) {
 
     const outcomeInput = outcomeSchema.parse(input);
 
+    let callbackAt: string | null = null;
+    if (outcomeInput.outcome === "callback") {
+      const preset = outcomeInput.callbackPreset || "30m";
+      const rows = await query<{ callback_at: string }>(`
+        select case
+          when $1='30m' then (now() + interval '30 minutes')
+          when $1='afternoon' then (
+            case
+              when (((now() at time zone 'Europe/Berlin')::date + time '15:00') at time zone 'Europe/Berlin') > now()
+                then (((now() at time zone 'Europe/Berlin')::date + time '15:00') at time zone 'Europe/Berlin')
+              else ((((now() at time zone 'Europe/Berlin')::date + 1 + time '15:00')) at time zone 'Europe/Berlin')
+            end
+          )
+          else (
+            case
+              when (((now() at time zone 'Europe/Berlin')::date + coalesce(nullif($2,'')::time,time '09:00')) at time zone 'Europe/Berlin') > now()
+                then (((now() at time zone 'Europe/Berlin')::date + coalesce(nullif($2,'')::time,time '09:00')) at time zone 'Europe/Berlin')
+              else ((((now() at time zone 'Europe/Berlin')::date + 1 + coalesce(nullif($2,'')::time,time '09:00'))) at time zone 'Europe/Berlin')
+            end
+          )
+        end as callback_at
+      `, [preset, outcomeInput.callbackTime || ""]);
+      callbackAt = rows[0]?.callback_at || null;
+    }
+
     await query(
       `update sales_outbound_tasks
-       set status='done', payload=payload || jsonb_build_object('callOutcome',$2::text,'callNote',$3::text,'openerTest',$4::text,'callOutcomeAt',now()::text), updated_at=now()
+       set status=$5,
+           payload=payload || jsonb_build_object(
+             'callOutcome',$2::text,
+             'callNote',$3::text,
+             'openerTest',$4::text,
+             'callOutcomeAt',now()::text,
+             'callbackAt',$6::text
+           ),
+           updated_at=now()
        where id=$1::text and channel='call'`,
-      [input.id, outcomeInput.outcome, outcomeInput.note, outcomeInput.opener],
+      [input.id, outcomeInput.outcome, outcomeInput.note, outcomeInput.opener, outcomeInput.outcome === "callback" ? "callback" : "done", callbackAt || ""],
     );
+
+    const dashboardOutcome =
+      outcomeInput.outcome === "not_reached" ? "Nicht erreicht" :
+      outcomeInput.outcome === "appointment" ? "Termin" :
+      outcomeInput.outcome === "pain" || outcomeInput.outcome === "website_requested" ? "Interesse" :
+      "Erreicht";
+
+    await query(`
+      insert into sales_activities(workspace,lead_id,company_id,type,summary,meta)
+      select workspace,id,company_id,'revenue.outcome',$2::text,
+             jsonb_build_object(
+               'outcome',$3::text,
+               'callOutcome',$4::text,
+               'note',$5::text,
+               'callbackAt',$6::text,
+               'source','call-console'
+             )
+      from sales_leads where id=$1
+    `, [
+      task.lead_id,
+      `Call · ${dashboardOutcome}`,
+      dashboardOutcome,
+      outcomeInput.outcome,
+      outcomeInput.note,
+      callbackAt || "",
+    ]);
+
+    await query(`
+      update sales_leads
+      set last_contact_at=now(),last_outcome=$2,updated_at=now(),
+          next_action=case when $3::text<>'' then 'Rückruf' else next_action end,
+          next_action_at=case when $3::text<>'' then $3::timestamptz else next_action_at end
+      where id=$1
+    `, [task.lead_id, outcomeInput.outcome, callbackAt || ""]);
 
     let websiteProject = null;
     let integrationWarning = "";
