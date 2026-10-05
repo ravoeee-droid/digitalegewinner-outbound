@@ -228,6 +228,23 @@ async function processOne(runId: string, url: string) {
   }
 }
 
+async function archiveOldActiveLeads(runId: string) {
+  await query(`
+    update sales_leads l
+       set status='archived',updated_at=now()
+      from sales_companies c
+     where l.company_id=c.id and l.workspace='default' and l.status='active'
+       and l.stage in ('Neu','Research','Bereit','Kontaktiert')
+       and coalesce(c.metadata->>'sourceRunId','')<>$1
+  `,[runId]);
+  await query(`
+    delete from sales_outbound_tasks t
+    using sales_leads l,sales_companies c
+    where t.lead_id=l.id and l.company_id=c.id and t.workspace='default'
+      and l.status='archived'
+  `);
+}
+
 async function finalize(runId: string) {
   await query(`
     update sales_leads l
@@ -267,6 +284,7 @@ async function runSync() {
     runId=prepared.runId;
   }
 
+  await archiveOldActiveLeads(runId);
   const jobs=await query<{url:string}>(`select url from pflege_source_jobs where run_id=$1 and status='pending' order by url limit 72`,[runId]);
   if (!jobs.length) return {ok:true,status:"complete",runId,counts:await finalize(runId)};
 
