@@ -4,6 +4,7 @@ import { z } from "zod";
 import { loadMailboxCredentials, type StoredMailboxCredential } from "@/lib/mailbox-credentials";
 import { setSecret } from "@/lib/secrets";
 import { testImapConnection, type ImapMailboxCredential } from "@/lib/imap-client";
+import { readState, writeState } from "@/lib/db";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -101,7 +102,17 @@ export async function PUT(request: Request) {
     merged.set(credential.id, credential);
     await setSecret("mailbox_credentials_json", JSON.stringify([...merged.values()]));
 
-    return Response.json({ ok: true, mailbox: publicMailbox(credential) });
+    const row = await readState().catch(() => null);
+    const state = (row?.payload || {}) as Record<string, unknown>;
+    const existingMailboxes = Array.isArray(state.mailboxes) ? state.mailboxes as Array<Record<string, unknown>> : [];
+    const nextMailbox = { id: credential.id, email: credential.email, enabled: true, dailyLimit: 30 };
+    const nextMailboxes = [
+      ...existingMailboxes.filter((item) => String(item.email || "").toLowerCase() !== credential.email.toLowerCase() && String(item.id || "") !== credential.id),
+      nextMailbox,
+    ];
+    await writeState({ ...state, mailboxes: nextMailboxes });
+
+    return Response.json({ ok: true, mailbox: publicMailbox(credential), campaignMailbox: nextMailbox });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Mailbox konnte nicht verbunden werden.";
     const normalized = /authentication|auth|login|credentials|password/i.test(message)
