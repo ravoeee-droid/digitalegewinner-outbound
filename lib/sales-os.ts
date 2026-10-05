@@ -173,6 +173,8 @@ export async function ensureSalesOsSchema() {
     alter table sales_leads add column if not exists last_contact_at timestamptz;
     alter table sales_leads add column if not exists last_outcome text not null default '';
     alter table sales_leads add column if not exists phone_status text not null default 'ready';
+    alter table sales_leads add column if not exists extreme_hot boolean not null default false;
+    create index if not exists sales_leads_extreme_hot_idx on sales_leads(workspace, extreme_hot, updated_at desc) where extreme_hot=true;
 
     create table if not exists sales_activities (
       id bigserial primary key,
