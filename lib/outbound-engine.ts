@@ -202,16 +202,20 @@ export async function getOutboundEngineSnapshot(workspace = "default") {
       count(*) filter(where status in ('ready','drafted','queued'))::int ready,
       count(*) filter(where status in ('done','sent','completed'))::int done,
       count(*)::int total
-    from sales_outbound_tasks
-    where workspace=$1 and task_date=(now() at time zone 'Europe/Berlin')::date
+    from sales_outbound_tasks t
+    join sales_leads l on l.id=t.lead_id and l.workspace=t.workspace
+    where t.workspace=$1 and t.task_date=(now() at time zone 'Europe/Berlin')::date
+      and l.status='active'
     group by channel
   `, [workspace]);
 
   const tasks = await query<TaskRow>(`
-    select id,channel,rank,status,score,lead_id,company_id,payload,updated_at
-    from sales_outbound_tasks
-    where workspace=$1 and task_date=(now() at time zone 'Europe/Berlin')::date
-    order by case channel when 'call' then 0 when 'email' then 1 when 'video' then 2 else 3 end, rank asc
+    select t.id,t.channel,t.rank,t.status,t.score,t.lead_id,t.company_id,t.payload,t.updated_at
+    from sales_outbound_tasks t
+    join sales_leads l on l.id=t.lead_id and l.workspace=t.workspace
+    where t.workspace=$1 and t.task_date=(now() at time zone 'Europe/Berlin')::date
+      and l.status='active'
+    order by case t.channel when 'call' then 0 when 'email' then 1 when 'video' then 2 else 3 end, t.rank asc
     limit 320
   `, [workspace]);
 
