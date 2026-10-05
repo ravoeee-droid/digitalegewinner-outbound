@@ -24,9 +24,12 @@ function productionConnectionString(raw: string) {
 }
 
 function getPool() {
-  if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL fehlt.");
+  const raw = process.env.POSTGRES_URL || process.env.DATABASE_URL;
+  if (!raw) throw new Error("Keine Postgres-Verbindung konfiguriert.");
   if (!pool) pool = new Pool({
-    connectionString: productionConnectionString(process.env.DATABASE_URL),
+    // Vercel Postgres/Neon is the operational fallback while the Supabase
+    // project's own Postgres and Supavisor endpoints are timing out.
+    connectionString: productionConnectionString(raw),
     ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : undefined,
     max: 1,
     idleTimeoutMillis: 10_000,
