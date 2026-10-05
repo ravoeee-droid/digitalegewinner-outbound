@@ -12,10 +12,10 @@ function productionConnectionString(raw: string) {
     if (!match) return raw;
     const projectRef = match[1];
     // Vercel is IPv4-only for this database path, so production must use
-    // Supavisor transaction mode. This project's Frankfurt pooler is on the
+    // Supavisor shared pooler. Transaction mode is currently returning EAUTHQUERY\n    // backend-unavailable errors for this project, so use IPv4 session mode by\n    // default; an explicit env override can switch the port later.\n    // This project's Frankfurt pooler is on the
     // aws-0 cluster; an explicit env override still takes precedence.
     url.hostname = process.env.SUPABASE_POOLER_HOST || "aws-0-eu-central-1.pooler.supabase.com";
-    url.port = "6543";
+    url.port = process.env.SUPABASE_POOLER_PORT || "5432";
     url.username = `postgres.${projectRef}`;
     return url.toString();
   } catch {
