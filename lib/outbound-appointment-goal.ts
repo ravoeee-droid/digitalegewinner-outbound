@@ -283,11 +283,11 @@ export async function ensureAppointmentGoalQueue(workspace="default") {
       const step=campaign.steps[stepIndex];
       const scheduled = new Date(firstTouchAt+Math.max(0,step.waitDays)*86400000);
       const copy=stepIndex===0?firstTouch:conciseFollowUp(lead,stepIndex);
-      await query(\`
+      await query(`
         insert into er_outbox(
           id,workspace,campaign_id,lead_id,mailbox_id,recipient,subject,body,variant,scheduled_at,campaign_version_id
         ) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
-      \`,[
+      `,[
         crypto.randomUUID(),workspace,campaign.id,lead.lead_id,mailbox.id,lead.email,
         copy.subject,copy.body,firstTouch.variant,scheduled,version.id,
       ]);
