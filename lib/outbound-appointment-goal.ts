@@ -240,27 +240,63 @@ export async function ensureAppointmentGoalQueue(workspace="default") {
     workspace,
   }).catch(() => ({ id:null as string|null }));
 
-  const candidates = await query<{
+  let queueSource:"pflege_email_outreach"|"crm"="pflege_email_outreach";
+  let candidates:Array<{
     queue_id:string;lead_id:string;email:string;company:string;contact:string;city:string;lead_payload:PflegeLeadPayload|null
-  }>(`
-    select q.id::text queue_id,l.id lead_id,ct.email,c.name company,coalesce(ct.name,'') contact,coalesce(c.city,'') city,q.lead lead_payload
-    from pflege_email_outreach q
-    join sales_contacts ct on lower(ct.email)=lower(q.email) and ct.workspace=$1
-    join sales_leads l on l.contact_id=ct.id and l.workspace=$1
-    join sales_companies c on c.id=l.company_id and c.workspace=l.workspace
-    where q.status in ('draft','approved')
-      and q.lead_date >= (now() at time zone 'Europe/Berlin')::date - 30
-      and l.status='active'
-      and l.stage in ('Neu','Research','Bereit')
-      and coalesce(l.do_not_contact,false)=false
-      and not exists(select 1 from er_suppressions s where s.workspace=$1 and lower(s.email)=lower(q.email))
-      and not exists(select 1 from er_outbox o where o.workspace=$1 and o.campaign_id=$2 and o.lead_id=l.id and o.status not in ('failed','suppressed'))
-    order by
-      case when q.lead_date=(now() at time zone 'Europe/Berlin')::date then 0 else 1 end,
-      q.lead_date desc,
-      q.rank asc
-    limit 250
-  `, [workspace,campaign.id]);
+  }>=[];
+  try {
+    candidates = await query<{
+      queue_id:string;lead_id:string;email:string;company:string;contact:string;city:string;lead_payload:PflegeLeadPayload|null
+    }>(`
+      select q.id::text queue_id,l.id lead_id,ct.email,c.name company,coalesce(ct.name,'') contact,coalesce(c.city,'') city,q.lead lead_payload
+      from pflege_email_outreach q
+      join sales_contacts ct on lower(ct.email)=lower(q.email) and ct.workspace=$1
+      join sales_leads l on l.contact_id=ct.id and l.workspace=$1
+      join sales_companies c on c.id=l.company_id and c.workspace=l.workspace
+      where q.status in ('draft','approved')
+        and q.lead_date >= (now() at time zone 'Europe/Berlin')::date - 30
+        and l.status='active'
+        and l.stage in ('Neu','Research','Bereit')
+        and coalesce(l.do_not_contact,false)=false
+        and not exists(select 1 from er_suppressions s where s.workspace=$1 and lower(s.email)=lower(q.email))
+        and not exists(select 1 from er_outbox o where o.workspace=$1 and o.campaign_id=$2 and o.lead_id=l.id and o.status not in ('failed','suppressed'))
+      order by
+        case when q.lead_date=(now() at time zone 'Europe/Berlin')::date then 0 else 1 end,
+        q.lead_date desc,
+        q.rank asc
+      limit 250
+    `, [workspace,campaign.id]);
+  } catch {
+    queueSource="crm";
+    candidates = await query<{
+      queue_id:string;lead_id:string;email:string;company:string;contact:string;city:string;lead_payload:PflegeLeadPayload|null
+    }>(`
+      select
+        l.id queue_id,
+        l.id lead_id,
+        ct.email,
+        c.name company,
+        coalesce(ct.name,'') contact,
+        coalesce(c.city,'') city,
+        jsonb_build_object(
+          'jobReferences',jsonb_build_array(jsonb_build_object('title',coalesce(nullif(c.metadata->>'jobTitle',''),'Pflegefachkräfte'))),
+          'signals',jsonb_build_object('jobTitles',jsonb_build_array(coalesce(nullif(c.metadata->>'jobTitle',''),'Pflegefachkräfte')))
+        ) lead_payload
+      from sales_leads l
+      join sales_companies c on c.id=l.company_id and c.workspace=l.workspace
+      join sales_contacts ct on ct.id=l.contact_id and ct.workspace=l.workspace
+      where l.workspace=$1
+        and l.status='active'
+        and l.stage in ('Neu','Research','Bereit')
+        and coalesce(l.do_not_contact,false)=false
+        and coalesce(ct.email,'')<>''
+        and lower(coalesce(c.source,''))='pflegedienstjobs24'
+        and not exists(select 1 from er_suppressions s where s.workspace=$1 and lower(s.email)=lower(ct.email))
+        and not exists(select 1 from er_outbox o where o.workspace=$1 and o.campaign_id=$2 and o.lead_id=l.id and o.status not in ('failed','suppressed'))
+      order by l.priority_score desc,l.updated_at desc
+      limit 250
+    `, [workspace,campaign.id]);
+  }
 
   let queuedLeads=0, queuedMessages=0, complianceBlocked=0;
   let mailboxIndex=0;
@@ -281,7 +317,7 @@ export async function ensureAppointmentGoalQueue(workspace="default") {
       });
       if (runtime.complianceMode === "enforce" && !compliance.decision.allowed) {
         complianceBlocked++;
-        await query("update pflege_email_outreach set status='blocked',updated_at=now() where id=$1::uuid",[lead.queue_id]);
+        if(queueSource==="pflege_email_outreach") await query("update pflege_email_outreach set status='blocked',updated_at=now() where id=$1::uuid",[lead.queue_id]);
         continue;
       }
     }
@@ -319,7 +355,7 @@ export async function ensureAppointmentGoalQueue(workspace="default") {
       [workspace,lead.lead_id,JSON.stringify({campaignId:campaign.id,variant:firstTouch.variant,experiment:"pflege-personalized-2sentence-v1",source:"appointment_goal_queue"})],
     );
 
-    await query("update pflege_email_outreach set status='approved',updated_at=now() where id=$1::uuid",[lead.queue_id]);
+    if(queueSource==="pflege_email_outreach") await query("update pflege_email_outreach set status='approved',updated_at=now() where id=$1::uuid",[lead.queue_id]);
     await recordOutboundEventByMode({
       workspace,
       type:"send_planned",
@@ -327,7 +363,7 @@ export async function ensureAppointmentGoalQueue(workspace="default") {
       leadId:lead.lead_id,
       campaignVersionId:version.id,
       idempotencyKey:`appointment-goal-enroll:${campaign.id}:${lead.lead_id}`,
-      payload:{legacyCampaignId:campaign.id,mailboxId:mailbox.id,source:"pflege_email_outreach",spreadMinutes},
+      payload:{legacyCampaignId:campaign.id,mailboxId:mailbox.id,source:queueSource,spreadMinutes},
     });
 
     remainingByMailbox.set(mailbox.id,(remainingByMailbox.get(mailbox.id)||0)-1);
