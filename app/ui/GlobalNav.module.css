@@ -8,3 +8,5 @@
 .nav a:hover{color:#fff;background:rgba(255,255,255,.045);border-color:rgba(255,255,255,.1)}
 .active{color:#0d1a10!important;background:#34c759!important;border-color:#34c759!important}
 @media(max-width:700px){.brand span{display:none}.bar{gap:10px;padding:0 10px}.nav a{font-size:9px;padding:6px 8px}}
+
+.logout{margin-left:auto;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.045);color:#d9dee3;border-radius:8px;padding:7px 10px;font-size:10px;font-weight:900;letter-spacing:.04em;cursor:pointer}.logout:hover{background:rgba(255,255,255,.09);border-color:rgba(255,255,255,.22)}
