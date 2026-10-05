@@ -31,6 +31,10 @@ async function run(request: Request) {
           coalesce(ct.name,'')=''
           or coalesce(ct.phone,c.phone,'')=''
           or coalesce(jsonb_array_length(coalesce(c.metadata->'enrichment'->'jobTitles','[]'::jsonb)),0)=0
+          or (
+            coalesce(jsonb_array_length(coalesce(c.metadata->'enrichment'->'jobTitles','[]'::jsonb)),0)>0
+            and coalesce(jsonb_array_length(coalesce(c.metadata->'enrichment'->'jobOpenings','[]'::jsonb)),0)=0
+          )
         )
         and (
           c.metadata->>'call_enrichment_attempt_at' is null
