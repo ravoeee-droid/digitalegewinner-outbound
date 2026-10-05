@@ -283,6 +283,7 @@ async function enrichLead(leadId: string, useAi: boolean) {
       decisionMakerName: contact.decisionMakerName || "",
       decisionMakerRole: contact.decisionMakerRole || "",
       jobTitles: contact.jobTitles || [],
+      jobOpenings: contact.jobOpenings || [],
     },
   };
   await query(
