@@ -16,6 +16,10 @@
     {
       "path": "/api/cron/enrich-call-leads",
       "schedule": "*/2 * * * *"
+    },
+    {
+      "path": "/api/cron/pflege-source",
+      "schedule": "*/2 * * * *"
     }
   ],
   "regions": [
