@@ -187,7 +187,7 @@ function jobAgeLabel(datePosted: string) {
   if (days < 60) return `seit ${Math.floor(days / 7)} Wochen offen`;
   return `seit ${Math.floor(days / 30)} Monaten offen`;
 }
-function callPriority(lead: Lead) { let score = lead.priority_score * 3 + lead.intent_score * 2 + lead.opportunity_score; if (lead.stage === "Engaged") score += 260; if (lead.stage === "Qualifiziert") score += 320; if (lead.stage === "Wiedervorlage") score += 300; if (due(lead)) score += 420; if (!lead.last_contact_at) score += 70; return score; }
+function callPriority(lead: Lead) { let score = lead.priority_score * 3 + lead.intent_score * 2 + lead.opportunity_score; if (leadPhone(lead)) score += 1000; if (lead.stage === "Engaged") score += 260; if (lead.stage === "Qualifiziert") score += 320; if (lead.stage === "Wiedervorlage") score += 300; if (due(lead)) score += 420; if (!lead.last_contact_at) score += 70; return score; }
 function researchQuality(lead: Lead) { return Number(enrichmentOf(lead).quality || 0); }
 function isEnriched(lead: Lead) { return Boolean(enrichmentOf(lead).enrichedAt); }
 function researchAge(lead: Lead) { const date = enrichmentOf(lead).enrichedAt; return date ? fmtDate(date) : "nicht geprüft"; }
