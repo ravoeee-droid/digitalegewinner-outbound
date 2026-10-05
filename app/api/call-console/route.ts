@@ -167,6 +167,35 @@ export async function POST(request: Request) {
     ]);
 
     await query(`
+      insert into sales_activities(workspace,lead_id,company_id,type,summary,meta)
+      select workspace,id,company_id,'call.outcome',$2::text,
+             jsonb_build_object(
+               'outcome',$3::text,
+               'callOutcome',$4::text,
+               'note',$5::text,
+               'callbackAt',$6::text,
+               'source','call-console',
+               'taskId',$7::text
+             )
+      from sales_leads
+      where id=$1
+        and not exists (
+          select 1 from sales_activities a
+          where a.workspace=sales_leads.workspace
+            and a.type='call.outcome'
+            and a.meta->>'taskId'=$7::text
+        )
+    `, [
+      task.lead_id,
+      `Call · ${dashboardOutcome}`,
+      dashboardOutcome,
+      outcomeInput.outcome,
+      outcomeInput.note,
+      callbackAt || "",
+      input.id,
+    ]);
+
+    await query(`
       update sales_leads
       set last_contact_at=now(),last_outcome=$2,updated_at=now(),
           next_action=case when $3::text<>'' then 'Rückruf' else next_action end,
