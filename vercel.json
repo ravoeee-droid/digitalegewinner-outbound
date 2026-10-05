@@ -13,5 +13,11 @@
       "path": "/api/cron/replies",
       "schedule": "*/10 * * * *"
     }
+  ],
+  "regions": [
+    "fra1"
+  ],
+  "functionFailoverRegions": [
+    "dub1"
   ]
 }
