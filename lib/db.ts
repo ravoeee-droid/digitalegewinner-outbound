@@ -1,7 +1,7 @@
 import { Pool } from "pg";
 
 let pool: Pool | null = null;
-let initialized = process.env.NODE_ENV === "production";
+let initialized = false;
 let initPromise: Promise<void> | null = null;
 
 function productionConnectionString(raw: string) {
