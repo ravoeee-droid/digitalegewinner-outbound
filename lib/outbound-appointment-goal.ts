@@ -35,6 +35,42 @@ function render(template:string, lead:{company:string; contact:string; city:stri
     .replaceAll("{{sender_name}}", senderName);
 }
 
+
+type PflegeLeadPayload = {
+  jobReferences?:Array<{title?:string}>;
+  signals?:{jobTitles?:string[];websiteAudit?:{finding?:string}};
+};
+
+function stableVariant(seed:string) {
+  let hash=2166136261;
+  for(let i=0;i<seed.length;i++){hash^=seed.charCodeAt(i);hash=Math.imul(hash,16777619);}
+  return (hash>>>0)%2===0 ? "A" : "B";
+}
+
+function cleanFinding(value:string) {
+  return value.replace(/[–—]/g,",").replace(/\s+/g," ").replace(/[.!?]+$/,"").trim();
+}
+
+function personalizedFirstTouch(lead:{lead_id:string;company:string;contact:string;city:string;lead_payload:PflegeLeadPayload|null}) {
+  const payload=lead.lead_payload||{};
+  const title=String(payload.jobReferences?.[0]?.title||payload.signals?.jobTitles?.[0]||"Pflegefachkräfte").trim();
+  const finding=cleanFinding(String(payload.signals?.websiteAudit?.finding||""));
+  const greeting=lead.contact.trim() ? "Hallo "+lead.contact.trim().split(/\s+/)[0]+"," : "Hallo,";
+  const variant=stableVariant(lead.lead_id||lead.company);
+  if(variant==="B"){
+    const area=lead.city.trim() ? " aus "+lead.city.trim() : " aus eurer Gegend";
+    return {variant,subject:"kurze Frage",body:greeting+"\n\nWir sprechen gerade mit Pflegefachkräften"+area+", die offen für einen Wechsel sind. Sucht ihr aktuell noch Verstärkung?"};
+  }
+  const websitePart=finding ? " und habe kurz auf euren Karriereauftritt geschaut, "+finding.charAt(0).toLowerCase()+finding.slice(1) : "";
+  return {variant,subject:title.length<80?title:"kurze Frage zur offenen Stelle",body:greeting+"\n\nBin gerade über eure Stelle für "+title+" gestolpert"+websitePart+". Läuft die Besetzung gerade zäh?"};
+}
+
+function conciseFollowUp(lead:{contact:string},stepIndex:number) {
+  const greeting=lead.contact.trim() ? "Hallo "+lead.contact.trim().split(/\s+/)[0]+"," : "Hallo,";
+  if(stepIndex===1)return {subject:"noch aktuell?",body:greeting+"\n\nIst das Thema bei euch noch aktuell? Wenn nicht, hake ich es direkt ab."};
+  return {subject:"soll ich es abhaken?",body:greeting+"\n\nSoll ich das Thema bei euch erstmal abhaken oder sucht ihr noch?"};
+}
+
 export async function getAppointmentGoalSnapshot(workspace="default") {
   const [todayRow] = await query<{appointments:number}>(`
     with booked as (
@@ -184,9 +220,9 @@ export async function ensureAppointmentGoalQueue(workspace="default") {
   });
 
   const candidates = await query<{
-    queue_id:string;lead_id:string;email:string;company:string;contact:string;city:string
+    queue_id:string;lead_id:string;email:string;company:string;contact:string;city:string;lead_payload:PflegeLeadPayload|null
   }>(`
-    select q.id::text queue_id,l.id lead_id,ct.email,c.name company,coalesce(ct.name,'') contact,coalesce(c.city,'') city
+    select q.id::text queue_id,l.id lead_id,ct.email,c.name company,coalesce(ct.name,'') contact,coalesce(c.city,'') city,q.lead lead_payload
     from pflege_email_outreach q
     join sales_contacts ct on lower(ct.email)=lower(q.email) and ct.workspace=$1
     join sales_leads l on l.contact_id=ct.id and l.workspace=$1
@@ -242,18 +278,25 @@ export async function ensureAppointmentGoalQueue(workspace="default") {
 
     const spreadMinutes=enrollmentCapacity<=1?0:Math.floor((queuedLeads*360)/Math.max(1,enrollmentCapacity-1));
     const firstTouchAt=Date.now()+spreadMinutes*60_000;
-    for (const step of campaign.steps) {
+    const firstTouch=personalizedFirstTouch(lead);
+    for (let stepIndex=0;stepIndex<campaign.steps.length;stepIndex++) {
+      const step=campaign.steps[stepIndex];
       const scheduled = new Date(firstTouchAt+Math.max(0,step.waitDays)*86400000);
-      await query(`
+      const copy=stepIndex===0?firstTouch:conciseFollowUp(lead,stepIndex);
+      await query(\`
         insert into er_outbox(
           id,workspace,campaign_id,lead_id,mailbox_id,recipient,subject,body,variant,scheduled_at,campaign_version_id
-        ) values($1,$2,$3,$4,$5,$6,$7,$8,'A',$9,$10)
-      `,[
+        ) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+      \`,[
         crypto.randomUUID(),workspace,campaign.id,lead.lead_id,mailbox.id,lead.email,
-        render(step.subject,lead,senderName),render(step.body,lead,senderName),scheduled,version.id,
+        copy.subject,copy.body,firstTouch.variant,scheduled,version.id,
       ]);
       queuedMessages++;
     }
+    await query(
+      "insert into er_events(workspace,lead_id,type,meta) values($1,$2,'experiment_assignment',$3::jsonb)",
+      [workspace,lead.lead_id,JSON.stringify({campaignId:campaign.id,variant:firstTouch.variant,experiment:"pflege-personalized-2sentence-v1",source:"appointment_goal_queue"})],
+    );
 
     await query("update pflege_email_outreach set status='approved',updated_at=now() where id=$1::uuid",[lead.queue_id]);
     await recordOutboundEventByMode({
