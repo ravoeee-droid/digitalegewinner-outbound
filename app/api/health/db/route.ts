@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { query } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
+// Runs in the project's configured data region.
 
 export async function GET() {
   const started = Date.now();
