@@ -3,6 +3,7 @@ import { evaluateEmailSendCompliance } from "@/lib/outbound-compliance-runtime";
 import { recordOutboundEventByMode } from "@/lib/outbound-event-ledger";
 import { resolveOutboundRuntimeConfig } from "@/lib/outbound-runtime-config";
 import { ensureLegacyCampaignVersionForAttribution } from "@/lib/outbound-revenue-attribution";
+import { loadMailboxCredentials } from "@/lib/mailbox-credentials";
 
 export const APPOINTMENT_GOAL_PER_DAY = 4;
 export const LEAD_BUFFER_TARGET = 200;
@@ -116,7 +117,12 @@ export async function getAppointmentGoalSnapshot(workspace="default") {
   const health = await loadSenderHealth(workspace);
 
   const state = (await readState(workspace).catch(() => null))?.payload as State | undefined;
-  const active = (state?.mailboxes || []).filter(m => m.enabled);
+  const credentials = await loadMailboxCredentials().catch(() => []);
+  const configuredSettings = new Map((state?.mailboxes || []).map(m => [String(m.email || "").toLowerCase(),m]));
+  const active = credentials.map(cred => {
+    const setting = configuredSettings.get(String(cred.email || "").toLowerCase());
+    return { id:cred.id, email:cred.email, enabled:setting?.enabled ?? true, dailyLimit:Number(setting?.dailyLimit || 30) };
+  }).filter(m => m.enabled);
   const healthById = new Map(health.map(h => [h.target_id,h]));
   const safeCapacity = active.reduce((sum,m) => {
     const h = healthById.get(m.id);
@@ -162,12 +168,31 @@ export async function ensureAppointmentGoalQueue(workspace="default") {
   const row = await readState(workspace);
   const state = row?.payload as State | undefined;
   const campaign = (state?.campaigns || []).find(c => c.id === "pflege-starter-v2")
-    || (state?.campaigns || []).find(c => c.status === "Bereit" && c.steps?.length);
-  if (!campaign?.steps?.length) {
-    return { ok:false, skipped:true, reason:"no_ready_campaign", snapshot:await getAppointmentGoalSnapshot(workspace) };
-  }
+    || (state?.campaigns || []).find(c => c.status === "Bereit" && c.steps?.length)
+    || {
+      id:"pflege-starter-v2",
+      name:"Pflege Recruiting NRW",
+      audience:"Private Pflegebetriebe in NRW mit aktivem Personalbedarf",
+      status:"Bereit",
+      dailyLimit:150,
+      steps:[
+        {waitDays:0,subject:"kurze Frage",body:"{{company}}"},
+        {waitDays:3,subject:"noch aktuell?",body:"{{company}}"},
+        {waitDays:7,subject:"soll ich es abhaken?",body:"{{company}}"},
+      ],
+    };
 
-  const mailboxes = (state?.mailboxes || []).filter(m => m.enabled);
+  const credentials = await loadMailboxCredentials().catch(() => []);
+  const configured = new Map((state?.mailboxes || []).map(m => [String(m.email || "").toLowerCase(),m]));
+  const mailboxes = credentials.map(cred => {
+    const setting = configured.get(String(cred.email || "").toLowerCase());
+    return {
+      id:cred.id,
+      email:cred.email,
+      enabled:setting?.enabled ?? true,
+      dailyLimit:Number(setting?.dailyLimit || 30),
+    };
+  }).filter(m => m.enabled);
   if (!mailboxes.length) {
     return { ok:false, skipped:true, reason:"no_active_mailboxes", snapshot:await getAppointmentGoalSnapshot(workspace) };
   }
