@@ -62,6 +62,7 @@ export default function MailWorkspace() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [setupOpen, setSetupOpen] = useState(false);
+  const [setupMode, setSetupMode] = useState<"add" | "edit">("add");
   const [advanced, setAdvanced] = useState(false);
   const [compose, setCompose] = useState<ComposeState>(emptyCompose);
   const [sending, setSending] = useState(false);
@@ -103,7 +104,7 @@ export default function MailWorkspace() {
       const items = json.items || [];
       setMailboxes(items);
       if (!items.length) {
-        setSetupOpen(true);
+        setSetupMode("add"); setSetupOpen(true);
         setLoading(false);
         return;
       }
@@ -324,19 +325,19 @@ export default function MailWorkspace() {
 
     {setupOpen && <div className={styles.overlay} onMouseDown={() => !saving && setSetupOpen(false)}>
       <section className={styles.modal} onMouseDown={(event) => event.stopPropagation()}>
-        <header><div><span>NETCUP MAIL</span><h2>Postfach verbinden</h2><p>Die Zugangsdaten werden verschlüsselt serverseitig gespeichert und nie wieder im Klartext angezeigt.</p></div><button disabled={saving} onClick={() => setSetupOpen(false)}>×</button></header>
+        <header><div><span>NETCUP MAIL</span><h2>{setupMode === "edit" ? "Postfach bearbeiten" : "Postfach hinzufügen"}</h2><p>Die Zugangsdaten werden verschlüsselt serverseitig gespeichert und nie wieder im Klartext angezeigt.</p></div><button disabled={saving} onClick={() => setSetupOpen(false)}>×</button></header>
         <form onSubmit={saveMailbox}>
-          {activeMailbox && <input type="hidden" name="id" value={activeMailbox.id} />}
-          <label>Absendername<input name="name" defaultValue={activeMailbox?.name || "Raphael Hermann"} autoComplete="name" /></label>
-          <label>E-Mail-Adresse<input name="email" type="email" defaultValue={activeMailbox?.email || ""} placeholder="raphael@digitalegewinner.de" required autoComplete="username" /></label>
+          {setupMode === "edit" && activeMailbox && <input type="hidden" name="id" value={activeMailbox.id} />}
+          <label>Absendername<input name="name" defaultValue={setupMode === "edit" ? (activeMailbox?.name || "Raphael Hermann") : "Raphael Hermann"} autoComplete="name" /></label>
+          <label>E-Mail-Adresse<input name="email" type="email" defaultValue={setupMode === "edit" ? (activeMailbox?.email || "") : ""} placeholder="raphael@digitalegewinner.de" required autoComplete="username" /></label>
           <label>Netcup E-Mail-Passwort<input name="password" type="password" required autoComplete="current-password" placeholder="Passwort des Postfachs" /><small>Das Passwort bleibt ausschließlich verschlüsselt im Server-Tresor.</small></label>
           <button type="button" className={styles.advancedToggle} onClick={() => setAdvanced((value) => !value)}>{advanced ? "▾" : "▸"} Erweiterte Serverdaten</button>
           {advanced && <div className={styles.advancedGrid}>
             <label>Benutzername<input name="username" placeholder="meist die E-Mail-Adresse" /></label>
-            <label>IMAP Server<input name="imapHost" defaultValue={activeMailbox?.imapHost || ""} placeholder="wird automatisch erkannt" /></label>
-            <label>IMAP Port<input name="imapPort" type="number" defaultValue={activeMailbox?.imapPort || 993} /></label>
-            <label>SMTP Server<input name="smtpHost" defaultValue={activeMailbox?.smtpHost || ""} placeholder="wird automatisch erkannt" /></label>
-            <label>SMTP Port<input name="smtpPort" type="number" defaultValue={activeMailbox?.smtpPort || 465} /></label>
+            <label>IMAP Server<input name="imapHost" defaultValue={setupMode === "edit" ? (activeMailbox?.imapHost || "") : ""} placeholder="wird automatisch erkannt" /></label>
+            <label>IMAP Port<input name="imapPort" type="number" defaultValue={setupMode === "edit" ? (activeMailbox?.imapPort || 993) : 993} /></label>
+            <label>SMTP Server<input name="smtpHost" defaultValue={setupMode === "edit" ? (activeMailbox?.smtpHost || "") : ""} placeholder="wird automatisch erkannt" /></label>
+            <label>SMTP Port<input name="smtpPort" type="number" defaultValue={setupMode === "edit" ? (activeMailbox?.smtpPort || 465) : 465} /></label>
           </div>}
           <div className={styles.modalHint}><b>Vor dem Speichern testen wir beides:</b><span>IMAP-Empfang + SMTP-Versand. Nur wenn beide funktionieren, wird das Postfach verbunden.</span></div>
           <button className={styles.saveButton} disabled={saving}>{saving ? "Verbindung wird geprüft …" : "✓ Speichern & verbinden"}</button>
