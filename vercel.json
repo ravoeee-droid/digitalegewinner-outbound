@@ -16,8 +16,5 @@
   ],
   "regions": [
     "fra1"
-  ],
-  "functionFailoverRegions": [
-    "dub1"
   ]
 }
