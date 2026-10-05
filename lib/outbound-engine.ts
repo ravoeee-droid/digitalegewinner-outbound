@@ -198,15 +198,15 @@ export async function buildDailyOutboundPlan(workspace = "default") {
 export async function getOutboundEngineSnapshot(workspace = "default") {
   await ensureOutboundEngineSchema();
   const counts = await query<ChannelCountRow>(`
-    select channel,
-      count(*) filter(where status in ('ready','drafted','queued'))::int ready,
-      count(*) filter(where status in ('done','sent','completed'))::int done,
+    select t.channel,
+      count(*) filter(where t.status in ('ready','drafted','queued'))::int ready,
+      count(*) filter(where t.status in ('done','sent','completed'))::int done,
       count(*)::int total
     from sales_outbound_tasks t
     join sales_leads l on l.id=t.lead_id and l.workspace=t.workspace
     where t.workspace=$1 and t.task_date=(now() at time zone 'Europe/Berlin')::date
       and l.status='active'
-    group by channel
+    group by t.channel
   `, [workspace]);
 
   const tasks = await query<TaskRow>(`
