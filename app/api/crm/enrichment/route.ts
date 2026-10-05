@@ -233,10 +233,9 @@ async function enrichLead(leadId: string, useAi: boolean) {
   const candidate: RadarCandidate = {
     id: place?.id || lead.source_id || lead.company_id,
     company: lead.company,
-    contact: lead.contact_name,
+    contact: contact.decisionMakerName || lead.contact_name,
     email: contact.email || lead.contact_email,
     phone: contact.phone || companyPhone,
-    contact: contact.decisionMakerName || lead.contact_name,
     website,
     city,
     industry: lead.industry || "Pflege",
