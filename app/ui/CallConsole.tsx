@@ -74,6 +74,7 @@ export default function CallConsole() {
   const city = value(p, "city");
   const phone = value(p, "phone");
   const website = value(p, "website");
+  const jobAdUrl = value(p, "jobAdUrl");
   const contact = value(p, "contactName") || value(p, "contact");
   const contactEmail = value(p, "contactEmail");
   const contactPhone = value(p, "contactPhone");
@@ -271,7 +272,8 @@ export default function CallConsole() {
                 </button>
               </div>
               <div className="rapid-links">
-                {website && <a className="rapid-site" href={website} target="_blank" rel="noreferrer">Website öffnen <span aria-hidden="true">↗</span></a>}
+                {website && <a className="rapid-site" href={website} target="_blank" rel="noreferrer">Homepage öffnen <span aria-hidden="true">↗</span></a>}
+                {jobAdUrl && <a className="rapid-site" href={jobAdUrl} target="_blank" rel="noreferrer">Stellenanzeige öffnen <span aria-hidden="true">↗</span></a>}
                 {baJobsUrl && <a className="rapid-ba" href={baJobsUrl} target="_blank" rel="noreferrer" title={`Offene Stellen von ${company} in der Jobsuche der Bundesagentur prüfen`}>🔎 BA Jobs prüfen <span aria-hidden="true">↗</span></a>}
               </div>
             </section>
