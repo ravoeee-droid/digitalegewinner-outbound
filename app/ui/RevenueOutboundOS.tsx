@@ -8,7 +8,7 @@ import pro from "./revenue-outbound-os-pro.module.css";
 type ProductKey = "pflege_recruiting" | "website" | "seo" | "automation";
 type RevenueStage = "Neu" | "Geprüft" | "Call bereit" | "Kontaktiert" | "Nachfassen" | "Interesse" | "Termin" | "Angebot" | "Verhandlung" | "Gewonnen" | "Verloren";
 type View = "dashboard" | "today" | "pipeline" | "followups" | "deals" | "multichannel";
-type FilterMode = "all" | "due" | "hot" | "phone";
+type FilterMode = "all" | "due" | "hot" | "extreme" | "phone";
 
 type CatalogItem = {
   key: ProductKey;
@@ -43,6 +43,7 @@ type Opportunity = {
   email: string;
   lead_priority: number;
   lead_opportunity: number;
+  extreme_hot: boolean;
   website_score: number;
   seo_score: number;
   annual_value: number;
@@ -186,6 +187,7 @@ export default function RevenueOutboundOS() {
   const filtered = useMemo(() => scoped.filter((item) => {
     if (filterMode === "due") return due(item.next_action_at) || item.stage === "Nachfassen";
     if (filterMode === "hot") return item.lead_priority >= 80 || item.call_score >= 420;
+    if (filterMode === "extreme") return item.extreme_hot;
     if (filterMode === "phone") return Boolean(item.phone);
     return true;
   }), [scoped, filterMode]);
@@ -414,6 +416,7 @@ export default function RevenueOutboundOS() {
                 <button className={filterMode === "all" ? pro.filterActive : ""} onClick={() => setFilterMode("all")}>Alle</button>
                 <button className={filterMode === "due" ? pro.filterActive : ""} onClick={() => setFilterMode("due")}>Fällig <b>{dueNow}</b></button>
                 <button className={filterMode === "hot" ? pro.filterActive : ""} onClick={() => setFilterMode("hot")}>Hot</button>
+                <button className={filterMode === "extreme" ? pro.filterActive : ""} onClick={() => setFilterMode("extreme")}>🔥 Extrem Hot <b>{scoped.filter((item) => item.extreme_hot).length}</b></button>
                 <button className={filterMode === "phone" ? pro.filterActive : ""} onClick={() => setFilterMode("phone")}>Mit Telefon</button>
               </div>
               <span>{filtered.length} Chancen im aktuellen Filter{(search || product !== "all" || filterMode !== "all") && <button onClick={resetFilters}>Filter zurücksetzen</button>}</span>
