@@ -114,7 +114,7 @@ function parseDetail(url: string, html: string) {
   const path = new URL(url).pathname.split("/").filter(Boolean);
   const city = titleCaseSlug(path[0] || "");
   const category = path[1] || "";
-  const workload = (text.match(/Arbeitsumfang:\\s*([^\\n]+)/i)?.[1] || text.match(/\\b(Vollzeit(?:\\s+oder\\s+Teilzeit|\\s*\\/\\s*Teilzeit)?)\\b/i)?.[1] || "").trim();
+  const workload = (text.match(/Arbeitsumfang:\\s*([^\\n]+)/i)?.[1] || text.match(/\b(Vollzeit(?:\s+oder\s+Teilzeit)?)\b/i)?.[1] || "").trim();
   let ageDays = -1;
   if (date) { const [d,m,y]=date.split(".").map(Number); ageDays=Math.floor((Date.now()-new Date(y,m-1,d).getTime())/86400000); }
   return {
@@ -199,7 +199,7 @@ async function processOne(runId: string, url: string) {
     const d = parseDetail(url,html);
     if (!d.company || !d.jobTitle) throw new Error("Arbeitgeber/Stellentitel nicht erkannt");
 
-    const fullTimeOk = /\\bvollzeit\\b/i.test(d.workload);
+    const fullTimeOk = /\bvollzeit\b/i.test(d.workload);
     const ageOk = d.ageDays >= 60;
     if (EXCLUDED.test(d.company) || LOW_VALUE_ROLE.test(d.jobTitle) || d.roleClass !== "Pflegefachkraft" || !fullTimeOk || !ageOk) {
       const reason = EXCLUDED.test(d.company) ? "excluded-employer"
@@ -267,7 +267,8 @@ async function archiveOldActiveLeads(runId: string) {
      where l.company_id=c.id and l.workspace='default' and l.status='active'
        and l.stage in ('Neu','Research','Bereit','Kontaktiert')
        and c.source='pflegedienstjobs24'
-       and coalesce(c.metadata->>'sourceRunId','')<>$1
+       and c.source='pflegedienstjobs24'
+      and coalesce(c.metadata->>'sourceRunId','')<>$1
   `,[runId]);
   await query(`
     delete from sales_outbound_tasks t
@@ -285,6 +286,7 @@ async function finalize(runId: string) {
       from sales_companies c
      where l.company_id=c.id and l.workspace='default' and l.status='active'
        and l.stage in ('Neu','Research','Bereit','Kontaktiert')
+       and c.source='pflegedienstjobs24'
        and coalesce(c.metadata->>'sourceRunId','')<>$1
   `,[runId]);
   await query(`
