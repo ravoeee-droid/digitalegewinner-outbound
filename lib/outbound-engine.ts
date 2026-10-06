@@ -144,10 +144,31 @@ function insertCallChannelSql() {
         or lower(coalesce(l.notes,'')) like '%altenpfleger%'
         or lower(coalesce(l.notes,'')) like '%examiniert%'
       )
-      and length(coalesce(c.metadata->>'jobPublishedAt',''))=10
-      and substr(c.metadata->>'jobPublishedAt',3,1)='.'
-      and substr(c.metadata->>'jobPublishedAt',6,1)='.'
-      and to_date(c.metadata->>'jobPublishedAt','DD.MM.YYYY') <= ((now() at time zone 'Europe/Berlin')::date - 60)
+      and length(
+        coalesce(
+          nullif(c.metadata->>'jobPublishedAt',''),
+          nullif(left(split_part(coalesce(l.notes,''),' · seit ',2),10),'')
+        )
+      )=10
+      and substr(
+        coalesce(
+          nullif(c.metadata->>'jobPublishedAt',''),
+          nullif(left(split_part(coalesce(l.notes,''),' · seit ',2),10),'')
+        ),3,1
+      )='.'
+      and substr(
+        coalesce(
+          nullif(c.metadata->>'jobPublishedAt',''),
+          nullif(left(split_part(coalesce(l.notes,''),' · seit ',2),10),'')
+        ),6,1
+      )='.'
+      and to_date(
+        coalesce(
+          nullif(c.metadata->>'jobPublishedAt',''),
+          nullif(left(split_part(coalesce(l.notes,''),' · seit ',2),10),'')
+        ),
+        'DD.MM.YYYY'
+      ) <= ((now() at time zone 'Europe/Berlin')::date - 60)
       and lower(c.name) not like '%caritas%'
       and lower(c.name) not like '%arbeiterwohlfahrt%'
       and lower(c.name) not like '%johanniter%'
@@ -242,10 +263,31 @@ export async function buildDailyOutboundPlan(workspace = "default") {
          or lower(coalesce(l.notes,'')) like '%altenpfleger%'
          or lower(coalesce(l.notes,'')) like '%examiniert%'
        )
-       and length(coalesce(c.metadata->>'jobPublishedAt',''))=10
-       and substr(c.metadata->>'jobPublishedAt',3,1)='.'
-       and substr(c.metadata->>'jobPublishedAt',6,1)='.'
-       and to_date(c.metadata->>'jobPublishedAt','DD.MM.YYYY') <= ((now() at time zone 'Europe/Berlin')::date - 60)
+       and length(
+         coalesce(
+           nullif(c.metadata->>'jobPublishedAt',''),
+           nullif(left(split_part(coalesce(l.notes,''),' · seit ',2),10),'')
+         )
+       )=10
+       and substr(
+         coalesce(
+           nullif(c.metadata->>'jobPublishedAt',''),
+           nullif(left(split_part(coalesce(l.notes,''),' · seit ',2),10),'')
+         ),3,1
+       )='.'
+       and substr(
+         coalesce(
+           nullif(c.metadata->>'jobPublishedAt',''),
+           nullif(left(split_part(coalesce(l.notes,''),' · seit ',2),10),'')
+         ),6,1
+       )='.'
+       and to_date(
+         coalesce(
+           nullif(c.metadata->>'jobPublishedAt',''),
+           nullif(left(split_part(coalesce(l.notes,''),' · seit ',2),10),'')
+         ),
+         'DD.MM.YYYY'
+       ) <= ((now() at time zone 'Europe/Berlin')::date - 60)
        and lower(c.name) not like '%caritas%'
        and lower(c.name) not like '%arbeiterwohlfahrt%'
        and lower(c.name) not like '%johanniter%'
@@ -289,10 +331,31 @@ export async function buildDailyOutboundPlan(workspace = "default") {
           and lower(coalesce(l.notes,'')) not like '%altenpfleger%'
           and lower(coalesce(l.notes,'')) not like '%examiniert%'
         )
-        or length(coalesce(c.metadata->>'jobPublishedAt',''))<>10
-        or substr(c.metadata->>'jobPublishedAt',3,1)<>'.'
-        or substr(c.metadata->>'jobPublishedAt',6,1)<>'.'
-        or to_date(c.metadata->>'jobPublishedAt','DD.MM.YYYY') > ((now() at time zone 'Europe/Berlin')::date - 60)
+        or length(
+          coalesce(
+            nullif(c.metadata->>'jobPublishedAt',''),
+            nullif(left(split_part(coalesce(l.notes,''),' · seit ',2),10),'')
+          )
+        )<>10
+        or substr(
+          coalesce(
+            nullif(c.metadata->>'jobPublishedAt',''),
+            nullif(left(split_part(coalesce(l.notes,''),' · seit ',2),10),'')
+          ),3,1
+        )<>'.'
+        or substr(
+          coalesce(
+            nullif(c.metadata->>'jobPublishedAt',''),
+            nullif(left(split_part(coalesce(l.notes,''),' · seit ',2),10),'')
+          ),6,1
+        )<>'.'
+        or to_date(
+          coalesce(
+            nullif(c.metadata->>'jobPublishedAt',''),
+            nullif(left(split_part(coalesce(l.notes,''),' · seit ',2),10),'')
+          ),
+          'DD.MM.YYYY'
+        ) > ((now() at time zone 'Europe/Berlin')::date - 60)
         or lower(c.name) like '%caritas%'
         or lower(c.name) like '%arbeiterwohlfahrt%'
         or lower(c.name) like '%johanniter%'
