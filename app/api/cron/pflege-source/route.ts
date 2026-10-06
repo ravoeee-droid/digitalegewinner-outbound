@@ -266,6 +266,7 @@ async function archiveOldActiveLeads(runId: string) {
       from sales_companies c
      where l.company_id=c.id and l.workspace='default' and l.status='active'
        and l.stage in ('Neu','Research','Bereit','Kontaktiert')
+       and c.source='pflegedienstjobs24'
        and coalesce(c.metadata->>'sourceRunId','')<>$1
   `,[runId]);
   await query(`
@@ -273,6 +274,7 @@ async function archiveOldActiveLeads(runId: string) {
     using sales_leads l,sales_companies c
     where t.lead_id=l.id and l.company_id=c.id and t.workspace='default'
       and l.status='archived'
+      and c.source='pflegedienstjobs24'
   `);
 }
 
