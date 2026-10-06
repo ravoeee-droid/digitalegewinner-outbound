@@ -137,7 +137,35 @@ function insertCallChannelSql() {
       and coalesce(ct.phone,c.phone,'')<>''
       and l.owner in ('Raphael','Mattias')
       and lower(coalesce(c.metadata->>'jobRole',''))='pflegefachkraft'
-      and coalesce(c.metadata->>'jobPublishedAt','') ~ '^\\d{2}\\.\\d{2}\\.\\d{4}
+      and length(coalesce(c.metadata->>'jobPublishedAt',''))=10
+      and substr(c.metadata->>'jobPublishedAt',3,1)='.'
+      and substr(c.metadata->>'jobPublishedAt',6,1)='.'
+      and to_date(c.metadata->>'jobPublishedAt','DD.MM.YYYY') <= ((now() at time zone 'Europe/Berlin')::date - 60)
+      and lower(c.name) not like '%caritas%'
+      and lower(c.name) not like '%arbeiterwohlfahrt%'
+      and lower(c.name) not like '%johanniter%'
+      and lower(c.name) not like '%diakonie%'
+      and lower(c.name) not like '%deutsches rotes kreuz%'
+      and lower(c.name) not like '%malteser%'
+      and lower(c.name) not like '%lebenshilfe%'
+      and lower(c.name) not like '%stiftung%'
+      and lower(c.name) not like '%gmbh gemeinnützig%'
+      and lower(c.name) not like '%ggmbh%'
+      and lower(c.name) not like '% e.v.%'
+      and lower(c.name) not like '% e.v'
+      and lower(c.name) not like '%verein%'
+      and lower(c.name) not like '%zeitarbeit%'
+      and lower(c.name) not like '%personalvermittlung%'
+      and lower(c.name) not like '%personaldienst%'
+      and lower(c.name) not like '%staffing%'
+      and (
+        coalesce(c.metadata->>'jobWorkload','')=''
+        or lower(c.metadata->>'jobWorkload') like '%vollzeit%'
+      )
+      and lower(coalesce(c.metadata->>'jobWorkload','')) not like '%nur teilzeit%'
+      and lower(coalesce(c.metadata->>'jobWorkload','')) not like '%minijob%'
+      and lower(coalesce(c.metadata->>'jobWorkload','')) not like '%geringfügig%'
+    ), ranked as (
       select *, row_number() over (
         partition by owner
         order by
@@ -199,605 +227,35 @@ export async function buildDailyOutboundPlan(workspace = "default") {
       and t.status in ('ready','drafted','queued')
       and (
         lower(coalesce(c.metadata->>'jobRole',''))<>'pflegefachkraft'
-        or coalesce(c.metadata->>'jobPublishedAt','') !~ '^\\d{2}\\.\\d{2}\\.\\d{4}
-  await query(insertChannelSql("email", "coalesce(ct.email,'')<>''", OUTBOUND_TARGETS.email), [workspace]);
-  await query(insertChannelSql("video", "coalesce(ct.email,'')<>'' and coalesce(c.website,'')<>''", OUTBOUND_TARGETS.video), [workspace]);
-  await query(insertChannelSql("linkedin", "coalesce(ct.linkedin,'')<>''", OUTBOUND_TARGETS.linkedin), [workspace]);
-
-  return getOutboundEngineSnapshot(workspace);
-}
-
-export async function getOutboundEngineSnapshot(workspace = "default") {
-  await ensureOutboundEngineSchema();
-  const counts = await query<ChannelCountRow>(`
-    select t.channel,
-      count(*) filter(where t.status in ('ready','drafted','queued'))::int ready,
-      count(*) filter(where t.status in ('done','sent','completed'))::int done,
-      count(*)::int total
-    from sales_outbound_tasks t
-    join sales_leads l on l.id=t.lead_id and l.workspace=t.workspace
-    where t.workspace=$1 and t.task_date=(now() at time zone 'Europe/Berlin')::date
-      and l.status='active'
-    group by t.channel
-  `, [workspace]);
-
-  const tasks = await query<TaskRow>(`
-    select t.id,t.channel,t.rank,t.status,t.score,t.lead_id,t.company_id,t.payload,t.updated_at
-    from sales_outbound_tasks t
-    join sales_leads l on l.id=t.lead_id and l.workspace=t.workspace
-    where t.workspace=$1 and t.task_date=(now() at time zone 'Europe/Berlin')::date
-      and l.status='active'
-    order by case t.channel when 'call' then 0 when 'email' then 1 when 'video' then 2 else 3 end, t.rank asc
-    limit 320
-  `, [workspace]);
-
-  const byChannel = Object.fromEntries((Object.keys(OUTBOUND_TARGETS) as OutboundChannel[]).map((channel) => {
-    const row = counts.find((item) => item.channel === channel);
-    return [channel, {
-      target: OUTBOUND_TARGETS[channel],
-      ready: Number(row?.ready || 0),
-      done: Number(row?.done || 0),
-      total: Number(row?.total || 0),
-    }];
-  })) as Record<OutboundChannel, { target: number; ready: number; done: number; total: number }>;
-
-  return {
-    date: new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Berlin" }).format(new Date()),
-    targets: OUTBOUND_TARGETS,
-    channels: byChannel,
-    tasks,
-    workers: {
-      openOutreach: {
-        configured: Boolean(process.env.OPENOUTREACH_WORKER_URL),
-        url: process.env.OPENOUTREACH_WORKER_URL ? "connected" : "missing",
-        source: "eracle/OpenOutreach",
-      },
-      linkedin: {
-        configured: Boolean(process.env.LINKEDIN_AGENT_WORKER_URL),
-        autoSend: process.env.LINKEDIN_AGENT_AUTO_SEND === "true",
-      },
-      video: {
-        configured: Boolean(process.env.VIDEO_RENDERER_URL),
-      },
-    },
-  };
-}
-
-export async function updateOutboundTask(id: string, status: string, workspace = "default") {
-  await ensureOutboundEngineSchema();
-  const allowed = new Set(["ready", "drafted", "queued", "sent", "done", "completed", "skipped", "failed"]);
-  if (!allowed.has(status)) throw new Error("Ungültiger Task-Status.");
-  await query(
-    `update sales_outbound_tasks set status=$3,updated_at=now() where id=$1 and workspace=$2`,
-    [id, workspace, status],
-  );
-}
-
-export async function prepareLinkedInDrafts(limit: number = OUTBOUND_TARGETS.linkedin, workspace = "default") {
-  await ensureOutboundEngineSchema();
-  const safeLimit = Math.max(1, Math.min(50, Math.round(limit)));
-  const rows = await query<TaskRow>(`
-    select id,channel,rank,status,score,lead_id,company_id,payload,updated_at
-    from sales_outbound_tasks
-    where workspace=$1
-      and task_date=(now() at time zone 'Europe/Berlin')::date
-      and channel='linkedin'
-      and status in ('ready','drafted')
-    order by rank asc
-    limit $2
-  `, [workspace, safeLimit]);
-
-  for (const row of rows) {
-    const company = String(row.payload?.company || "Ihrem Pflegedienst");
-    const reasons = Array.isArray(row.payload?.reasons) ? row.payload.reasons.map(String) : [];
-    const reason = reasons.find(Boolean) || "bei Ihrem Online-Auftritt ist mir ein konkreter Recruiting-Hebel aufgefallen";
-    const message = `Hallo, ich habe mir ${company} kurz angesehen. ${reason}. Ich habe dazu 2 konkrete Ideen vorbereitet – soll ich sie Ihnen kurz schicken?`;
-    await query(
-      `update sales_outbound_tasks
-       set payload=payload || jsonb_build_object('message',$2,'draftedAt',now()::text),status='drafted',updated_at=now()
-       where id=$1 and workspace=$3`,
-      [row.id, message, workspace],
-    );
-  }
-
-  return getOutboundEngineSnapshot(workspace);
-}
-
-export async function dispatchLinkedInQueue(limit: number = 10, workspace = "default") {
-  await ensureOutboundEngineSchema();
-  const workerUrl = (process.env.LINKEDIN_AGENT_WORKER_URL || "").replace(/\/$/, "");
-  if (!workerUrl) {
-    return { ok: false, configured: false, error: "LINKEDIN_AGENT_WORKER_URL fehlt.", dispatched: 0 };
-  }
-
-  const safeLimit = Math.max(1, Math.min(30, Math.round(limit)));
-  const rows = await query<TaskRow>(`
-    select id,channel,rank,status,score,lead_id,company_id,payload,updated_at
-    from sales_outbound_tasks
-    where workspace=$1
-      and task_date=(now() at time zone 'Europe/Berlin')::date
-      and channel='linkedin'
-      and status='drafted'
-      and coalesce(payload->>'linkedin','')<>''
-      and coalesce(payload->>'message','')<>''
-    order by rank asc
-    limit $2
-  `, [workspace, safeLimit]);
-
-  if (!rows.length) return { ok: true, configured: true, dispatched: 0, message: "Keine vorbereiteten LinkedIn-Tasks offen." };
-
-  const response = await fetch(`${workerUrl}/v1/actions`, {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      ...(process.env.LINKEDIN_AGENT_WORKER_SECRET ? { authorization: `Bearer ${process.env.LINKEDIN_AGENT_WORKER_SECRET}` } : {}),
-    },
-    body: JSON.stringify({
-      mode: process.env.LINKEDIN_AGENT_AUTO_SEND === "true" ? "send" : "queue",
-      actions: rows.map((row) => ({
-        taskId: row.id,
-        leadId: row.lead_id,
-        profileUrl: String(row.payload?.linkedin || ""),
-        message: String(row.payload?.message || ""),
-      })),
-    }),
-  });
-
-  if (!response.ok) {
-    const body = await response.text().catch(() => "");
-    throw new Error(`LinkedIn Worker ${response.status}: ${body.slice(0, 300)}`);
-  }
-
-  for (const row of rows) {
-    await query(
-      `update sales_outbound_tasks set status='queued',payload=payload || jsonb_build_object('queuedAt',now()::text),updated_at=now() where id=$1 and workspace=$2`,
-      [row.id, workspace],
-    );
-  }
-  return { ok: true, configured: true, dispatched: rows.length, autoSend: process.env.LINKEDIN_AGENT_AUTO_SEND === "true" };
-}
-
-      and to_date(c.metadata->>'jobPublishedAt','DD.MM.YYYY') <= ((now() at time zone 'Europe/Berlin')::date - 60)
-      and lower(c.name) !~ '(caritas|arbeiterwohlfahrt|(^|[^a-z])awo([^a-z]|$)|johanniter|diakonie|deutsches rotes kreuz|(^|[^a-z])drk([^a-z]|$)|malteser|(^|[^a-z])asb([^a-z]|$)|(^|[^a-z])brk([^a-z]|$)|lebenshilfe|stiftung|(^|[^a-z])e\\.?v\\.?([^a-z]|$)|ggmbh|verein|zeitarbeit|personalvermittlung|personaldienst|staffing)'
-      and (
-        coalesce(c.metadata->>'jobWorkload','')=''
-        or lower(c.metadata->>'jobWorkload') like '%vollzeit%'
-      )
-      and lower(coalesce(c.metadata->>'jobWorkload','')) !~ '(nur teilzeit|teilzeit only|minijob|geringfügig|20[-– ]?30 ?h|50[-– ]?80 ?%)'
-    ), ranked as (
-      select *, row_number() over (
-        partition by owner
-        order by
-          case tier when 'A+' then 0 when 'A' then 1 when 'B' then 2 else 3 end,
-          score desc,
-          job_count desc,
-          company asc
-      )::int as rn
-      from candidates
-    )
-    insert into sales_outbound_tasks(
-      id,workspace,task_date,lead_id,company_id,channel,rank,score,status,payload
-    )
-    select
-      lead_id || ':call:' || ((now() at time zone 'Europe/Berlin')::date)::text,
-      $1,
-      (now() at time zone 'Europe/Berlin')::date,
-      lead_id,
-      company_id,
-      'call',
-      rn,
-      score,
-      'ready',
-      jsonb_build_object(
-        'company',company,
-        'city',city,
-        'website',website,
-        'email',email,
-        'phone',phone,
-        'linkedin',linkedin,
-        'jobAdUrl',job_ad_url,
-        'tier',tier,
-        'reasons',reasons,
-        'websiteWeak',website_weak,
-        'jobCount',job_count,
-        'owner',owner
-      )
-    from ranked
-    where rn <= 50
-    on conflict(workspace,task_date,lead_id,channel) do update set
-      rank=excluded.rank,
-      score=excluded.score,
-      payload=excluded.payload,
-      updated_at=now()
-  `;
-}
-
-export async function buildDailyOutboundPlan(workspace = "default") {
-  await ensureOutboundEngineSchema();
-
-  await query(insertCallChannelSql(), [workspace]);
-  await query(insertChannelSql("email", "coalesce(ct.email,'')<>''", OUTBOUND_TARGETS.email), [workspace]);
-  await query(insertChannelSql("video", "coalesce(ct.email,'')<>'' and coalesce(c.website,'')<>''", OUTBOUND_TARGETS.video), [workspace]);
-  await query(insertChannelSql("linkedin", "coalesce(ct.linkedin,'')<>''", OUTBOUND_TARGETS.linkedin), [workspace]);
-
-  return getOutboundEngineSnapshot(workspace);
-}
-
-export async function getOutboundEngineSnapshot(workspace = "default") {
-  await ensureOutboundEngineSchema();
-  const counts = await query<ChannelCountRow>(`
-    select t.channel,
-      count(*) filter(where t.status in ('ready','drafted','queued'))::int ready,
-      count(*) filter(where t.status in ('done','sent','completed'))::int done,
-      count(*)::int total
-    from sales_outbound_tasks t
-    join sales_leads l on l.id=t.lead_id and l.workspace=t.workspace
-    where t.workspace=$1 and t.task_date=(now() at time zone 'Europe/Berlin')::date
-      and l.status='active'
-    group by t.channel
-  `, [workspace]);
-
-  const tasks = await query<TaskRow>(`
-    select t.id,t.channel,t.rank,t.status,t.score,t.lead_id,t.company_id,t.payload,t.updated_at
-    from sales_outbound_tasks t
-    join sales_leads l on l.id=t.lead_id and l.workspace=t.workspace
-    where t.workspace=$1 and t.task_date=(now() at time zone 'Europe/Berlin')::date
-      and l.status='active'
-    order by case t.channel when 'call' then 0 when 'email' then 1 when 'video' then 2 else 3 end, t.rank asc
-    limit 320
-  `, [workspace]);
-
-  const byChannel = Object.fromEntries((Object.keys(OUTBOUND_TARGETS) as OutboundChannel[]).map((channel) => {
-    const row = counts.find((item) => item.channel === channel);
-    return [channel, {
-      target: OUTBOUND_TARGETS[channel],
-      ready: Number(row?.ready || 0),
-      done: Number(row?.done || 0),
-      total: Number(row?.total || 0),
-    }];
-  })) as Record<OutboundChannel, { target: number; ready: number; done: number; total: number }>;
-
-  return {
-    date: new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Berlin" }).format(new Date()),
-    targets: OUTBOUND_TARGETS,
-    channels: byChannel,
-    tasks,
-    workers: {
-      openOutreach: {
-        configured: Boolean(process.env.OPENOUTREACH_WORKER_URL),
-        url: process.env.OPENOUTREACH_WORKER_URL ? "connected" : "missing",
-        source: "eracle/OpenOutreach",
-      },
-      linkedin: {
-        configured: Boolean(process.env.LINKEDIN_AGENT_WORKER_URL),
-        autoSend: process.env.LINKEDIN_AGENT_AUTO_SEND === "true",
-      },
-      video: {
-        configured: Boolean(process.env.VIDEO_RENDERER_URL),
-      },
-    },
-  };
-}
-
-export async function updateOutboundTask(id: string, status: string, workspace = "default") {
-  await ensureOutboundEngineSchema();
-  const allowed = new Set(["ready", "drafted", "queued", "sent", "done", "completed", "skipped", "failed"]);
-  if (!allowed.has(status)) throw new Error("Ungültiger Task-Status.");
-  await query(
-    `update sales_outbound_tasks set status=$3,updated_at=now() where id=$1 and workspace=$2`,
-    [id, workspace, status],
-  );
-}
-
-export async function prepareLinkedInDrafts(limit: number = OUTBOUND_TARGETS.linkedin, workspace = "default") {
-  await ensureOutboundEngineSchema();
-  const safeLimit = Math.max(1, Math.min(50, Math.round(limit)));
-  const rows = await query<TaskRow>(`
-    select id,channel,rank,status,score,lead_id,company_id,payload,updated_at
-    from sales_outbound_tasks
-    where workspace=$1
-      and task_date=(now() at time zone 'Europe/Berlin')::date
-      and channel='linkedin'
-      and status in ('ready','drafted')
-    order by rank asc
-    limit $2
-  `, [workspace, safeLimit]);
-
-  for (const row of rows) {
-    const company = String(row.payload?.company || "Ihrem Pflegedienst");
-    const reasons = Array.isArray(row.payload?.reasons) ? row.payload.reasons.map(String) : [];
-    const reason = reasons.find(Boolean) || "bei Ihrem Online-Auftritt ist mir ein konkreter Recruiting-Hebel aufgefallen";
-    const message = `Hallo, ich habe mir ${company} kurz angesehen. ${reason}. Ich habe dazu 2 konkrete Ideen vorbereitet – soll ich sie Ihnen kurz schicken?`;
-    await query(
-      `update sales_outbound_tasks
-       set payload=payload || jsonb_build_object('message',$2,'draftedAt',now()::text),status='drafted',updated_at=now()
-       where id=$1 and workspace=$3`,
-      [row.id, message, workspace],
-    );
-  }
-
-  return getOutboundEngineSnapshot(workspace);
-}
-
-export async function dispatchLinkedInQueue(limit: number = 10, workspace = "default") {
-  await ensureOutboundEngineSchema();
-  const workerUrl = (process.env.LINKEDIN_AGENT_WORKER_URL || "").replace(/\/$/, "");
-  if (!workerUrl) {
-    return { ok: false, configured: false, error: "LINKEDIN_AGENT_WORKER_URL fehlt.", dispatched: 0 };
-  }
-
-  const safeLimit = Math.max(1, Math.min(30, Math.round(limit)));
-  const rows = await query<TaskRow>(`
-    select id,channel,rank,status,score,lead_id,company_id,payload,updated_at
-    from sales_outbound_tasks
-    where workspace=$1
-      and task_date=(now() at time zone 'Europe/Berlin')::date
-      and channel='linkedin'
-      and status='drafted'
-      and coalesce(payload->>'linkedin','')<>''
-      and coalesce(payload->>'message','')<>''
-    order by rank asc
-    limit $2
-  `, [workspace, safeLimit]);
-
-  if (!rows.length) return { ok: true, configured: true, dispatched: 0, message: "Keine vorbereiteten LinkedIn-Tasks offen." };
-
-  const response = await fetch(`${workerUrl}/v1/actions`, {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      ...(process.env.LINKEDIN_AGENT_WORKER_SECRET ? { authorization: `Bearer ${process.env.LINKEDIN_AGENT_WORKER_SECRET}` } : {}),
-    },
-    body: JSON.stringify({
-      mode: process.env.LINKEDIN_AGENT_AUTO_SEND === "true" ? "send" : "queue",
-      actions: rows.map((row) => ({
-        taskId: row.id,
-        leadId: row.lead_id,
-        profileUrl: String(row.payload?.linkedin || ""),
-        message: String(row.payload?.message || ""),
-      })),
-    }),
-  });
-
-  if (!response.ok) {
-    const body = await response.text().catch(() => "");
-    throw new Error(`LinkedIn Worker ${response.status}: ${body.slice(0, 300)}`);
-  }
-
-  for (const row of rows) {
-    await query(
-      `update sales_outbound_tasks set status='queued',payload=payload || jsonb_build_object('queuedAt',now()::text),updated_at=now() where id=$1 and workspace=$2`,
-      [row.id, workspace],
-    );
-  }
-  return { ok: true, configured: true, dispatched: rows.length, autoSend: process.env.LINKEDIN_AGENT_AUTO_SEND === "true" };
-}
-
+        or length(coalesce(c.metadata->>'jobPublishedAt',''))<>10
+        or substr(c.metadata->>'jobPublishedAt',3,1)<>'.'
+        or substr(c.metadata->>'jobPublishedAt',6,1)<>'.'
         or to_date(c.metadata->>'jobPublishedAt','DD.MM.YYYY') > ((now() at time zone 'Europe/Berlin')::date - 60)
-        or lower(c.name) ~ '(caritas|arbeiterwohlfahrt|(^|[^a-z])awo([^a-z]|$)|johanniter|diakonie|deutsches rotes kreuz|(^|[^a-z])drk([^a-z]|$)|malteser|(^|[^a-z])asb([^a-z]|$)|(^|[^a-z])brk([^a-z]|$)|lebenshilfe|stiftung|(^|[^a-z])e\\.?v\\.?([^a-z]|$)|ggmbh|verein|zeitarbeit|personalvermittlung|personaldienst|staffing)'
+        or lower(c.name) like '%caritas%'
+        or lower(c.name) like '%arbeiterwohlfahrt%'
+        or lower(c.name) like '%johanniter%'
+        or lower(c.name) like '%diakonie%'
+        or lower(c.name) like '%deutsches rotes kreuz%'
+        or lower(c.name) like '%malteser%'
+        or lower(c.name) like '%lebenshilfe%'
+        or lower(c.name) like '%stiftung%'
+        or lower(c.name) like '%ggmbh%'
+        or lower(c.name) like '% e.v.%'
+        or lower(c.name) like '% e.v'
+        or lower(c.name) like '%verein%'
+        or lower(c.name) like '%zeitarbeit%'
+        or lower(c.name) like '%personalvermittlung%'
+        or lower(c.name) like '%personaldienst%'
+        or lower(c.name) like '%staffing%'
         or (
           coalesce(c.metadata->>'jobWorkload','')<>''
           and lower(c.metadata->>'jobWorkload') not like '%vollzeit%'
         )
-        or lower(coalesce(c.metadata->>'jobWorkload','')) ~ '(nur teilzeit|teilzeit only|minijob|geringfügig|20[-– ]?30 ?h|50[-– ]?80 ?%)'
+        or lower(coalesce(c.metadata->>'jobWorkload','')) like '%nur teilzeit%'
+        or lower(coalesce(c.metadata->>'jobWorkload','')) like '%minijob%'
+        or lower(coalesce(c.metadata->>'jobWorkload','')) like '%geringfügig%'
       )
   `, [workspace]);
-
-  await query(insertCallChannelSql(), [workspace]);
-  await query(insertChannelSql("email", "coalesce(ct.email,'')<>''", OUTBOUND_TARGETS.email), [workspace]);
-  await query(insertChannelSql("video", "coalesce(ct.email,'')<>'' and coalesce(c.website,'')<>''", OUTBOUND_TARGETS.video), [workspace]);
-  await query(insertChannelSql("linkedin", "coalesce(ct.linkedin,'')<>''", OUTBOUND_TARGETS.linkedin), [workspace]);
-
-  return getOutboundEngineSnapshot(workspace);
-}
-
-export async function getOutboundEngineSnapshot(workspace = "default") {
-  await ensureOutboundEngineSchema();
-  const counts = await query<ChannelCountRow>(`
-    select t.channel,
-      count(*) filter(where t.status in ('ready','drafted','queued'))::int ready,
-      count(*) filter(where t.status in ('done','sent','completed'))::int done,
-      count(*)::int total
-    from sales_outbound_tasks t
-    join sales_leads l on l.id=t.lead_id and l.workspace=t.workspace
-    where t.workspace=$1 and t.task_date=(now() at time zone 'Europe/Berlin')::date
-      and l.status='active'
-    group by t.channel
-  `, [workspace]);
-
-  const tasks = await query<TaskRow>(`
-    select t.id,t.channel,t.rank,t.status,t.score,t.lead_id,t.company_id,t.payload,t.updated_at
-    from sales_outbound_tasks t
-    join sales_leads l on l.id=t.lead_id and l.workspace=t.workspace
-    where t.workspace=$1 and t.task_date=(now() at time zone 'Europe/Berlin')::date
-      and l.status='active'
-    order by case t.channel when 'call' then 0 when 'email' then 1 when 'video' then 2 else 3 end, t.rank asc
-    limit 320
-  `, [workspace]);
-
-  const byChannel = Object.fromEntries((Object.keys(OUTBOUND_TARGETS) as OutboundChannel[]).map((channel) => {
-    const row = counts.find((item) => item.channel === channel);
-    return [channel, {
-      target: OUTBOUND_TARGETS[channel],
-      ready: Number(row?.ready || 0),
-      done: Number(row?.done || 0),
-      total: Number(row?.total || 0),
-    }];
-  })) as Record<OutboundChannel, { target: number; ready: number; done: number; total: number }>;
-
-  return {
-    date: new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Berlin" }).format(new Date()),
-    targets: OUTBOUND_TARGETS,
-    channels: byChannel,
-    tasks,
-    workers: {
-      openOutreach: {
-        configured: Boolean(process.env.OPENOUTREACH_WORKER_URL),
-        url: process.env.OPENOUTREACH_WORKER_URL ? "connected" : "missing",
-        source: "eracle/OpenOutreach",
-      },
-      linkedin: {
-        configured: Boolean(process.env.LINKEDIN_AGENT_WORKER_URL),
-        autoSend: process.env.LINKEDIN_AGENT_AUTO_SEND === "true",
-      },
-      video: {
-        configured: Boolean(process.env.VIDEO_RENDERER_URL),
-      },
-    },
-  };
-}
-
-export async function updateOutboundTask(id: string, status: string, workspace = "default") {
-  await ensureOutboundEngineSchema();
-  const allowed = new Set(["ready", "drafted", "queued", "sent", "done", "completed", "skipped", "failed"]);
-  if (!allowed.has(status)) throw new Error("Ungültiger Task-Status.");
-  await query(
-    `update sales_outbound_tasks set status=$3,updated_at=now() where id=$1 and workspace=$2`,
-    [id, workspace, status],
-  );
-}
-
-export async function prepareLinkedInDrafts(limit: number = OUTBOUND_TARGETS.linkedin, workspace = "default") {
-  await ensureOutboundEngineSchema();
-  const safeLimit = Math.max(1, Math.min(50, Math.round(limit)));
-  const rows = await query<TaskRow>(`
-    select id,channel,rank,status,score,lead_id,company_id,payload,updated_at
-    from sales_outbound_tasks
-    where workspace=$1
-      and task_date=(now() at time zone 'Europe/Berlin')::date
-      and channel='linkedin'
-      and status in ('ready','drafted')
-    order by rank asc
-    limit $2
-  `, [workspace, safeLimit]);
-
-  for (const row of rows) {
-    const company = String(row.payload?.company || "Ihrem Pflegedienst");
-    const reasons = Array.isArray(row.payload?.reasons) ? row.payload.reasons.map(String) : [];
-    const reason = reasons.find(Boolean) || "bei Ihrem Online-Auftritt ist mir ein konkreter Recruiting-Hebel aufgefallen";
-    const message = `Hallo, ich habe mir ${company} kurz angesehen. ${reason}. Ich habe dazu 2 konkrete Ideen vorbereitet – soll ich sie Ihnen kurz schicken?`;
-    await query(
-      `update sales_outbound_tasks
-       set payload=payload || jsonb_build_object('message',$2,'draftedAt',now()::text),status='drafted',updated_at=now()
-       where id=$1 and workspace=$3`,
-      [row.id, message, workspace],
-    );
-  }
-
-  return getOutboundEngineSnapshot(workspace);
-}
-
-export async function dispatchLinkedInQueue(limit: number = 10, workspace = "default") {
-  await ensureOutboundEngineSchema();
-  const workerUrl = (process.env.LINKEDIN_AGENT_WORKER_URL || "").replace(/\/$/, "");
-  if (!workerUrl) {
-    return { ok: false, configured: false, error: "LINKEDIN_AGENT_WORKER_URL fehlt.", dispatched: 0 };
-  }
-
-  const safeLimit = Math.max(1, Math.min(30, Math.round(limit)));
-  const rows = await query<TaskRow>(`
-    select id,channel,rank,status,score,lead_id,company_id,payload,updated_at
-    from sales_outbound_tasks
-    where workspace=$1
-      and task_date=(now() at time zone 'Europe/Berlin')::date
-      and channel='linkedin'
-      and status='drafted'
-      and coalesce(payload->>'linkedin','')<>''
-      and coalesce(payload->>'message','')<>''
-    order by rank asc
-    limit $2
-  `, [workspace, safeLimit]);
-
-  if (!rows.length) return { ok: true, configured: true, dispatched: 0, message: "Keine vorbereiteten LinkedIn-Tasks offen." };
-
-  const response = await fetch(`${workerUrl}/v1/actions`, {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      ...(process.env.LINKEDIN_AGENT_WORKER_SECRET ? { authorization: `Bearer ${process.env.LINKEDIN_AGENT_WORKER_SECRET}` } : {}),
-    },
-    body: JSON.stringify({
-      mode: process.env.LINKEDIN_AGENT_AUTO_SEND === "true" ? "send" : "queue",
-      actions: rows.map((row) => ({
-        taskId: row.id,
-        leadId: row.lead_id,
-        profileUrl: String(row.payload?.linkedin || ""),
-        message: String(row.payload?.message || ""),
-      })),
-    }),
-  });
-
-  if (!response.ok) {
-    const body = await response.text().catch(() => "");
-    throw new Error(`LinkedIn Worker ${response.status}: ${body.slice(0, 300)}`);
-  }
-
-  for (const row of rows) {
-    await query(
-      `update sales_outbound_tasks set status='queued',payload=payload || jsonb_build_object('queuedAt',now()::text),updated_at=now() where id=$1 and workspace=$2`,
-      [row.id, workspace],
-    );
-  }
-  return { ok: true, configured: true, dispatched: rows.length, autoSend: process.env.LINKEDIN_AGENT_AUTO_SEND === "true" };
-}
-
-      and to_date(c.metadata->>'jobPublishedAt','DD.MM.YYYY') <= ((now() at time zone 'Europe/Berlin')::date - 60)
-      and lower(c.name) !~ '(caritas|arbeiterwohlfahrt|(^|[^a-z])awo([^a-z]|$)|johanniter|diakonie|deutsches rotes kreuz|(^|[^a-z])drk([^a-z]|$)|malteser|(^|[^a-z])asb([^a-z]|$)|(^|[^a-z])brk([^a-z]|$)|lebenshilfe|stiftung|(^|[^a-z])e\\.?v\\.?([^a-z]|$)|ggmbh|verein|zeitarbeit|personalvermittlung|personaldienst|staffing)'
-      and (
-        coalesce(c.metadata->>'jobWorkload','')=''
-        or lower(c.metadata->>'jobWorkload') like '%vollzeit%'
-      )
-      and lower(coalesce(c.metadata->>'jobWorkload','')) !~ '(nur teilzeit|teilzeit only|minijob|geringfügig|20[-– ]?30 ?h|50[-– ]?80 ?%)'
-    ), ranked as (
-      select *, row_number() over (
-        partition by owner
-        order by
-          case tier when 'A+' then 0 when 'A' then 1 when 'B' then 2 else 3 end,
-          score desc,
-          job_count desc,
-          company asc
-      )::int as rn
-      from candidates
-    )
-    insert into sales_outbound_tasks(
-      id,workspace,task_date,lead_id,company_id,channel,rank,score,status,payload
-    )
-    select
-      lead_id || ':call:' || ((now() at time zone 'Europe/Berlin')::date)::text,
-      $1,
-      (now() at time zone 'Europe/Berlin')::date,
-      lead_id,
-      company_id,
-      'call',
-      rn,
-      score,
-      'ready',
-      jsonb_build_object(
-        'company',company,
-        'city',city,
-        'website',website,
-        'email',email,
-        'phone',phone,
-        'linkedin',linkedin,
-        'jobAdUrl',job_ad_url,
-        'tier',tier,
-        'reasons',reasons,
-        'websiteWeak',website_weak,
-        'jobCount',job_count,
-        'owner',owner
-      )
-    from ranked
-    where rn <= 50
-    on conflict(workspace,task_date,lead_id,channel) do update set
-      rank=excluded.rank,
-      score=excluded.score,
-      payload=excluded.payload,
-      updated_at=now()
-  `;
-}
-
-export async function buildDailyOutboundPlan(workspace = "default") {
-  await ensureOutboundEngineSchema();
 
   await query(insertCallChannelSql(), [workspace]);
   await query(insertChannelSql("email", "coalesce(ct.email,'')<>''", OUTBOUND_TARGETS.email), [workspace]);
