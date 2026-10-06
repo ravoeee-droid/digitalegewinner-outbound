@@ -7,13 +7,30 @@ export const maxDuration = 300;
 
 const INDEX_URLS = [
   "https://www.pflegedienstjobs24.de/nordrhein-westfalen",
-  "https://www.pflegedienstjobs24.de/nordrhein-westfalen/pflegehelfer",
-  "https://www.pflegedienstjobs24.de/nordrhein-westfalen/pflegedienstleitung",
-  "https://www.pflegedienstjobs24.de/nordrhein-westfalen/pflegefachkraft",
-  "https://www.pflegedienstjobs24.de/nordrhein-westfalen/pflegedienstfahrer",
+  "https://www.pflegedienstjobs24.de/koeln",
+  "https://www.pflegedienstjobs24.de/duesseldorf",
+  "https://www.pflegedienstjobs24.de/bonn",
+  "https://www.pflegedienstjobs24.de/leverkusen",
+  "https://www.pflegedienstjobs24.de/bergisch-gladbach",
+  "https://www.pflegedienstjobs24.de/aachen",
+  "https://www.pflegedienstjobs24.de/moenchengladbach",
+  "https://www.pflegedienstjobs24.de/krefeld",
+  "https://www.pflegedienstjobs24.de/duisburg",
+  "https://www.pflegedienstjobs24.de/essen",
+  "https://www.pflegedienstjobs24.de/bochum",
+  "https://www.pflegedienstjobs24.de/wuppertal",
+  "https://www.pflegedienstjobs24.de/solingen",
+  "https://www.pflegedienstjobs24.de/remscheid",
+  "https://www.pflegedienstjobs24.de/siegburg",
+  "https://www.pflegedienstjobs24.de/troisdorf",
+  "https://www.pflegedienstjobs24.de/dueren",
+  "https://www.pflegedienstjobs24.de/euskirchen",
+  "https://www.pflegedienstjobs24.de/erftstadt",
+  "https://www.pflegedienstjobs24.de/huerth",
+  "https://www.pflegedienstjobs24.de/frechen",
 ];
 
-const EXCLUDED = /(caritas|arbeiterwohlfahrt|\bawo\b|johanniter|deutsches rotes kreuz|\bdrk\b|\basb\b)/i;
+const EXCLUDED = /(caritas|arbeiterwohlfahrt|\bawo\b|johanniter|diakonie|deutsches rotes kreuz|\bdrk\b|malteser|\basb\b|\bbrk\b|lebenshilfe|stiftung|ggmbh|gemeinnützig|zeitarbeit|personalvermittlung|personaldienst|staffing)/i;
 const LOW_VALUE_ROLE = /(ausbildung|azubi|fsj|praktikum)/i;
 
 function authorized(request: Request) {
