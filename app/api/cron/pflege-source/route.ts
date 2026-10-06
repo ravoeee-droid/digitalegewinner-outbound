@@ -324,8 +324,8 @@ async function runSync() {
   if (!jobs.length) return {ok:true,status:"complete",runId,counts:await finalize(runId)};
 
   const results:string[]=[];
-  for (let i=0;i<jobs.length;i+=9) {
-    const batch=jobs.slice(i,i+9);
+  for (let i=0;i<jobs.length;i+=12) {
+    const batch=jobs.slice(i,i+12);
     const part=await Promise.all(batch.map(j=>processOne(runId!,j.url)));
     results.push(...part);
   }
