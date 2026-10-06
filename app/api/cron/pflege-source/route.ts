@@ -114,6 +114,9 @@ function parseDetail(url: string, html: string) {
   const path = new URL(url).pathname.split("/").filter(Boolean);
   const city = titleCaseSlug(path[0] || "");
   const category = path[1] || "";
+  const workload = (text.match(/Arbeitsumfang:\\s*([^\\n]+)/i)?.[1] || text.match(/\\b(Vollzeit(?:\\s+oder\\s+Teilzeit|\\s*\\/\\s*Teilzeit)?)\\b/i)?.[1] || "").trim();
+  let ageDays = -1;
+  if (date) { const [d,m,y]=date.split(".").map(Number); ageDays=Math.floor((Date.now()-new Date(y,m-1,d).getTime())/86400000); }
   return {
     company,
     jobTitle,
@@ -123,6 +126,8 @@ function parseDetail(url: string, html: string) {
     homepage: homepageFromHtml(html, url),
     contact: contactFromText(text),
     roleClass: roleClass(jobTitle),
+    workload,
+    ageDays,
     adUrl: url,
   };
 }
