@@ -241,8 +241,95 @@ function insertCallChannelSql() {
   `;
 }
 
+async function ensureEmergencyVerifiedCallLeads(workspace: string) {
+  const seeds = [
+    {
+      companyId: "manual-sz-siegburg-company",
+      contactId: "manual-sz-siegburg-contact",
+      leadId: "manual-sz-siegburg-lead",
+      company: "Seniorenzentrum Siegburg GmbH",
+      website: "https://www.seniorenzentrum-siegburg.de",
+      city: "Siegburg",
+      phone: "02241 2504-0",
+      email: "bewerbung@seniorenzentrum.siegburg.de",
+      contact: "",
+      sourceId: "seniorenzentrum-siegburg-pflegefachkraft",
+      jobUrl: "https://www.seniorenzentrum-siegburg.de/aktuelle-stellenangebote/examinierte-pflegefachkraefte-m-w-d/",
+      jobTitle: "Examinierte Pflegefachkraft (M/W/D)",
+      workload: "Vollzeit oder Teilzeit",
+      publishedAt: "06.07.2026",
+      ageDays: 92,
+      score: 97,
+    },
+    {
+      companyId: "manual-vilana-company",
+      contactId: "manual-vilana-contact",
+      leadId: "manual-vilana-lead",
+      company: "Vilana Pflegedienst ihres Vertrauens Nadine Plewniok",
+      website: "https://www.vilana-pflege.de",
+      city: "Oberhausen",
+      phone: "0208 88483343",
+      email: "info@vilana-pflege.de",
+      contact: "Nadine Plewniok",
+      sourceId: "vilana-pflegefachkraft",
+      jobUrl: "https://www.easyworkclub.com/de/job/pflegefachkraft-m-w-d-ambulante-pflege-in-vollzeit-vilana-pflegedienst-ihres-ver--32b5fe9e-7285-45aa-8bb0-b85fbc216e85/",
+      jobTitle: "Pflegefachkraft (m/w/d) – Ambulante Pflege in Vollzeit",
+      workload: "Vollzeit",
+      publishedAt: "06.08.2026",
+      ageDays: 61,
+      score: 96,
+    },
+  ];
+
+  for (const s of seeds) {
+    await query(
+      `insert into sales_companies(id,workspace,name,domain,website,city,industry,phone,source,source_id,research_status,latest_score,metadata)
+       values($1,$2,$3,$4,$5,$6,'Pflege',$7,'manual-verified',$8,'complete',$9,$10::jsonb)
+       on conflict(id) do update set
+         name=excluded.name,website=excluded.website,city=excluded.city,phone=excluded.phone,
+         source=excluded.source,source_id=excluded.source_id,research_status='complete',
+         latest_score=excluded.latest_score,metadata=excluded.metadata,updated_at=now()`,
+      [
+        s.companyId, workspace, s.company, new URL(s.website).hostname.replace(/^www\./,""), s.website,
+        s.city, s.phone, s.sourceId, s.score,
+        JSON.stringify({
+          jobAdUrl: s.jobUrl,
+          jobTitle: s.jobTitle,
+          jobRole: "Pflegefachkraft",
+          jobWorkload: s.workload,
+          jobPublishedAt: s.publishedAt,
+          jobPublishedAtApprox: true,
+          jobAgeDays: s.ageDays,
+          sourceVerifiedAt: "2026-10-06",
+        }),
+      ],
+    );
+
+    await query(
+      `insert into sales_contacts(id,workspace,company_id,name,email,phone,is_primary,source,metadata)
+       values($1,$2,$3,$4,$5,$6,true,'public-website','{}'::jsonb)
+       on conflict(id) do update set
+         name=excluded.name,email=excluded.email,phone=excluded.phone,is_primary=true,updated_at=now()`,
+      [s.contactId, workspace, s.companyId, s.contact, s.email, s.phone],
+    );
+
+    await query(
+      `insert into sales_leads(id,workspace,company_id,contact_id,stage,status,intent_score,fit_score,opportunity_score,priority_score,owner,notes)
+       values($1,$2,$3,$4,'Neu','active',95,90,95,$5,'Raphael',$6)
+       on conflict(id) do update set
+         contact_id=excluded.contact_id,stage='Neu',status='active',priority_score=excluded.priority_score,
+         owner='Raphael',notes=excluded.notes,updated_at=now()`,
+      [
+        s.leadId, workspace, s.companyId, s.contactId, s.score,
+        `Pflegefachkraft · ${s.workload} · Anzeige seit ca. ${s.ageDays >= 90 ? "3 Monaten" : "2 Monaten"} live · Anzeige: ${s.jobUrl}`,
+      ],
+    );
+  }
+}
+
 export async function buildDailyOutboundPlan(workspace = "default") {
   await ensureOutboundEngineSchema();
+  await ensureEmergencyVerifiedCallLeads(workspace);
 
   await query(`
     update sales_leads l
