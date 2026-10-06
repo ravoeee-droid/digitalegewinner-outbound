@@ -185,8 +185,23 @@ async function prepareRun() {
   const runId = crypto.randomUUID();
   const pages = await Promise.allSettled(INDEX_URLS.map(async url => ({url,html:await fetchHtml(url)})));
   const urls = new Set<string>();
-  for (const page of pages) if (page.status === "fulfilled") jobLinks(page.value.html,page.value.url).forEach(u=>urls.add(u));
-  await query(`insert into pflege_source_sync_runs(id,total,quality_version) values($1,$2,\'pflegefachkraft_fulltime_60d_v5\')`,[runId,urls.size]);
+  const localPages = new Set<string>();
+  for (const page of pages) {
+    if (page.status !== "fulfilled") continue;
+    jobLinks(page.value.html,page.value.url).forEach(u=>urls.add(u));
+    for (const m of page.value.html.matchAll(/href\s*=\s*["']([^"']+)["']/gi)) {
+      const u=absolute(page.value.url,decodeHtml(m[1])).split("#")[0];
+      if (!u.startsWith("https://www.pflegedienstjobs24.de/")) continue;
+      const parts=new URL(u).pathname.split("/").filter(Boolean);
+      if (parts.length===1 && !["login","inserieren","watchlist","kontakt","agb","datenschutz","impressum"].includes(parts[0]||"")) localPages.add(u);
+    }
+  }
+  const extras=[...localPages].slice(0,260);
+  for (let i=0;i<extras.length;i+=15) {
+    const batch=await Promise.allSettled(extras.slice(i,i+15).map(async url=>({url,html:await fetchHtml(url)})));
+    for (const page of batch) if (page.status==="fulfilled") jobLinks(page.value.html,page.value.url).forEach(u=>urls.add(u));
+  }
+  await query(`insert into pflege_source_sync_runs(id,total,quality_version) values($1,$2,\'pflegefachkraft_fulltime_60d_v6\')`,[runId,urls.size]);
   for (const url of urls) {
     await query(`insert into pflege_source_jobs(run_id,url) values($1,$2) on conflict do nothing`,[runId,url]);
   }
@@ -318,7 +333,7 @@ async function runSync() {
   const running=await query<{id:string}>(`select id from pflege_source_sync_runs where status='running' order by started_at desc limit 1`);
   let runId=running[0]?.id;
   if (!runId) {
-    const recent=await query<{id:string}>(`select id from pflege_source_sync_runs where status='complete' and quality_version='pflegefachkraft_fulltime_60d_v5' and completed_at>now()-interval '20 hours' order by completed_at desc limit 1`);
+    const recent=await query<{id:string}>(`select id from pflege_source_sync_runs where status='complete' and quality_version='pflegefachkraft_fulltime_60d_v6' and completed_at>now()-interval '20 hours' order by completed_at desc limit 1`);
     if (recent[0]) return {ok:true,status:"fresh",runId:recent[0].id};
     const prepared=await prepareRun();
     runId=prepared.runId;
