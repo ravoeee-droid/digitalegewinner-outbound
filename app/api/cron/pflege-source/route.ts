@@ -197,9 +197,16 @@ async function processOne(runId: string, url: string) {
     const d = parseDetail(url,html);
     if (!d.company || !d.jobTitle) throw new Error("Arbeitgeber/Stellentitel nicht erkannt");
 
-    if (EXCLUDED.test(d.company) || LOW_VALUE_ROLE.test(d.jobTitle)) {
-      await query(`update pflege_source_jobs set status='skipped',company=$3,job_title=$4,homepage=$5,contact=$6,city=$7,role_class=$8,published_at=$9,updated_at=now() where run_id=$1 and url=$2`,
-        [runId,url,d.company,d.jobTitle,d.homepage,d.contact,d.city,d.roleClass,d.publishedAt]);
+    const fullTimeOk = /\\bvollzeit\\b/i.test(d.workload);
+    const ageOk = d.ageDays >= 60;
+    if (EXCLUDED.test(d.company) || LOW_VALUE_ROLE.test(d.jobTitle) || d.roleClass !== "Pflegefachkraft" || !fullTimeOk || !ageOk) {
+      const reason = EXCLUDED.test(d.company) ? "excluded-employer"
+        : d.roleClass !== "Pflegefachkraft" ? "wrong-role"
+        : !fullTimeOk ? "no-fulltime"
+        : !ageOk ? "under-60-days"
+        : "excluded";
+      await query(`update pflege_source_jobs set status='skipped',company=$3,job_title=$4,homepage=$5,contact=$6,city=$7,role_class=$8,published_at=$9,error=$10,updated_at=now() where run_id=$1 and url=$2`,
+        [runId,url,d.company,d.jobTitle,d.homepage,d.contact,d.city,d.roleClass,d.publishedAt,reason]);
       return "skipped";
     }
 
