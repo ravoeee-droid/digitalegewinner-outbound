@@ -186,7 +186,7 @@ async function prepareRun() {
   const pages = await Promise.allSettled(INDEX_URLS.map(async url => ({url,html:await fetchHtml(url)})));
   const urls = new Set<string>();
   for (const page of pages) if (page.status === "fulfilled") jobLinks(page.value.html,page.value.url).forEach(u=>urls.add(u));
-  await query(`insert into pflege_source_sync_runs(id,total,quality_version) values($1,$2,\'pflegefachkraft_fulltime_60d_v4\')`,[runId,urls.size]);
+  await query(`insert into pflege_source_sync_runs(id,total,quality_version) values($1,$2,\'pflegefachkraft_fulltime_60d_v5\')`,[runId,urls.size]);
   for (const url of urls) {
     await query(`insert into pflege_source_jobs(run_id,url) values($1,$2) on conflict do nothing`,[runId,url]);
   }
@@ -199,11 +199,16 @@ async function processOne(runId: string, url: string) {
     const d = parseDetail(url,html);
     if (!d.company || !d.jobTitle) throw new Error("Arbeitgeber/Stellentitel nicht erkannt");
 
-    const fullTimeOk = /\bvollzeit\b/i.test(d.workload);
+    const detailText = stripHtml(html);
+    const explicitPflegefachkraftDemand =
+      /pflegefachkraft[^\n]{0,120}(?:gesucht|suchen|in vollzeit)/i.test(detailText) ||
+      /(?:gesucht|suchen|wird)[^\n]{0,120}pflegefachkraft[^\n]{0,120}vollzeit/i.test(detailText);
+    const effectiveRole = d.roleClass === "Pflegefachkraft" || explicitPflegefachkraftDemand ? "Pflegefachkraft" : d.roleClass;
+    const fullTimeOk = /\bvollzeit\b/i.test(d.workload) || /pflegefachkraft[^\n]{0,160}vollzeit/i.test(detailText);
     const ageOk = d.ageDays >= 60;
-    if (EXCLUDED.test(d.company) || LOW_VALUE_ROLE.test(d.jobTitle) || d.roleClass !== "Pflegefachkraft" || !fullTimeOk || !ageOk) {
+    if (EXCLUDED.test(d.company) || LOW_VALUE_ROLE.test(d.jobTitle) || effectiveRole !== "Pflegefachkraft" || !fullTimeOk || !ageOk) {
       const reason = EXCLUDED.test(d.company) ? "excluded-employer"
-        : d.roleClass !== "Pflegefachkraft" ? "wrong-role"
+        : effectiveRole !== "Pflegefachkraft" ? "wrong-role"
         : !fullTimeOk ? "no-fulltime"
         : !ageOk ? "under-60-days"
         : "excluded";
@@ -247,7 +252,7 @@ async function processOne(runId: string, url: string) {
       set owner=$2,intent_score=95,fit_score=85,opportunity_score=90,priority_score=$3,
           notes=$4,status='active',stage=case when stage='Verloren' then 'Neu' else stage end,updated_at=now()
       where id=$1
-    `,[persisted.leadId,owner,priority,`${d.roleClass}: ${d.jobTitle} · Anzeige: ${d.adUrl}${d.publishedAt ? ` · seit ${d.publishedAt}` : ""}`]);
+    `,[persisted.leadId,owner,priority,`${effectiveRole}: ${d.jobTitle} · Anzeige: ${d.adUrl}${d.publishedAt ? ` · seit ${d.publishedAt}` : ""}`]);
 
     await query(`update pflege_source_jobs set status='imported',company=$3,job_title=$4,homepage=$5,contact=$6,city=$7,role_class=$8,published_at=$9,updated_at=now() where run_id=$1 and url=$2`,
       [runId,url,d.company,d.jobTitle,d.homepage,d.contact,d.city,d.roleClass,d.publishedAt]);
@@ -313,7 +318,7 @@ async function runSync() {
   const running=await query<{id:string}>(`select id from pflege_source_sync_runs where status='running' order by started_at desc limit 1`);
   let runId=running[0]?.id;
   if (!runId) {
-    const recent=await query<{id:string}>(`select id from pflege_source_sync_runs where status='complete' and quality_version='pflegefachkraft_fulltime_60d_v4' and completed_at>now()-interval '20 hours' order by completed_at desc limit 1`);
+    const recent=await query<{id:string}>(`select id from pflege_source_sync_runs where status='complete' and quality_version='pflegefachkraft_fulltime_60d_v5' and completed_at>now()-interval '20 hours' order by completed_at desc limit 1`);
     if (recent[0]) return {ok:true,status:"fresh",runId:recent[0].id};
     const prepared=await prepareRun();
     runId=prepared.runId;
