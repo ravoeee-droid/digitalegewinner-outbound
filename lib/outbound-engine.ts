@@ -136,7 +136,14 @@ function insertCallChannelSql() {
       ${baseCandidateSql}
       and coalesce(ct.phone,c.phone,'')<>''
       and l.owner in ('Raphael','Mattias')
-      and lower(coalesce(c.metadata->>'jobRole',''))='pflegefachkraft'
+      and (
+        lower(coalesce(c.metadata->>'jobRole',''))='pflegefachkraft'
+        or lower(coalesce(c.metadata->>'jobAdUrl','')) like '%/pflegefachkraft/%'
+        or lower(coalesce(c.metadata->>'jobTitle','')) like '%pflegefach%'
+        or lower(coalesce(l.notes,'')) like '%pflegefach%'
+        or lower(coalesce(l.notes,'')) like '%altenpfleger%'
+        or lower(coalesce(l.notes,'')) like '%examiniert%'
+      )
       and length(coalesce(c.metadata->>'jobPublishedAt',''))=10
       and substr(c.metadata->>'jobPublishedAt',3,1)='.'
       and substr(c.metadata->>'jobPublishedAt',6,1)='.'
@@ -217,6 +224,54 @@ export async function buildDailyOutboundPlan(workspace = "default") {
   await ensureOutboundEngineSchema();
 
   await query(`
+    update sales_leads l
+       set status='active',
+           updated_at=now()
+      from sales_companies c
+     where l.company_id=c.id
+       and l.workspace=$1
+       and l.status='archived'
+       and l.stage in ('Neu','Research','Bereit','Kontaktiert')
+       and coalesce(l.do_not_contact,false)=false
+       and coalesce(c.source,'')='pflegedienstjobs24'
+       and (
+         lower(coalesce(c.metadata->>'jobRole',''))='pflegefachkraft'
+         or lower(coalesce(c.metadata->>'jobAdUrl','')) like '%/pflegefachkraft/%'
+         or lower(coalesce(c.metadata->>'jobTitle','')) like '%pflegefach%'
+         or lower(coalesce(l.notes,'')) like '%pflegefach%'
+         or lower(coalesce(l.notes,'')) like '%altenpfleger%'
+         or lower(coalesce(l.notes,'')) like '%examiniert%'
+       )
+       and length(coalesce(c.metadata->>'jobPublishedAt',''))=10
+       and substr(c.metadata->>'jobPublishedAt',3,1)='.'
+       and substr(c.metadata->>'jobPublishedAt',6,1)='.'
+       and to_date(c.metadata->>'jobPublishedAt','DD.MM.YYYY') <= ((now() at time zone 'Europe/Berlin')::date - 60)
+       and lower(c.name) not like '%caritas%'
+       and lower(c.name) not like '%arbeiterwohlfahrt%'
+       and lower(c.name) not like '%johanniter%'
+       and lower(c.name) not like '%diakonie%'
+       and lower(c.name) not like '%deutsches rotes kreuz%'
+       and lower(c.name) not like '%malteser%'
+       and lower(c.name) not like '%lebenshilfe%'
+       and lower(c.name) not like '%stiftung%'
+       and lower(c.name) not like '%ggmbh%'
+       and lower(c.name) not like '% e.v.%'
+       and lower(c.name) not like '% e.v'
+       and lower(c.name) not like '%verein%'
+       and lower(c.name) not like '%zeitarbeit%'
+       and lower(c.name) not like '%personalvermittlung%'
+       and lower(c.name) not like '%personaldienst%'
+       and lower(c.name) not like '%staffing%'
+       and (
+         coalesce(c.metadata->>'jobWorkload','')=''
+         or lower(c.metadata->>'jobWorkload') like '%vollzeit%'
+       )
+       and lower(coalesce(c.metadata->>'jobWorkload','')) not like '%nur teilzeit%'
+       and lower(coalesce(c.metadata->>'jobWorkload','')) not like '%minijob%'
+       and lower(coalesce(c.metadata->>'jobWorkload','')) not like '%geringfügig%'
+  `, [workspace]);
+
+  await query(`
     delete from sales_outbound_tasks t
     using sales_leads l, sales_companies c
     where t.lead_id=l.id
@@ -226,7 +281,14 @@ export async function buildDailyOutboundPlan(workspace = "default") {
       and t.channel='call'
       and t.status in ('ready','drafted','queued')
       and (
-        lower(coalesce(c.metadata->>'jobRole',''))<>'pflegefachkraft'
+        (
+          lower(coalesce(c.metadata->>'jobRole',''))<>'pflegefachkraft'
+          and lower(coalesce(c.metadata->>'jobAdUrl','')) not like '%/pflegefachkraft/%'
+          and lower(coalesce(c.metadata->>'jobTitle','')) not like '%pflegefach%'
+          and lower(coalesce(l.notes,'')) not like '%pflegefach%'
+          and lower(coalesce(l.notes,'')) not like '%altenpfleger%'
+          and lower(coalesce(l.notes,'')) not like '%examiniert%'
+        )
         or length(coalesce(c.metadata->>'jobPublishedAt',''))<>10
         or substr(c.metadata->>'jobPublishedAt',3,1)<>'.'
         or substr(c.metadata->>'jobPublishedAt',6,1)<>'.'
