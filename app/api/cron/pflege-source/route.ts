@@ -158,8 +158,10 @@ async function ensureSyncSchema() {
       skipped integer not null default 0,
       failed integer not null default 0,
       started_at timestamptz not null default now(),
-      completed_at timestamptz
+      completed_at timestamptz,
+      quality_version text not null default ''
     );
+    alter table pflege_source_sync_runs add column if not exists quality_version text not null default '';
     create table if not exists pflege_source_jobs(
       run_id text not null references pflege_source_sync_runs(id) on delete cascade,
       url text not null,
@@ -184,7 +186,7 @@ async function prepareRun() {
   const pages = await Promise.allSettled(INDEX_URLS.map(async url => ({url,html:await fetchHtml(url)})));
   const urls = new Set<string>();
   for (const page of pages) if (page.status === "fulfilled") jobLinks(page.value.html,page.value.url).forEach(u=>urls.add(u));
-  await query(`insert into pflege_source_sync_runs(id,total) values($1,$2)`,[runId,urls.size]);
+  await query(`insert into pflege_source_sync_runs(id,total,quality_version) values($1,$2,\'pflegefachkraft_fulltime_60d_v4\')`,[runId,urls.size]);
   for (const url of urls) {
     await query(`insert into pflege_source_jobs(run_id,url) values($1,$2) on conflict do nothing`,[runId,url]);
   }
@@ -307,7 +309,7 @@ async function runSync() {
   const running=await query<{id:string}>(`select id from pflege_source_sync_runs where status='running' order by started_at desc limit 1`);
   let runId=running[0]?.id;
   if (!runId) {
-    const recent=await query<{id:string}>(`select id from pflege_source_sync_runs where status='complete' and completed_at>now()-interval '20 hours' order by completed_at desc limit 1`);
+    const recent=await query<{id:string}>(`select id from pflege_source_sync_runs where status='complete' and quality_version='pflegefachkraft_fulltime_60d_v4' and completed_at>now()-interval '20 hours' order by completed_at desc limit 1`);
     if (recent[0]) return {ok:true,status:"fresh",runId:recent[0].id};
     const prepared=await prepareRun();
     runId=prepared.runId;
