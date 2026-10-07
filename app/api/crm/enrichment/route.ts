@@ -142,8 +142,8 @@ function fallbackBrief(company: string, contact: Partial<ContactEnrichment>, aud
   const opportunity = audit?.sales?.opportunitySummary || signals.slice(0, 3).join(" · ") || "Öffentliche Recruiting- und Kontaktdaten wurden geprüft.";
   return {
     summary: opportunity,
-    callOpening: audit?.sales?.opener || `Guten Tag, Raphael Hermann hier. Ich habe mir ${company} und Ihren aktuellen Recruiting-Auftritt kurz angesehen. Darf ich Ihnen in zwei Minuten sagen, welcher Hebel mir dabei aufgefallen ist?`,
-    emailHook: audit?.sales?.emailHook || `Ich habe mir den Recruiting-Auftritt von ${company} angesehen und dabei einen konkreten Hebel für einen einfacheren Bewerberweg gefunden.`,
+    callOpening: audit?.sales?.opener || `Guten Tag, Raphael Hermann hier. Ich unterstütze Pflegebetriebe dabei, mehr passende Bewerbungen aus der Region zu bekommen. Darf ich Ihnen in zwei Minuten kurz sagen, worum es geht?`,
+    emailHook: audit?.sales?.emailHook || `Wir helfen Pflegebetrieben, mehr passende Bewerbungen zu bekommen und den Bewerbungsweg einfacher zu machen. Gern zeige ich Ihnen, wie das für ${company} aussehen könnte.`,
     personalizationPoints: signals.slice(0, 5),
     likelyDecisionMaker: contact.decisionMakerName
       ? [contact.decisionMakerName, contact.decisionMakerRole].filter(Boolean).join(" · ")

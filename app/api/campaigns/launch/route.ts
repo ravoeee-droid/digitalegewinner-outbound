@@ -33,7 +33,7 @@ export async function POST(request:Request){
   }
   const input=schema.parse(await request.json());const active=input.mailboxes.filter(m=>m.enabled&&m.dailyLimit>0);if(!active.length)return Response.json({error:"Keine aktive Mailbox."},{status:409});
   const suppressedRows=await query<{email:string}>("select email from er_suppressions where workspace='default'");const suppressed=new Set(suppressedRows.map(r=>r.email.toLowerCase()));const appUrl=input.appUrl||process.env.NEXT_PUBLIC_APP_URL||new URL(request.url).origin;
-  const eligible=input.leads.filter(l=>matches(l,input.campaign.filters));const leadIds=eligible.map(l=>l.id);const enrolledRows=leadIds.length?await query<{lead_id:string}>("select distinct lead_id from er_outbox where workspace='default' and campaign_id=$1 and lead_id=any($2::text[]) and status not in ('failed','suppressed')",[input.campaign.id,leadIds]):[];const enrolled=new Set(enrolledRows.map(r=>r.lead_id));
+  const needsAnalysis=input.campaign.steps.some(step=>[step.body,...(step.variants??[]).map(v=>v.body)].some(body=>body.includes("{{analysis_link}}")));const eligible=input.leads.filter(l=>matches(l,input.campaign.filters)&&(!needsAnalysis||l.websiteScore>0));const skippedNoAnalysis=needsAnalysis?input.leads.filter(l=>matches(l,input.campaign.filters)&&!(l.websiteScore>0)).length:0;const leadIds=eligible.map(l=>l.id);const enrolledRows=leadIds.length?await query<{lead_id:string}>("select distinct lead_id from er_outbox where workspace='default' and campaign_id=$1 and lead_id=any($2::text[]) and status not in ('failed','suppressed')",[input.campaign.id,leadIds]):[];const enrolled=new Set(enrolledRows.map(r=>r.lead_id));
   // Don't trust the client's snapshot of lead stage - it can be stale by the time this runs.
   // Re-check the real CRM row so a lead closed/blocked since the page loaded can't get enrolled.
   const closedRows=leadIds.length?await query<{id:string}>("select id from sales_leads where workspace='default' and id=any($1::text[]) and (stage in ('Gewonnen','Verloren') or do_not_contact)",[leadIds]):[];const closed=new Set(closedRows.map(r=>r.id));
@@ -173,6 +173,7 @@ export async function POST(request:Request){
     queued,
     skipped,
     eligibleLeads:eligible.length,
+    skippedNoAnalysis,
     totalLeads:input.leads.length,
     variants,
     compliance:{

@@ -498,8 +498,8 @@ export async function runWebsiteAudit(rawUrl: string, companyInput = ""): Promis
     ? `Der größte aktuell sichtbare Hebel liegt bei „${first.title}“. Zusammen mit ${second ? `„${second.title}“` : "der bestehenden Seitenstruktur"} ergibt sich konkretes Potenzial für mehr qualifizierte Anfragen.`
     : "Die Website hat bereits eine solide Basis. Der nächste Hebel liegt in datenbasierten Conversion-Tests und gezielter Personalisierung.";
   const opener = first
-    ? `Ich habe mir ${inferredCompany} kurz angesehen. Mir ist direkt aufgefallen, dass ${first.title.toLowerCase()} – genau dort geht bei kaltem Traffic häufig unnötig Conversion verloren.`
-    : `Ich habe mir ${inferredCompany} kurz angesehen. Die Basis ist bereits stark – ich sehe trotzdem ein paar konkrete Hebel, die sich sauber testen lassen.`;
+    ? `Unsere Analyse von ${inferredCompany} zeigt: ${first.title.toLowerCase()} – genau dort geht bei kaltem Traffic häufig unnötig Conversion verloren.`
+    : `Unsere Analyse von ${inferredCompany} zeigt eine starke Basis – dazu gibt es ein paar konkrete Hebel, die sich sauber testen lassen.`;
   const emailHook = `Ich habe für ${inferredCompany} einen kurzen Website-Radar gebaut: Score ${scores.overall}/100. ${first ? `Größter Hebel: ${first.title}.` : "Die Basis ist stark; die interessantesten Punkte liegen im Feintuning."}`;
   const loomTalkingPoints = [first, second, third]
     .filter((value): value is AuditFinding => Boolean(value))

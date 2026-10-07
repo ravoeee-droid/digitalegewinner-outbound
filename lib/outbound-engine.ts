@@ -560,8 +560,11 @@ export async function prepareLinkedInDrafts(limit: number = OUTBOUND_TARGETS.lin
   for (const row of rows) {
     const company = String(row.payload?.company || "Ihrem Pflegedienst");
     const reasons = Array.isArray(row.payload?.reasons) ? row.payload.reasons.map(String) : [];
-    const reason = reasons.find(Boolean) || "bei Ihrem Online-Auftritt ist mir ein konkreter Recruiting-Hebel aufgefallen";
-    const message = `Hallo, ich habe mir ${company} kurz angesehen. ${reason}. Ich habe dazu 2 konkrete Ideen vorbereitet – soll ich sie Ihnen kurz schicken?`;
+    const reason = reasons.find(Boolean);
+    // Nur mit belegtem Signal behaupten wir, uns den Betrieb angesehen zu haben.
+    const message = reason
+      ? `Hallo, ich habe mir ${company} kurz angesehen. ${reason}. Ich habe dazu 2 konkrete Ideen vorbereitet – soll ich sie Ihnen kurz schicken?`
+      : `Hallo, ich helfe Pflegebetrieben wie ${company} dabei, mehr passende Bewerbungen aus der Region zu bekommen. Darf ich Ihnen kurz zeigen, wie das aussehen könnte?`;
     await query(
       `update sales_outbound_tasks
        set payload=payload || jsonb_build_object('message',$2,'draftedAt',now()::text),status='drafted',updated_at=now()
