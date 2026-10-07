@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import styles from "./GlobalNav.module.css";
 
 const SECTIONS = [
+  { href: "/heute", label: "Heute" },
   { href: "/outbound", label: "Outbound" },
   { href: "/call", label: "Call" },
   { href: "/websites", label: "Websites" },
@@ -16,6 +17,8 @@ const SECTIONS = [
   { href: "/outreach", label: "Outreach" },
 ];
 
+// Im Alltag genügt "Heute" – alles andere liegt unter "Mehr".
+const PRIMARY = ["/heute"];
 const HIDDEN_PREFIXES = ["/a/", "/login"];
 
 export default function GlobalNav() {
@@ -29,21 +32,31 @@ export default function GlobalNav() {
     window.location.href="/login";
   }
 
+  const visible = SECTIONS.filter((section)=>role!=="sales" || ["/heute","/pflege","/call"].includes(section.href));
+  const more = visible.filter((section)=>!PRIMARY.includes(section.href));
+  const renderLink = (section:{href:string;label:string}) => {
+    const isActive = pathname === section.href || pathname.startsWith(`${section.href}/`);
+    return (
+      <Link key={section.href} href={section.href} className={isActive ? styles.active : undefined}>
+        {section.label}
+      </Link>
+    );
+  };
+
   return (
     <div className={styles.bar}>
-      <Link href={role==="sales"?"/pflege":"/outbound"} className={styles.brand}>
+      <Link href="/heute" className={styles.brand}>
         <span className={styles.mark}>DG</span>
         <span>DIGITALE GEWINNER</span>
       </Link>
       <nav className={styles.nav} aria-label="Hauptnavigation">
-        {SECTIONS.filter((section)=>role!=="sales" || ["/pflege","/call"].includes(section.href)).map((section) => {
-          const isActive = pathname === section.href || pathname.startsWith(`${section.href}/`);
-          return (
-            <Link key={section.href} href={section.href} className={isActive ? styles.active : undefined}>
-              {section.label}
-            </Link>
-          );
-        })}
+        {visible.filter((section)=>PRIMARY.includes(section.href)).map(renderLink)}
+        {more.length>0 && (
+          <details className={styles.more}>
+            <summary className={more.some((section)=>pathname.startsWith(section.href)) ? styles.active : undefined}>Mehr</summary>
+            <div className={styles.moreMenu}>{more.map(renderLink)}</div>
+          </details>
+        )}
       </nav>
       {role && <button className={styles.logout} type="button" onClick={()=>void logout()}>Logout</button>}
     </div>

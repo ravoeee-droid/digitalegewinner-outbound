@@ -10,3 +10,10 @@
 @media(max-width:700px){.brand span{display:none}.bar{gap:10px;padding:0 10px}.nav a{font-size:9px;padding:6px 8px}}
 
 .logout{margin-left:auto;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.045);color:#d9dee3;border-radius:8px;padding:7px 10px;font-size:10px;font-weight:900;letter-spacing:.04em;cursor:pointer}.logout:hover{background:rgba(255,255,255,.09);border-color:rgba(255,255,255,.22)}
+
+.more{position:relative}
+.more summary{list-style:none;cursor:pointer;color:#9aa3a9;font-size:10px;font-weight:800;letter-spacing:.06em;padding:6px 10px;border-radius:7px;border:1px solid transparent;white-space:nowrap}
+.more summary::-webkit-details-marker{display:none}
+.more summary:hover{color:#fff;background:rgba(255,255,255,.045);border-color:rgba(255,255,255,.1)}
+.moreMenu{position:absolute;left:0;top:34px;display:grid;gap:2px;min-width:160px;padding:6px;background:#0a0f12;border:1px solid rgba(255,255,255,.12);border-radius:10px;box-shadow:0 18px 50px rgba(0,0,0,.5);z-index:700}
+.moreMenu a{display:block}

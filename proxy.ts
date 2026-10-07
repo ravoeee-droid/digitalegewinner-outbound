@@ -28,6 +28,7 @@ export const config={
  matcher:[
   "/",
   "/call/:path*",
+  "/heute/:path*",
   "/dashboard/:path*",
   "/mail/:path*",
   "/outbound/:path*",
