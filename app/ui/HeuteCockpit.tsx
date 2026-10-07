@@ -39,6 +39,7 @@ export default function HeuteCockpit({ role }: { role: "admin" | "sales" }) {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
+  const [limit, setLimit] = useState(5); // Aufwärmen: Woche 1 = 5, Woche 2 = 10, Woche 3 = 15, ab Woche 4 = 20
 
   const load = useCallback(async () => {
     try {
@@ -62,7 +63,7 @@ export default function HeuteCockpit({ role }: { role: "admin" | "sales" }) {
   }, [load]);
 
   async function setLimits() {
-    const target = data?.emails?.perMailboxTarget ?? 20;
+    const target = limit;
     if (!window.confirm(`Tageslimit aller aktiven Postfächer auf ${target} setzen?`)) return;
     setBusy(true);
     setNotice("");
@@ -120,10 +121,17 @@ export default function HeuteCockpit({ role }: { role: "admin" | "sales" }) {
               )}
             </p>
             <div className={styles.actions}>
-              <button type="button" onClick={() => void setLimits()} disabled={busy}>{busy ? "Setze …" : `Alle Postfächer auf ${emails?.perMailboxTarget ?? 20} pro Tag`}</button>
+              <label className={styles.limitPick}>
+                Limit pro Postfach
+                <select value={limit} onChange={(event) => setLimit(Number(event.target.value))}>
+                  {[5, 10, 15, 20].map((value) => <option key={value} value={value}>{value} pro Tag</option>)}
+                </select>
+              </label>
+              <button type="button" onClick={() => void setLimits()} disabled={busy}>{busy ? "Setze …" : `Alle Postfächer auf ${limit} pro Tag`}</button>
               <Link href="/mail">Postfach öffnen</Link>
             </div>
           </div>
+          <p className={styles.muted}>Empfehlung beim Aufwärmen neuer Postfächer: Woche 1 → 5, Woche 2 → 10, Woche 3 → 15, ab Woche 4 → 20 pro Tag.</p>
           {notice && <p className={styles.notice} role="status">{notice}</p>}
           <div className={styles.boxes}>
             {(emails?.mailboxes || []).map((m) => {
