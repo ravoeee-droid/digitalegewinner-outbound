@@ -129,7 +129,7 @@ const STARTER: Campaign = {
   positive: 0,
   appointments: 0,
   steps: [
-    { waitDays: 0, subject: "Kurze Idee für {{company}}", body: "Hallo {{first_name}},\n\nich habe mir {{company}} kurz angesehen und eine persönliche Analyse vorbereitet: {{analysis_link}}\n\nDabei geht es konkret darum, qualifizierte Pflegefachkräfte außerhalb klassischer Jobbörsen zu erreichen und den Bewerbungsweg deutlich einfacher zu machen.\n\nViele Grüße\n{{sender_name}}" },
+    { waitDays: 0, subject: "Kurze Idee für {{company}}", body: "Hallo {{first_name}},\n\nwir haben uns {{company}} angesehen und eine Analyse vorbereitet: {{analysis_link}}\n\nDabei geht es konkret darum, qualifizierte Pflegefachkräfte außerhalb klassischer Jobbörsen zu erreichen und den Bewerbungsweg deutlich einfacher zu machen.\n\nViele Grüße\n{{sender_name}}" },
     { waitDays: 3, subject: "Re: Kurze Idee für {{company}}", body: "Hallo {{first_name}}, kurze Nachfrage: Soll ich Ihnen die drei wichtigsten Recruiting-Hebel aus der Analyse direkt zusammenfassen?" },
     { waitDays: 7, subject: "Re: Pflege-Recruiting bei {{company}}", body: "Falls Mitarbeitergewinnung gerade keine Priorität hat, reicht ein kurzes 'später'. Dann hake ich nicht weiter nach." },
   ],
