@@ -196,6 +196,7 @@ async function classifyWithModel(input:{
     `CURRENT inbound reply:\n${cleanText(input.body,5000)}`,
   ].join("\n\n");
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- SDK-Typen kennen diesen Aufruf nicht
   const response=await (client.responses.create as any)({
     model,
     input:[

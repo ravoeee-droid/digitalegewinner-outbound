@@ -932,8 +932,8 @@ export async function getExperimentDashboard(workspace="default"){
   const summary={
     running:experiments.filter(e=>e.status==="running").length,
     paused:experiments.filter(e=>e.status==="paused").length,
-    evidence:experiments.filter(e=>(e.latest_evaluation as any)?.status==="evidence_signal").length,
-    safety:experiments.filter(e=>["srm_warning","guardrail_risk"].includes(String((e.latest_evaluation as any)?.status||""))).length,
+    evidence:experiments.filter(e=>(e.latest_evaluation as {status?:string}|null)?.status==="evidence_signal").length,
+    safety:experiments.filter(e=>["srm_warning","guardrail_risk"].includes(String((e.latest_evaluation as {status?:string}|null)?.status||""))).length,
   };
   return {
     policyVersion:EXPERIMENT_POLICY_VERSION,

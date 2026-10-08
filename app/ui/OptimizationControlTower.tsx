@@ -1,13 +1,13 @@
 "use client";
 import {useCallback,useEffect,useState} from "react";
 type P={id:string;policy_key:string;version:number;status:string;description:string;max_weight_shift_per_cycle:number;min_control_weight:number;min_arm_exposure:number;cooldown_hours:number;approved_by:string|null};
-type Q={id:string;proposal_type:string;status:string;experiment_id:string|null;payload:any;rationale:string;blocker_reasons:string[];created_at:string};
+type Q={id:string;proposal_type:string;status:string;experiment_id:string|null;payload:Record<string,unknown>;rationale:string;blocker_reasons:string[];created_at:string};
 type D={policyVersion:string;autonomyLevel:number;l4Executable:boolean;l5Executable:boolean;currentProductionTarget:string;policies:P[];proposals:Q[];summary:{proposed:number;approved:number;executed:number;blocked:number;activePolicies:number}};
 export default function OptimizationControlTower(){
  const[d,setD]=useState<D|null>(null),[busy,setBusy]=useState(""),[err,setErr]=useState(""),[msg,setMsg]=useState("");
  const load=useCallback(async()=>{try{const r=await fetch("/api/outbound/v3/optimization",{cache:"no-store"});const j=await r.json();if(!r.ok)throw new Error(j?.error||"Load failed");setD(j)}catch(e){setErr(e instanceof Error?e.message:"Load failed")}},[]);
- useEffect(()=>{void load()},[load]);
- async function post(p:any,key:string){setBusy(key);setErr("");setMsg("");try{const r=await fetch("/api/outbound/v3/optimization",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(p)});const j=await r.json();if(!r.ok)throw new Error(j?.error||"Action failed");setMsg("Optimization aktualisiert.");await load()}catch(e){setErr(e instanceof Error?e.message:"Action failed")}finally{setBusy("")}}
+ useEffect(()=>{const t=window.setTimeout(()=>void load(),0);return()=>window.clearTimeout(t)},[load]);
+ async function post(p:Record<string,unknown>,key:string){setBusy(key);setErr("");setMsg("");try{const r=await fetch("/api/outbound/v3/optimization",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(p)});const j=await r.json();if(!r.ok)throw new Error(j?.error||"Action failed");setMsg("Optimization aktualisiert.");await load()}catch(e){setErr(e instanceof Error?e.message:"Action failed")}finally{setBusy("")}}
  async function policy(p:P,a:"approve"|"activate"|"pause"|"retire"){const reason=window.prompt("Grund:",a==="approve"?"Policy geprüft":"Manuell bestätigt");if(reason)await post({action:"policy",policyId:p.id,policyAction:a,reason},"p"+p.id)}
  async function proposal(q:Q,a:"approve"|"reject"|"execute"){const reason=window.prompt("Grund:",a==="approve"?"Proposal geprüft":"Manuell geprüft");if(reason)await post({action:"proposal",proposalId:q.id,proposalAction:a,reason},"q"+q.id)}
  return <section style={{maxWidth:1540,margin:"0 auto 18px",padding:"0 28px"}}><div style={{border:"1px solid rgba(181,123,255,.2)",background:"rgba(12,8,18,.94)",borderRadius:24,padding:20}}>

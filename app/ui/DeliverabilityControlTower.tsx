@@ -48,9 +48,9 @@ export default function DeliverabilityControlTower(){
   },[]);
 
   useEffect(()=>{
-    void load();
+    const first=window.setTimeout(()=>void load(),0);
     const timer=window.setInterval(()=>void load(),60_000);
-    return()=>window.clearInterval(timer);
+    return()=>{window.clearTimeout(first);window.clearInterval(timer)};
   },[load]);
 
   async function runHealthCheck(){
@@ -89,6 +89,7 @@ export default function DeliverabilityControlTower(){
   const staleCount=useMemo(()=>{
     if(!snapshot)return 0;
     const rows=[...snapshot.deliverability.domains,...snapshot.deliverability.mailboxes];
+    // eslint-disable-next-line react-hooks/purity -- Anzeige des Alters, bewusst aktuelle Zeit
     return rows.filter(row=>Date.now()-new Date(row.observed_at).getTime()>3*60*60*1000).length;
   },[snapshot]);
 
@@ -159,6 +160,7 @@ function HealthTable({title,rows}:{title:string;rows:HealthRow[]}){
 
 function HealthRowView({row}:{row:HealthRow}){
   const rates=row.metrics||{};
+  // eslint-disable-next-line react-hooks/purity -- Anzeige des Alters, bewusst aktuelle Zeit
   const ageMinutes=Math.max(0,Math.round((Date.now()-new Date(row.observed_at).getTime())/60000));
   return (
     <div style={{display:"grid",gridTemplateColumns:"minmax(180px,1.4fr) 90px 110px 160px minmax(180px,1fr)",gap:10,padding:"11px 13px",borderBottom:"1px solid rgba(255,255,255,.045)",alignItems:"center",fontSize:10}}>
