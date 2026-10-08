@@ -1,7 +1,7 @@
 {
   "contractVersion": "1.0.0",
   "instance": "DG-MAIN",
-  "updatedAt": "2026-09-30",
+  "updatedAt": "2026-10-07",
   "policy": "same-task-adapt-both-directions",
   "status": "parity-realignment-in-progress",
   "sharedSurfaces": {
@@ -20,7 +20,9 @@
     "studioGenericV3": "peer-webmotion-v3-blocked-no-equivalent-browser-render-seam",
     "websiteBuildStreamVercelLink": "implemented-in-dg-peer-has-no-website-build-stream",
     "outboundOsV3": "dg-foundation-feature-branch-peer-parity-blocked",
-    "appointmentGoalAutopilot": "dg-implemented-peer-parity-blocked"
+    "appointmentGoalAutopilot": "dg-implemented-peer-parity-blocked",
+    "dailyCockpitHeute": "dg-implemented-peer-parity-blocked",
+    "crmKanbanWorkspace": "dg-implemented-peer-parity-blocked"
   },
   "blockers": [
     {
@@ -46,6 +48,13 @@
       "surface": "appointmentGoalAutopilot",
       "peer": "CLIENT-WALKENHORST",
       "detail": "DG-MAIN now has a Pflege-specific appointment-goal controller that bridges pflege_email_outreach, er_outbox and DG mailbox health. CLIENT-WALKENHORST uses a different energy_campaign_members / energy_messages worker model and has no equivalent DG Pflege queue seam. Peer source was inspected read-only; adapting this behavior safely requires a separate mapping to its customer-specific campaign model without copying DG runtime data, credentials, branding or Pflege logic."
+    },
+    {
+      "id": "daily-cockpit-heute-2026-10-07",
+      "surface": "dailyCockpitHeute",
+      "peer": "CLIENT-WALKENHORST",
+      "detail": "DG-MAIN: neue Tagesansicht /heute (Anrufe 50, E-Mails 200 = 10 Postfaecher x 20, Termine), Navigation mit 'Heute' + 'Mehr', Startseite leitet auf /heute. Peer-Quellcode war in dieser Session nicht lesbar; Paritaet nicht geprueft. Vor Abschluss im Peer gleichwertig pruefen. Zusaetzlich: /crm Kanban-Workspace (Drag & Drop, Detail-Drawer, Faelligkeiten, Ergebnisse) auf Basis von /api/revenue-opportunities.",
+      "resolution": "open"
     }
   ],
   "rules": [

@@ -105,7 +105,7 @@ export async function PUT(request: Request) {
     const row = await readState().catch(() => null);
     const state = (row?.payload || {}) as Record<string, unknown>;
     const existingMailboxes = Array.isArray(state.mailboxes) ? state.mailboxes as Array<Record<string, unknown>> : [];
-    const nextMailbox = { id: credential.id, email: credential.email, enabled: true, dailyLimit: 30 };
+    const nextMailbox = { id: credential.id, email: credential.email, enabled: true, dailyLimit: 5 };
     const nextMailboxes = [
       ...existingMailboxes.filter((item) => String(item.email || "").toLowerCase() !== credential.email.toLowerCase() && String(item.id || "") !== credential.id),
       nextMailbox,
