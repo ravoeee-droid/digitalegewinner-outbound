@@ -74,7 +74,7 @@ export default function ComplianceControlTower(){
     }catch(err){setError(err instanceof Error?err.message:"Compliance Dashboard konnte nicht geladen werden.")}
   },[candidateId]);
 
-  useEffect(()=>{void load()},[load]);
+  useEffect(()=>{const t=window.setTimeout(()=>void load(),0);return()=>window.clearTimeout(t)},[load]);
 
   const candidate=useMemo(
     ()=>dashboard?.candidates.find(item=>item.contact_id===candidateId)||null,

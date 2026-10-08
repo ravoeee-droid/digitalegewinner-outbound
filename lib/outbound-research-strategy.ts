@@ -330,6 +330,7 @@ async function modelHypothesis(company:CompanyRow,evidence:Evidence[]):Promise<{
     id:item.id,key:item.evidenceKey,claim:item.claim,value:item.valueText,source:item.sourceUrl,
     excerpt:item.excerpt,confidence:item.confidence,
   }));
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- SDK-Typen kennen diesen Aufruf nicht
   const response=await (client.responses.create as any)({
     model,
     input:[

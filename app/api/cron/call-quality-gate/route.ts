@@ -58,6 +58,7 @@ async function run() {
     order by l.priority_score desc,c.name asc
   `);
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Prüfergebnis hat je Fall unterschiedliche Felder
   const checked:any[]=[];
   for (let i=0;i<rows.length;i+=8) {
     const part=await Promise.all(rows.slice(i,i+8).map(async r=>({...r,check:await verify(r.job_url,r.company)})));

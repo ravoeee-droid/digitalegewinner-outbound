@@ -225,6 +225,7 @@ async function modelDraft(prompt:PromptRow,hypothesis:HypothesisRow,evidence:Evi
   if(!apiKey)return {draft:fallback,generator:"deterministic-copy",model:null};
   const model=process.env.OUTBOUND_COPY_MODEL||"gpt-5.6-luna";
   const client=new OpenAI({apiKey});
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- SDK-Typen kennen diesen Aufruf nicht
   const response=await (client.responses.create as any)({
     model,
     input:[
