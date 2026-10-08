@@ -57,12 +57,18 @@ async function emailProgress() {
     "select count(*)::text n from er_outbox where workspace='default' and status='queued'",
   ).catch(() => [{ n: "0" }]);
 
-  const mailboxes = credentials.map((c) => {
+  // "Domains & Mail" speichert nur Name und Limit (nicht versandfähig). Versandfähig sind nur Postfächer mit
+  // Zugangsdaten (Menü "Mail"). Beide Listen werden hier zusammengeführt, damit sichtbar ist, was fehlt.
+  const credEmails = new Set(credentials.map((c) => String(c.email || "").toLowerCase()));
+  const connected = credentials.map((c) => {
     const known = settings.get(String(c.email || "").toLowerCase());
     const h = health.get(c.id);
+    const imap = c as unknown as { imapHost?: string; imapUser?: string; imapPass?: string; smtpHost?: string; smtpPass?: string };
     return {
       id: c.id,
       email: String(c.email || c.id),
+      connected: true,
+      warmupReady: c.provider === "smtp" && Boolean(imap.imapHost && imap.imapUser && imap.imapPass && imap.smtpHost && imap.smtpPass),
       enabled: known?.enabled ?? true,
       limit: Number(known?.dailyLimit || 0),
       enforced: h?.enforced_daily_limit ?? null,
@@ -70,7 +76,21 @@ async function emailProgress() {
       sent: sentBy.get(c.id) || 0,
     };
   });
-  const active = mailboxes.filter((m) => m.enabled);
+  const listedOnly = (state.mailboxes || [])
+    .filter((m) => m.email && !credEmails.has(String(m.email).toLowerCase()))
+    .map((m) => ({
+      id: String(m.id || m.email),
+      email: String(m.email),
+      connected: false,
+      warmupReady: false,
+      enabled: m.enabled ?? true,
+      limit: Number(m.dailyLimit || 0),
+      enforced: null,
+      status: null,
+      sent: 0,
+    }));
+  const mailboxes = [...connected, ...listedOnly];
+  const active = connected.filter((m) => m.enabled);
   const sent = mailboxes.reduce((a, m) => a + m.sent, 0);
   // Heutiges Kontingent: je Postfach das kleinste von Limit und (falls vorhanden) erzwungenem Limit.
   const capacity = active.reduce((a, m) => a + Math.min(m.limit || 0, m.enforced ?? Number.POSITIVE_INFINITY), 0);
@@ -80,6 +100,8 @@ async function emailProgress() {
     sent,
     queued: Number(queuedRows[0]?.n || 0),
     capacity,
+    connectedCount: connected.length,
+    listedCount: mailboxes.length,
     mailboxes,
   };
 }

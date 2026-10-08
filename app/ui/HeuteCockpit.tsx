@@ -7,11 +7,11 @@ import CloudTalkPhone from "@/app/ui/CloudTalkPhone";
 import CRMWorkspace from "@/app/ui/CRMWorkspace";
 import styles from "./HeuteCockpit.module.css";
 
-type Mailbox = { id: string; email: string; enabled: boolean; limit: number; enforced: number | null; status: string | null; sent: number };
+type Mailbox = { id: string; email: string; connected: boolean; warmupReady: boolean; enabled: boolean; limit: number; enforced: number | null; status: string | null; sent: number };
 type Summary = {
   role: "admin" | "sales";
   calls: { target: number; done: number; open: number; total: number };
-  emails?: { target: number; perMailboxTarget: number; sent: number; queued: number; capacity: number; mailboxes: Mailbox[] };
+  emails?: { target: number; perMailboxTarget: number; sent: number; queued: number; capacity: number; connectedCount: number; listedCount: number; mailboxes: Mailbox[] };
   appointments: number;
 };
 
@@ -134,15 +134,20 @@ export default function HeuteCockpit({ role }: { role: "admin" | "sales" }) {
             </div>
           </div>
           <p className={styles.muted}>Empfehlung beim Aufwärmen neuer Postfächer: Woche 1 → 5, Woche 2 → 10, Woche 3 → 15, ab Woche 4 → 20 pro Tag.</p>
+          {emails && emails.connectedCount < emails.listedCount && (
+            <p className={styles.error} role="alert">
+              Nur <b>{emails.connectedCount} von {emails.listedCount}</b> Postfächern sind wirklich verbunden und können Mails senden. Die übrigen stehen nur als Name in „Domains &amp; Mail“. <Link href="/mail">Jetzt unter „Mail“ verbinden</Link>
+            </p>
+          )}
           {notice && <p className={styles.notice} role="status">{notice}</p>}
           <div className={styles.boxes}>
             {(emails?.mailboxes || []).map((m) => {
               const limit = m.limit || emails?.perMailboxTarget || 20;
               return (
-                <article key={m.id} className={`${styles.box} ${m.enabled ? "" : styles.off}`}>
-                  <header><strong>{m.email}</strong>{m.status && <span className={styles.chip} data-status={m.status}>{m.status}</span>}</header>
+                <article key={m.id} className={`${styles.box} ${m.enabled && m.connected ? "" : styles.off}`}>
+                  <header><strong>{m.email}</strong>{!m.connected ? <span className={styles.chip} data-status="paused">nicht verbunden</span> : m.status && <span className={styles.chip} data-status={m.status}>{m.status}</span>}</header>
                   <div className={styles.track} aria-hidden="true"><i style={{ width: `${pct(m.sent, limit)}%` }} /></div>
-                  <p>{m.sent} von {limit} heute{m.enforced !== null && m.enforced < limit ? ` · begrenzt auf ${m.enforced}` : ""}{m.enabled ? "" : " · aus"}</p>
+                  <p>{m.connected ? `${m.sent} von ${limit} heute${m.enforced !== null && m.enforced < limit ? ` · begrenzt auf ${m.enforced}` : ""}${m.enabled ? "" : " · aus"}` : "Zugangsdaten fehlen – verschickt noch nichts"}{m.connected && !m.warmupReady ? " · Aufwärmen nicht möglich (IMAP/SMTP unvollständig)" : ""}</p>
                 </article>
               );
             })}
