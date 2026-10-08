@@ -21,7 +21,8 @@
     "websiteBuildStreamVercelLink": "implemented-in-dg-peer-has-no-website-build-stream",
     "outboundOsV3": "dg-foundation-feature-branch-peer-parity-blocked",
     "appointmentGoalAutopilot": "dg-implemented-peer-parity-blocked",
-    "dailyCockpitHeute": "dg-implemented-peer-parity-blocked"
+    "dailyCockpitHeute": "dg-implemented-peer-parity-blocked",
+    "crmKanbanWorkspace": "dg-implemented-peer-parity-blocked"
   },
   "blockers": [
     {
@@ -52,7 +53,7 @@
       "id": "daily-cockpit-heute-2026-10-07",
       "surface": "dailyCockpitHeute",
       "peer": "CLIENT-WALKENHORST",
-      "detail": "DG-MAIN: neue Tagesansicht /heute (Anrufe 50, E-Mails 200 = 10 Postfaecher x 20, Termine), Navigation mit 'Heute' + 'Mehr', Startseite leitet auf /heute. Peer-Quellcode war in dieser Session nicht lesbar; Paritaet nicht geprueft. Vor Abschluss im Peer gleichwertig pruefen.",
+      "detail": "DG-MAIN: neue Tagesansicht /heute (Anrufe 50, E-Mails 200 = 10 Postfaecher x 20, Termine), Navigation mit 'Heute' + 'Mehr', Startseite leitet auf /heute. Peer-Quellcode war in dieser Session nicht lesbar; Paritaet nicht geprueft. Vor Abschluss im Peer gleichwertig pruefen. Zusaetzlich: /crm Kanban-Workspace (Drag & Drop, Detail-Drawer, Faelligkeiten, Ergebnisse) auf Basis von /api/revenue-opportunities.",
       "resolution": "open"
     }
   ],

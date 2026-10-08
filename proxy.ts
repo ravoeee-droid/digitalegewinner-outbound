@@ -29,6 +29,7 @@ export const config={
   "/",
   "/call/:path*",
   "/heute/:path*",
+  "/crm/:path*",
   "/dashboard/:path*",
   "/mail/:path*",
   "/outbound/:path*",

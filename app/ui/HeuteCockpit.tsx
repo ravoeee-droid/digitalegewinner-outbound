@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import CallConsole from "@/app/ui/CallConsole";
 import CloudTalkPhone from "@/app/ui/CloudTalkPhone";
+import CRMWorkspace from "@/app/ui/CRMWorkspace";
 import styles from "./HeuteCockpit.module.css";
 
 type Mailbox = { id: string; email: string; enabled: boolean; limit: number; enforced: number | null; status: string | null; sent: number };
@@ -34,7 +35,7 @@ function Counter({ label, value, target, hint }: { label: string; value: number;
 }
 
 export default function HeuteCockpit({ role }: { role: "admin" | "sales" }) {
-  const [tab, setTab] = useState<"calls" | "emails">("calls");
+  const [tab, setTab] = useState<"calls" | "emails" | "crm">("calls");
   const [data, setData] = useState<Summary | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -99,14 +100,15 @@ export default function HeuteCockpit({ role }: { role: "admin" | "sales" }) {
 
       {error && <p className={styles.error} role="alert">{error}</p>}
 
-      {role === "admin" && (
-        <div className={styles.tabs} role="tablist" aria-label="Arbeitsbereich">
-          <button type="button" role="tab" aria-selected={tab === "calls"} className={tab === "calls" ? styles.on : undefined} onClick={() => setTab("calls")}>Anrufen</button>
-          <button type="button" role="tab" aria-selected={tab === "emails"} className={tab === "emails" ? styles.on : undefined} onClick={() => setTab("emails")}>E-Mails</button>
-        </div>
-      )}
+      <div className={styles.tabs} role="tablist" aria-label="Arbeitsbereich">
+        <button type="button" role="tab" aria-selected={tab === "calls"} className={tab === "calls" ? styles.on : undefined} onClick={() => setTab("calls")}>Anrufen</button>
+        {role === "admin" && <button type="button" role="tab" aria-selected={tab === "emails"} className={tab === "emails" ? styles.on : undefined} onClick={() => setTab("emails")}>E-Mails</button>}
+        <button type="button" role="tab" aria-selected={tab === "crm"} className={tab === "crm" ? styles.on : undefined} onClick={() => setTab("crm")}>Pipeline</button>
+      </div>
 
-      {tab === "calls" || role === "sales" ? (
+      {tab === "crm" ? (
+        <CRMWorkspace embedded />
+      ) : tab === "calls" || role === "sales" ? (
         <section aria-label="Anrufen">
           <CallConsole />
           <CloudTalkPhone />

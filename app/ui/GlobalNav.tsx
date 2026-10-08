@@ -7,6 +7,7 @@ import styles from "./GlobalNav.module.css";
 
 const SECTIONS = [
   { href: "/heute", label: "Heute" },
+  { href: "/crm", label: "CRM" },
   { href: "/outbound", label: "Outbound" },
   { href: "/call", label: "Call" },
   { href: "/websites", label: "Websites" },
@@ -18,7 +19,7 @@ const SECTIONS = [
 ];
 
 // Im Alltag genügt "Heute" – alles andere liegt unter "Mehr".
-const PRIMARY = ["/heute"];
+const PRIMARY = ["/heute", "/crm"];
 const HIDDEN_PREFIXES = ["/a/", "/login"];
 
 export default function GlobalNav() {
@@ -32,7 +33,7 @@ export default function GlobalNav() {
     window.location.href="/login";
   }
 
-  const visible = SECTIONS.filter((section)=>role!=="sales" || ["/heute","/pflege","/call"].includes(section.href));
+  const visible = SECTIONS.filter((section)=>role!=="sales" || ["/heute","/crm","/pflege","/call"].includes(section.href));
   const more = visible.filter((section)=>!PRIMARY.includes(section.href));
   const renderLink = (section:{href:string;label:string}) => {
     const isActive = pathname === section.href || pathname.startsWith(`${section.href}/`);
