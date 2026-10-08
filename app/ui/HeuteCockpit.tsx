@@ -40,6 +40,9 @@ export default function HeuteCockpit({ role }: { role: "admin" | "sales" }) {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
+  const [bulkText, setBulkText] = useState("");
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [bulkResults, setBulkResults] = useState<Array<{ email: string; ok: boolean; message: string }>>([]);
   const [limit, setLimit] = useState(5); // Aufwärmen: Woche 1 = 5, Woche 2 = 10, Woche 3 = 15, ab Woche 4 = 20
 
   const load = useCallback(async () => {
@@ -79,6 +82,36 @@ export default function HeuteCockpit({ role }: { role: "admin" | "sales" }) {
     } finally {
       setBusy(false);
     }
+  }
+
+  async function connectAll() {
+    const lines = bulkText.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+    const entries = lines.map((line) => {
+      const cut = line.search(/[;\t]/) >= 0 ? line.search(/[;\t]/) : line.indexOf(" ");
+      return cut > 0 ? { email: line.slice(0, cut).trim(), password: line.slice(cut + 1).trim() } : { email: line, password: "" };
+    });
+    setBulkBusy(true);
+    setBulkResults([]);
+    const results: Array<{ email: string; ok: boolean; message: string }> = [];
+    for (const entry of entries) {
+      if (!entry.email.includes("@") || !entry.password) {
+        results.push({ email: entry.email || "(leer)", ok: false, message: "Format: adresse;passwort" });
+      } else {
+        try {
+          const response = await fetch("/api/mail/config", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(entry) });
+          const json = await response.json();
+          results.push({ email: entry.email, ok: response.ok, message: response.ok ? "verbunden" : json.error || "Fehlgeschlagen" });
+        } catch (e) {
+          results.push({ email: entry.email, ok: false, message: e instanceof Error ? e.message : "Fehlgeschlagen" });
+        }
+      }
+      setBulkResults([...results]);
+    }
+    // Erfolgreiche Zeilen entfernen, damit Passwörter nicht im Feld stehen bleiben.
+    const failed = new Set(results.filter((r) => !r.ok).map((r) => r.email));
+    setBulkText(lines.filter((line, index) => failed.has(entries[index].email)).join("\n"));
+    setBulkBusy(false);
+    await load();
   }
 
   const emails = data?.emails;
@@ -140,6 +173,17 @@ export default function HeuteCockpit({ role }: { role: "admin" | "sales" }) {
             </p>
           )}
           {notice && <p className={styles.notice} role="status">{notice}</p>}
+          <details className={styles.bulk}>
+            <summary>Mehrere Postfächer auf einmal verbinden</summary>
+            <p>Eine Zeile pro Postfach im Format <code>adresse;passwort</code>. Das Passwort geht direkt aus Ihrem Browser an Ihr Tool und wird nach dem Verbinden aus dem Feld entfernt. Neue Postfächer starten mit 5 Mails pro Tag.</p>
+            <textarea className={styles.bulkText} rows={6} value={bulkText} onChange={(event) => setBulkText(event.target.value)} placeholder={"raphael1@domain1.de;passwort\nraphael2@domain1.de;passwort"} autoComplete="off" spellCheck={false} aria-label="Postfächer, eine Zeile pro Postfach" />
+            <button type="button" className={styles.bulkBtn} onClick={() => void connectAll()} disabled={bulkBusy || !bulkText.trim()}>{bulkBusy ? "Verbinde … (kann etwas dauern)" : "Alle verbinden"}</button>
+            {bulkResults.length > 0 && (
+              <ul className={styles.bulkList}>
+                {bulkResults.map((r, i) => <li key={`${r.email}-${i}`} data-ok={r.ok}>{r.ok ? "✓" : "✕"} <b>{r.email}</b> – {r.message}</li>)}
+              </ul>
+            )}
+          </details>
           <div className={styles.boxes}>
             {(emails?.mailboxes || []).map((m) => {
               const limit = m.limit || emails?.perMailboxTarget || 20;
