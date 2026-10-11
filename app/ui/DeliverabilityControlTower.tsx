@@ -97,10 +97,10 @@ export default function DeliverabilityControlTower(){
 
   return (
     <section style={{maxWidth:1540,margin:"0 auto 18px",padding:"0 28px"}}>
-      <div style={{border:"1px solid rgba(255,255,255,.08)",background:"rgba(8,13,10,.92)",borderRadius:24,padding:20}}>
+      <div style={{border:"1px solid rgba(255,255,255,.08)",background:"rgba(9,16,13,.92)",borderRadius:18,padding:20}}>
         <div style={{display:"flex",justifyContent:"space-between",gap:16,alignItems:"flex-start",flexWrap:"wrap"}}>
           <div>
-            <div style={{fontSize:10,fontWeight:900,letterSpacing:".13em",color:"#8be9b2"}}>M3 · DELIVERABILITY CONTROL TOWER</div>
+            <div style={{fontSize:10,fontWeight:900,letterSpacing:".13em",color:"#5eeaa0"}}>M3 · DELIVERABILITY CONTROL TOWER</div>
             <h2 style={{fontSize:25,letterSpacing:"-.035em",margin:"7px 0 6px"}}>Sender Health & Adaptive Capacity</h2>
             <p style={{margin:0,color:"#89958e",fontSize:12,lineHeight:1.55,maxWidth:820}}>
               Domain-Authentifizierung, SMTP/IMAP-Erreichbarkeit, Bounces, Deferrals und Complaints werden getrennt bewertet.
@@ -148,7 +148,7 @@ export default function DeliverabilityControlTower(){
 
 function HealthTable({title,rows}:{title:string;rows:HealthRow[]}){
   return (
-    <div style={{marginTop:14,border:"1px solid rgba(255,255,255,.07)",borderRadius:16,overflow:"hidden"}}>
+    <div style={{marginTop:14,border:"1px solid rgba(255,255,255,.07)",borderRadius:18,overflow:"hidden"}}>
       <div style={{padding:"11px 13px",fontSize:10,fontWeight:850,letterSpacing:".1em",color:"#849088",borderBottom:"1px solid rgba(255,255,255,.06)"}}>{title.toUpperCase()}</div>
       {rows.length===0
         ? <div style={{padding:14,color:"#6f7b75",fontSize:11}}>Noch kein Health-Snapshot. „Jetzt prüfen“ startet den ersten Lauf.</div>
@@ -186,17 +186,17 @@ function Stat({title,value}:{title:string;value:number}){
   </div>;
 }
 function Badge({label,value,emphasis=false}:{label:string;value:string;emphasis?:boolean}){
-  return <span style={{padding:"7px 9px",borderRadius:999,border:"1px solid rgba(255,255,255,.08)",background:emphasis?"rgba(52,199,89,.09)":"rgba(255,255,255,.035)",fontSize:9,color:emphasis?"#8be9b2":"#89958e",fontWeight:850}}>{label}: {value}</span>;
+  return <span style={{padding:"7px 9px",borderRadius:999,border:"1px solid rgba(255,255,255,.08)",background:emphasis?"rgba(52,199,89,.09)":"rgba(255,255,255,.035)",fontSize:9,color:emphasis?"#5eeaa0":"#89958e",fontWeight:850}}>{label}: {value}</span>;
 }
 function Notice({kind,children}:{kind:"error"|"warn"|"ok";children:React.ReactNode}){
-  const cfg=kind==="error"?["rgba(255,80,80,.08)","#ffb3b3"]:kind==="warn"?["rgba(242,217,140,.07)","#f2d98c"]:["rgba(52,199,89,.07)","#8be9b2"];
+  const cfg=kind==="error"?["rgba(255,80,80,.08)","#ffb3b3"]:kind==="warn"?["rgba(242,217,140,.07)","#f2d98c"]:["rgba(52,199,89,.07)","#5eeaa0"];
   return <div style={{marginTop:12,padding:"9px 11px",borderRadius:10,background:cfg[0],color:cfg[1],fontSize:10}}>{children}</div>;
 }
 function buttonStyle(primary:boolean):React.CSSProperties{
-  return {border:primary?"1px solid rgba(94,234,160,.25)":"1px solid rgba(255,255,255,.1)",background:primary?"rgba(52,199,89,.1)":"rgba(255,255,255,.04)",color:primary?"#8be9b2":"#aab5af",padding:"9px 11px",borderRadius:10,fontSize:10,fontWeight:850,cursor:"pointer"};
+  return {border:primary?"1px solid rgba(94,234,160,.25)":"1px solid rgba(255,255,255,.1)",background:primary?"rgba(52,199,89,.1)":"rgba(255,255,255,.04)",color:primary?"#5eeaa0":"#aab5af",padding:"9px 11px",borderRadius:10,fontSize:10,fontWeight:850,cursor:"pointer"};
 }
 function statusColor(status:HealthStatus){
-  if(status==="healthy")return "#8be9b2";
+  if(status==="healthy")return "#5eeaa0";
   if(status==="watch")return "#f2d98c";
   if(status==="degraded")return "#ffbd75";
   return "#ff9292";

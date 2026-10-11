@@ -80,7 +80,7 @@ export default function OutboundEngineRuntime() {
   }
 
   return (
-    <main style={{ minHeight: "100vh", background: "#07090d", color: "#f7f8fa", fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif", padding: "28px" }}>
+    <main style={{ minHeight: "100vh", background: "#09100d", color: "#f7f8fa", fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif", padding: "28px" }}>
       <div style={{ maxWidth: 1540, margin: "0 auto" }}>
         <header style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 24, flexWrap: "wrap", marginBottom: 26 }}>
           <div>
@@ -104,14 +104,14 @@ export default function OutboundEngineRuntime() {
             const state = snapshot?.channels?.[key] || { target: key === "call" ? 120 : key === "email" ? 100 : 30, ready: 0, done: 0, total: 0 };
             const percent = Math.min(100, Math.round((state.total / Math.max(1, state.target)) * 100));
             return (
-              <button key={key} onClick={() => setChannel(key)} style={{ textAlign: "left", padding: 18, borderRadius: 20, border: channel === key ? "1px solid rgba(213,255,89,.45)" : "1px solid rgba(255,255,255,.1)", background: channel === key ? "rgba(213,255,89,.07)" : "rgba(255,255,255,.035)", color: "inherit", cursor: "pointer" }}>
+              <button key={key} onClick={() => setChannel(key)} style={{ textAlign: "left", padding: 18, borderRadius: 18, border: channel === key ? "1px solid rgba(213,255,89,.45)" : "1px solid rgba(255,255,255,.1)", background: channel === key ? "rgba(213,255,89,.07)" : "rgba(255,255,255,.035)", color: "inherit", cursor: "pointer" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", gap: 14, alignItems: "center" }}>
                   <span style={{ fontWeight: 800, fontSize: 13 }}>{meta[key].icon} {meta[key].label}</span>
                   <span style={{ color: state.total >= state.target ? "#bffb84" : "#f2d98c", fontSize: 11 }}>{state.total}/{state.target}</span>
                 </div>
                 <div style={{ marginTop: 14, fontSize: 36, fontWeight: 850, letterSpacing: "-.05em" }}>{state.ready}</div>
                 <div style={{ color: "#7f8998", fontSize: 11 }}>bereit · {state.done} erledigt</div>
-                <div style={{ marginTop: 12, height: 6, borderRadius: 999, overflow: "hidden", background: "rgba(255,255,255,.08)" }}><div style={{ height: "100%", width: `${percent}%`, background: "linear-gradient(90deg,#34c759,#5df0b8)" }} /></div>
+                <div style={{ marginTop: 12, height: 6, borderRadius: 999, overflow: "hidden", background: "rgba(255,255,255,.08)" }}><div style={{ height: "100%", width: `${percent}%`, background: "linear-gradient(90deg,#34c759,#5eeaa0)" }} /></div>
                 <div style={{ marginTop: 9, color: "#8f98a6", fontSize: 11 }}>{meta[key].hint}</div>
               </button>
             );
@@ -119,7 +119,7 @@ export default function OutboundEngineRuntime() {
         </section>
 
         <section style={{ display: "grid", gridTemplateColumns: "minmax(0,1.55fr) minmax(300px,.45fr)", gap: 14 }}>
-          <div style={{ border: "1px solid rgba(255,255,255,.1)", background: "rgba(255,255,255,.03)", borderRadius: 22, overflow: "hidden" }}>
+          <div style={{ border: "1px solid rgba(255,255,255,.1)", background: "rgba(255,255,255,.03)", borderRadius: 18, overflow: "hidden" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, padding: 16, borderBottom: "1px solid rgba(255,255,255,.08)" }}>
               <div><strong>{meta[channel].label} Queue</strong><div style={{ marginTop: 3, fontSize: 11, color: "#7f8998" }}>höchste Abschlusswahrscheinlichkeit zuerst</div></div>
               {channel === "linkedin" && <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -148,10 +148,10 @@ export default function OutboundEngineRuntime() {
                         {value(p, "linkedin") && <a href={value(p, "linkedin")} target="_blank" rel="noreferrer" style={linkPill}>in Profil</a>}
                         {value(p, "website") && <a href={value(p, "website")} target="_blank" rel="noreferrer" style={linkPill}>↗ Website</a>}
                       </div>
-                      {value(p, "message") && <div style={{ marginTop: 10, padding: 11, borderRadius: 12, background: "#0b0e13", color: "#aeb6c2", fontSize: 11, lineHeight: 1.5 }}>{value(p, "message")}</div>}
+                      {value(p, "message") && <div style={{ marginTop: 10, padding: 11, borderRadius: 14, background: "#09100d", color: "#aeb6c2", fontSize: 11, lineHeight: 1.5 }}>{value(p, "message")}</div>}
                     </div>
                     <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8 }}>
-                      <span style={{ fontSize: 10, color: task.status === "done" || task.status === "sent" ? "#84f5c8" : "#8f98a6" }}>{task.status.toUpperCase()}</span>
+                      <span style={{ fontSize: 10, color: task.status === "done" || task.status === "sent" ? "#5eeaa0" : "#8f98a6" }}>{task.status.toUpperCase()}</span>
                       {!["done", "sent", "completed"].includes(task.status) && <button onClick={() => void mark(task, channel === "email" || channel === "linkedin" ? "sent" : "done")} style={miniButton}>✓ erledigt</button>}
                     </div>
                   </article>
@@ -188,13 +188,13 @@ export default function OutboundEngineRuntime() {
 }
 
 function StatusLine({ ok, label, neutral = false }: { ok: boolean; label: string; neutral?: boolean }) {
-  return <div style={{ display: "flex", justifyContent: "space-between", gap: 12, padding: "9px 0", borderTop: "1px solid rgba(255,255,255,.06)", fontSize: 12 }}><span style={{ color: "#aeb6c2" }}>{label}</span><b style={{ color: neutral ? "#f2d98c" : ok ? "#84f5c8" : "#ffadad" }}>{neutral ? "MANUELL" : ok ? "VERBUNDEN" : "FEHLT"}</b></div>;
+  return <div style={{ display: "flex", justifyContent: "space-between", gap: 12, padding: "9px 0", borderTop: "1px solid rgba(255,255,255,.06)", fontSize: 12 }}><span style={{ color: "#aeb6c2" }}>{label}</span><b style={{ color: neutral ? "#f2d98c" : ok ? "#5eeaa0" : "#ffadad" }}>{neutral ? "MANUELL" : ok ? "VERBUNDEN" : "FEHLT"}</b></div>;
 }
 
-const panel: React.CSSProperties = { padding: 18, borderRadius: 20, border: "1px solid rgba(255,255,255,.1)", background: "rgba(255,255,255,.035)" };
+const panel: React.CSSProperties = { padding: 18, borderRadius: 18, border: "1px solid rgba(255,255,255,.1)", background: "rgba(255,255,255,.035)" };
 const eyebrow: React.CSSProperties = { color: "#34c759", fontSize: 10, fontWeight: 850, letterSpacing: ".12em" };
 const panelTitle: React.CSSProperties = { margin: "8px 0", fontSize: 18, letterSpacing: "-.02em" };
 const panelText: React.CSSProperties = { margin: "0 0 14px", color: "#8f98a6", fontSize: 12, lineHeight: 1.55 };
 const miniButton: React.CSSProperties = { border: "1px solid rgba(255,255,255,.12)", background: "rgba(255,255,255,.06)", color: "#eef1f4", padding: "7px 10px", borderRadius: 10, cursor: "pointer", fontSize: 11, fontWeight: 700 };
 const linkPill: React.CSSProperties = { ...miniButton, display: "inline-flex", textDecoration: "none", color: "#34c759" };
-function buttonStyle(secondary: boolean): React.CSSProperties { return { border: secondary ? "1px solid rgba(255,255,255,.12)" : "1px solid rgba(213,255,89,.35)", background: secondary ? "rgba(255,255,255,.05)" : "rgba(213,255,89,.1)", color: secondary ? "#eef1f4" : "#34c759", padding: "10px 14px", borderRadius: 12, cursor: "pointer", fontSize: 12, fontWeight: 800 }; }
+function buttonStyle(secondary: boolean): React.CSSProperties { return { border: secondary ? "1px solid rgba(255,255,255,.12)" : "1px solid rgba(213,255,89,.35)", background: secondary ? "rgba(255,255,255,.05)" : "rgba(213,255,89,.1)", color: secondary ? "#eef1f4" : "#34c759", padding: "10px 14px", borderRadius: 14, cursor: "pointer", fontSize: 12, fontWeight: 800 }; }

@@ -30,13 +30,13 @@ export default function ChannelEnginePage() {
           padding: "11px 15px",
           borderRadius: 999,
           border: "1px solid rgba(213,255,89,.32)",
-          background: "rgba(13,18,10,.94)",
+          background: "rgba(9,16,13,.94)",
           color: "#34c759",
           textDecoration: "none",
           fontSize: 11,
           fontWeight: 900,
           letterSpacing: ".08em",
-          boxShadow: "0 14px 44px rgba(0,0,0,.35)",
+          boxShadow: "0 14px 44px rgba(5,10,8,.35)",
         }}
       >
         ← REVENUE OS

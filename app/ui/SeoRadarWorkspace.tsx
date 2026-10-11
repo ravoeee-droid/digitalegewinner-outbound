@@ -34,7 +34,7 @@ const demoKeywords = [
 ];
 
 function ScoreRing({ value, label }: { value: number; label: string }) {
-  return <div className={styles.scoreRing} style={{ background: `conic-gradient(#c9a45a ${value * 3.6}deg, rgba(15,23,42,.08) 0deg)` }}><div><b>{value}</b><span>{label}</span></div></div>;
+  return <div className={styles.scoreRing} style={{ background: `conic-gradient(#c9a45a ${value * 3.6}deg, rgba(18,29,24,.08) 0deg)` }}><div><b>{value}</b><span>{label}</span></div></div>;
 }
 
 function Source({ name, description, state }: { name: string; description: string; state: "live" | "ready" | "pending" }) {

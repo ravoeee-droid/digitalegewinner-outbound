@@ -29,13 +29,13 @@ export default async function PflegePage() {
           padding: "10px 14px",
           borderRadius: 999,
           border: "1px solid rgba(52,199,89,.24)",
-          background: "rgba(7,9,10,.92)",
+          background: "rgba(5,10,8,.92)",
           backdropFilter: "blur(18px)",
           color: "#34c759",
           textDecoration: "none",
           fontSize: 12,
           fontWeight: 900,
-          boxShadow: "0 14px 50px rgba(0,0,0,.38)",
+          boxShadow: "0 14px 50px rgba(5,10,8,.38)",
         }}
       >
         ⚡ Revenue Outbound OS

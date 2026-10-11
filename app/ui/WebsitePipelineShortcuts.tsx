@@ -84,13 +84,13 @@ export default function WebsitePipelineShortcuts() {
     border: "1px solid rgba(255,255,255,.10)",
     borderRadius: 14,
     padding: "11px 12px",
-    background: "linear-gradient(180deg, rgba(25,25,30,.98), rgba(14,14,18,.98))",
+    background: "linear-gradient(180deg, rgba(18,29,24,.98), rgba(13,22,18,.98))",
     color: "#fff",
     textAlign: "left" as const,
     cursor: "pointer",
     display: "grid",
     gap: 4,
-    boxShadow: "0 10px 28px rgba(0,0,0,.18)",
+    boxShadow: "0 10px 28px rgba(5,10,8,.18)",
   };
 
   return createPortal(
@@ -100,8 +100,8 @@ export default function WebsitePipelineShortcuts() {
         <small style={{ color: "rgba(255,255,255,.58)", fontSize: 10 }}>{noWebsite.count} verifiziert · direkter Website-Hebel</small>
         <b style={{ fontSize: 13 }}>{compactEuro(noWebsite.value)}</b>
       </button>
-      <button type="button" onClick={() => clickPipeline("bad-website")} style={{ ...baseStyle, borderColor: "rgba(146,229,181,.28)" }}>
-        <span style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, fontWeight: 900 }}><i style={{ width: 8, height: 8, borderRadius: 999, background: "#92e5b5", display: "inline-block" }} />Schlechte Website</span>
+      <button type="button" onClick={() => clickPipeline("bad-website")} style={{ ...baseStyle, borderColor: "rgba(94,234,160,.28)" }}>
+        <span style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, fontWeight: 900 }}><i style={{ width: 8, height: 8, borderRadius: 999, background: "#5eeaa0", display: "inline-block" }} />Schlechte Website</span>
         <small style={{ color: "rgba(255,255,255,.58)", fontSize: 10 }}>{badWebsite.count} verifiziert · {maintenance} Wartung · {outdated} veraltet · {broken} kaputt</small>
         <b style={{ fontSize: 13 }}>{compactEuro(badWebsite.value)}</b>
       </button>

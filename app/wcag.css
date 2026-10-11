@@ -24,12 +24,12 @@ body{line-height:1.5}
   align-items:center;
   border:2px solid var(--a11y-focus);
   border-radius:10px;
-  background:#0a120e;
+  background:#09100d;
   color:#eef4f0;
   font-size:16px;
   font-weight:850;
   text-decoration:none;
-  box-shadow:0 10px 30px rgba(0,0,0,.4);
+  box-shadow:0 10px 30px rgba(5,10,8,.4);
 }
 .wcag-skip-link:focus{transform:none;outline:3px solid var(--a11y-focus);outline-offset:3px}
 

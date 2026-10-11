@@ -1,13 +1,13 @@
 .root{
---bg:#07090d;
---panel:#0c1016;
---panel2:#111721;
+--bg:#09100d;
+--panel:#0d1612;
+--panel2:#121d18;
 --line:rgba(255,255,255,.09);
 --muted:#7e8998;
 --text:#f5f7fb;
 --lime:#34c759;
 min-height:100vh;
-background:radial-gradient(circle at 72% -10%,rgba(52,199,89,.08),transparent 30%),#07090d;
+background:radial-gradient(circle at 72% -10%,rgba(52,199,89,.08),transparent 30%),#09100d;
 color:var(--text);
 font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
 .root *{
@@ -24,7 +24,7 @@ top:0;
 height:100vh;
 padding:20px 16px;
 border-right:1px solid var(--line);
-background:rgba(7,9,13,.88);
+background:rgba(9,16,13,.88);
 backdrop-filter:blur(24px);
 display:flex;
 flex-direction:column;
@@ -37,11 +37,11 @@ padding:2px 6px 22px}
 .logo,.mobileBrand span{
 width:36px;
 height:36px;
-border-radius:11px;
+border-radius:10px;
 display:grid;
 place-items:center;
 background:var(--lime);
-color:#0a0c09;
+color:#09100d;
 font-weight:950;
 letter-spacing:-.05em}
 .brand div:last-child{
@@ -63,7 +63,7 @@ gap:4px}
 border:0;
 background:transparent;
 color:#9aa3af;
-border-radius:12px;
+border-radius:14px;
 padding:11px 10px;
 display:grid;
 grid-template-columns:24px 1fr auto;
@@ -72,7 +72,7 @@ align-items:center;
 text-align:left;
 cursor:pointer}
 .mainNav button:hover{
-background:rgba(255,255,255,.04);
+background:rgba(255,255,255,.035);
 color:#fff}
 .mainNav i{
 font-style:normal;
@@ -105,7 +105,7 @@ gap:7px}
 .productNav button{
 position:relative;
 border:1px solid transparent;
-background:rgba(255,255,255,.025);
+background:rgba(255,255,255,.035);
 border-radius:14px;
 color:#d3d8df;
 padding:11px;
@@ -116,7 +116,7 @@ text-align:left;
 cursor:pointer}
 .productNav button:hover,.productNav .productActive{
 border-color:var(--line);
-background:rgba(255,255,255,.05)}
+background:rgba(255,255,255,.035)}
 .productNav button>span{
 display:flex;
 gap:8px;
@@ -144,8 +144,8 @@ color:#9da8b4}
 --product:#34c759;
 color:#34c759!important}
 .productWebsite{
---product:#a2e9c0;
-color:#a2e9c0!important}
+--product:#5eeaa0;
+color:#5eeaa0!important}
 .productSeo{
 --product:#69def2;
 color:#69def2!important}
@@ -164,8 +164,8 @@ font-size:11px;
 color:#788493;
 text-decoration:none;
 padding:7px 8px;
-border-radius:8px;
-background:rgba(255,255,255,.03)}
+border-radius:10px;
+background:rgba(255,255,255,.035)}
 .sideFooter a:hover{
 color:#fff}
 .workspace{
@@ -176,7 +176,7 @@ position:sticky;
 top:0;
 z-index:15;
 border-bottom:1px solid var(--line);
-background:rgba(7,9,13,.78);
+background:rgba(9,16,13,.78);
 backdrop-filter:blur(22px);
 display:flex;
 align-items:center;
@@ -190,8 +190,8 @@ display:flex;
 gap:4px;
 padding:4px;
 background:rgba(255,255,255,.035);
-border:1px solid rgba(255,255,255,.05);
-border-radius:11px}
+border:1px solid rgba(255,255,255,.035);
+border-radius:10px}
 .productSwitch button{
 border:0;
 background:transparent;
@@ -199,20 +199,20 @@ color:#727d8b;
 font-size:12px;
 font-weight:800;
 padding:7px 10px;
-border-radius:8px;
+border-radius:10px;
 cursor:pointer}
 .productSwitch button:hover{
 color:#fff}
 .productSwitch .productSwitchActive{
-background:#151b24;
+background:#121d18;
 color:#fff;
-box-shadow:0 4px 14px rgba(0,0,0,.25)}
+box-shadow:0 4px 14px rgba(5,10,8,.25)}
 .topActions{
 display:flex;
 gap:8px}
 .topActions button,.topActions a{
 border:1px solid var(--line);
-background:#10151d;
+background:#0d1612;
 color:#b9c2cd;
 border-radius:10px;
 padding:9px 11px;
@@ -233,9 +233,9 @@ top:74px;
 z-index:40;
 margin-bottom:12px;
 padding:12px 14px;
-border-radius:12px;
+border-radius:14px;
 border:1px solid rgba(255,102,102,.25);
-background:#251114;
+background:#121d18;
 color:#ffb4b4;
 font-size:11px}
 .toast{
@@ -244,18 +244,18 @@ right:24px;
 bottom:24px;
 z-index:100;
 padding:11px 14px;
-border-radius:12px;
+border-radius:14px;
 background:#e8ff9b;
-color:#0c1105;
+color:#09100d;
 font-size:11px;
 font-weight:850;
-box-shadow:0 18px 60px rgba(0,0,0,.45)}
+box-shadow:0 18px 60px rgba(5,10,8,.45)}
 .kpiStrip{
 display:grid;
 grid-template-columns:repeat(4,minmax(0,1fr));
 border:1px solid var(--line);
 background:linear-gradient(180deg,rgba(255,255,255,.035),rgba(255,255,255,.018));
-border-radius:16px;
+border-radius:18px;
 overflow:hidden;
 margin-bottom:22px}
 .kpiStrip>div{
@@ -325,11 +325,11 @@ letter-spacing:0}
 .nextDeal{
 position:relative;
 border:1px solid color-mix(in srgb,var(--product) 26%,transparent);
-background:linear-gradient(135deg,color-mix(in srgb,var(--product) 6%,#0d1219),#0a0e14 55%);
-border-radius:22px;
+background:linear-gradient(135deg,color-mix(in srgb,var(--product) 6%,#0d1612),#09100d 55%);
+border-radius:18px;
 padding:21px;
 overflow:hidden;
-box-shadow:0 24px 70px rgba(0,0,0,.22)}
+box-shadow:0 24px 70px rgba(5,10,8,.22)}
 .nextDeal:after{
 content:"";
 position:absolute;
@@ -388,7 +388,7 @@ z-index:1;
 margin-top:18px;
 padding:14px 16px;
 border-radius:14px;
-background:rgba(0,0,0,.22);
+background:rgba(5,10,8,.22);
 border:1px solid rgba(255,255,255,.07);
 display:grid;
 grid-template-columns:110px 1fr;
@@ -414,7 +414,7 @@ background:rgba(255,255,255,.055);
 padding:4px 7px;
 border-radius:999px}
 .signalBox .dueTag{
-color:#171003;
+color:#09100d;
 background:#f3c45e}
 .valueGrid{
 position:relative;
@@ -425,9 +425,9 @@ gap:8px;
 margin-top:14px}
 .valueGrid>div{
 padding:12px;
-border-radius:12px;
+border-radius:14px;
 border:1px solid rgba(255,255,255,.065);
-background:rgba(255,255,255,.025);
+background:rgba(255,255,255,.035);
 display:flex;
 flex-direction:column;
 gap:3px}
@@ -445,7 +445,7 @@ gap:7px;
 margin-top:14px}
 .callBar button,.callBar a{
 border:1px solid var(--line);
-background:#121821;
+background:#121d18;
 color:#bcc5d0;
 border-radius:10px;
 padding:10px 11px;
@@ -457,7 +457,7 @@ cursor:pointer}
 flex:1;
 border-color:color-mix(in srgb,var(--product) 44%,transparent);
 background:var(--product);
-color:#0b0e0a;
+color:#09100d;
 font-size:11px}
 .outcomes{
 position:relative;
@@ -480,9 +480,9 @@ flex-wrap:wrap;
 justify-content:flex-end}
 .outcomes button{
 border:1px solid rgba(255,255,255,.08);
-background:#11161e;
+background:#121d18;
 color:#99a4b2;
-border-radius:8px;
+border-radius:10px;
 padding:7px 9px;
 font-size:11px;
 font-weight:800;
@@ -516,7 +516,7 @@ font-size:11px;
 color:#596574}
 .callQueue{
 border:1px solid var(--line);
-border-radius:16px;
+border-radius:18px;
 overflow:hidden;
 background:rgba(255,255,255,.018)}
 .queueRow{
@@ -535,7 +535,7 @@ cursor:pointer}
 .queueRow:last-child{
 border-bottom:0}
 .queueRow:hover{
-background:rgba(255,255,255,.025)}
+background:rgba(255,255,255,.035)}
 .queueRow>i{
 font-style:normal;
 color:#4f5a68;
@@ -586,8 +586,8 @@ flex-direction:column;
 gap:11px}
 .dailyCard,.productPotentialCard,.playbookCard{
 border:1px solid var(--line);
-border-radius:17px;
-background:rgba(255,255,255,.024);
+border-radius:18px;
+background:rgba(255,255,255,.035);
 padding:15px}
 .railHead{
 display:flex;
@@ -611,14 +611,14 @@ color:#8c97a5}
 .progressTrack{
 height:5px;
 border-radius:99px;
-background:#171d25;
+background:#121d18;
 margin-top:6px;
 overflow:hidden}
 .progressTrack i{
 display:block;
 height:100%;
 border-radius:99px;
-background:linear-gradient(90deg,#34c759,#82efb1)}
+background:linear-gradient(90deg,#34c759,#5eeaa0)}
 .momentumLine{
 margin-top:13px;
 padding-top:11px;
@@ -664,7 +664,7 @@ color:#5f6c7a}
 .productPotentialCard button>b{
 font-size:11px}
 .productPotentialCard .railProductActive{
-background:linear-gradient(90deg,rgba(255,255,255,.025),transparent)}
+background:linear-gradient(90deg,rgba(255,255,255,.035),transparent)}
 .playbookCard ol{
 list-style:none;
 padding:0;
@@ -682,7 +682,7 @@ height:20px;
 border-radius:7px;
 display:grid;
 place-items:center;
-background:#141b23;
+background:#121d18;
 color:#75808e;
 font-size:11px}
 .playbookCard li span{
@@ -721,7 +721,7 @@ scrollbar-color:#2a323d transparent}
 width:255px;
 min-width:255px;
 border:1px solid rgba(255,255,255,.07);
-border-radius:16px;
+border-radius:18px;
 background:rgba(255,255,255,.018);
 display:flex;
 flex-direction:column;
@@ -746,7 +746,7 @@ min-width:18px;
 height:18px;
 padding:0 5px;
 border-radius:999px;
-background:#171d25;
+background:#121d18;
 display:grid;
 place-items:center;
 color:#728090}
@@ -759,8 +759,8 @@ overflow-y:auto;
 min-height:160px}
 .pipelineCard{
 border:1px solid color-mix(in srgb,var(--product) 17%,rgba(255,255,255,.07));
-border-radius:13px;
-background:linear-gradient(150deg,color-mix(in srgb,var(--product) 3%,#10151c),#0c1117);
+border-radius:14px;
+background:linear-gradient(150deg,color-mix(in srgb,var(--product) 3%,#0d1612),#0d1612);
 padding:11px;
 margin-bottom:8px;
 cursor:grab;
@@ -803,7 +803,7 @@ color:#687482}
 .cardProgress{
 height:3px;
 border-radius:99px;
-background:#1a2028;
+background:#121d18;
 margin-top:9px;
 overflow:hidden}
 .cardProgress i{
@@ -829,7 +829,7 @@ font-size:11px}
 .dropZone{
 height:72px;
 border:1px dashed rgba(255,255,255,.08);
-border-radius:11px;
+border-radius:10px;
 display:grid;
 place-items:center;
 color:#404b58;
@@ -838,7 +838,7 @@ font-size:11px}
 margin-top:6px;
 border:1px solid rgba(255,117,117,.1);
 background:rgba(255,85,85,.03);
-border-radius:12px;
+border-radius:14px;
 padding:10px 12px;
 display:flex;
 gap:10px;
@@ -856,7 +856,7 @@ font-size:11px;
 cursor:pointer}
 .dealTableWrap{
 border:1px solid var(--line);
-border-radius:16px;
+border-radius:18px;
 overflow:auto;
 background:rgba(255,255,255,.018)}
 .dealTable{
@@ -866,7 +866,7 @@ min-width:1250px}
 .dealTable th{
 position:sticky;
 top:0;
-background:#0d1218;
+background:#0d1612;
 color:#596675;
 text-transform:uppercase;
 letter-spacing:.08em;
@@ -876,7 +876,7 @@ padding:9px 10px;
 border-bottom:1px solid var(--line)}
 .dealTable td{
 padding:10px;
-border-bottom:1px solid rgba(255,255,255,.045);
+border-bottom:1px solid rgba(255,255,255,.035);
 font-size:11px;
 color:#919dab}
 .dealTable tr:hover td{
@@ -911,18 +911,18 @@ text-overflow:ellipsis}
 display:inline-flex;
 padding:4px 6px;
 border-radius:999px;
-background:#161d25;
+background:#121d18;
 color:#8f9aa7;
 font-size:11px}
 .dealTable td strong{
 color:#d7dce2}
 .dealTable td:last-child button{
 border:0;
-background:#141a22;
+background:#121d18;
 color:#798593;
 width:26px;
 height:26px;
-border-radius:8px;
+border-radius:10px;
 cursor:pointer}
 .dueText{
 color:#f4c66a}
@@ -932,8 +932,8 @@ grid-template-columns:repeat(2,minmax(0,1fr));
 gap:10px}
 .channelGrid a{
 border:1px solid var(--line);
-border-radius:17px;
-background:linear-gradient(145deg,rgba(255,255,255,.03),rgba(255,255,255,.015));
+border-radius:18px;
+background:linear-gradient(145deg,rgba(255,255,255,.035),rgba(255,255,255,.015));
 padding:18px;
 text-decoration:none;
 color:#d2d8df;
@@ -947,8 +947,8 @@ transform:translateY(-1px)}
 .channelGrid>a>span{
 width:40px;
 height:40px;
-border-radius:12px;
-background:#151c24;
+border-radius:14px;
+background:#121d18;
 display:grid;
 place-items:center;
 color:var(--lime);
@@ -967,8 +967,8 @@ color:#71808f}
 margin-top:12px;
 padding:17px;
 border:1px solid var(--line);
-border-radius:16px;
-background:rgba(255,255,255,.02)}
+border-radius:18px;
+background:rgba(255,255,255,.035)}
 .systemFlow>span{
 font-size:11px;
 letter-spacing:.14em;
@@ -983,8 +983,8 @@ margin-top:12px}
 .systemFlow b{
 font-size:11px;
 padding:7px 9px;
-border-radius:9px;
-background:#131a22;
+border-radius:10px;
+background:#121d18;
 color:#98a4b1}
 .systemFlow i{
 font-style:normal;
@@ -993,18 +993,18 @@ color:#4b5968}
 position:fixed;
 inset:0;
 z-index:120;
-background:rgba(0,0,0,.55);
+background:rgba(5,10,8,.55);
 backdrop-filter:blur(5px);
 display:flex;
 justify-content:flex-end}
 .drawer{
 height:100%;
 width:min(520px,94vw);
-background:#0b0f15;
+background:#0d1612;
 border-left:1px solid rgba(255,255,255,.1);
 padding:20px;
 overflow-y:auto;
-box-shadow:-30px 0 90px rgba(0,0,0,.4)}
+box-shadow:-30px 0 90px rgba(5,10,8,.4)}
 .drawer>header{
 display:flex;
 justify-content:space-between;
@@ -1022,7 +1022,7 @@ line-height:1.45;
 margin:0}
 .drawer>header>button{
 border:1px solid var(--line);
-background:#121820;
+background:#121d18;
 color:#8b96a3;
 width:32px;
 height:32px;
@@ -1035,9 +1035,9 @@ grid-template-columns:repeat(3,1fr);
 gap:7px;
 margin:13px 0}
 .drawerValues div{
-background:#111720;
+background:#121d18;
 border:1px solid rgba(255,255,255,.065);
-border-radius:11px;
+border-radius:10px;
 padding:10px;
 display:flex;
 flex-direction:column;
@@ -1062,9 +1062,9 @@ color:#778391}
 .drawerForm input,.drawerForm select,.drawerForm textarea{
 width:100%;
 border:1px solid rgba(255,255,255,.09);
-background:#10161e;
+background:#121d18;
 color:#d9dee4;
-border-radius:9px;
+border-radius:10px;
 padding:9px 10px;
 font-size:12px;
 outline:none}
@@ -1078,8 +1078,8 @@ grid-template-columns:1fr 1fr;
 gap:8px}
 .probabilityInput{
 border:1px solid rgba(255,255,255,.07);
-background:#10161e;
-border-radius:9px;
+background:#121d18;
+border-radius:10px;
 padding:8px 10px;
 display:grid;
 grid-template-columns:1fr auto;
@@ -1095,7 +1095,7 @@ color:#7e8997}
 .saveButton{
 border:0;
 background:var(--lime);
-color:#0a0d08;
+color:#09100d;
 border-radius:10px;
 padding:11px;
 font-size:12px;
@@ -1118,9 +1118,9 @@ gap:6px;
 flex-wrap:wrap}
 .drawerContact button,.drawerContact a,.crossSell button,.productExists{
 border:1px solid rgba(255,255,255,.08);
-background:#121820;
+background:#121d18;
 color:#9aa6b3;
-border-radius:8px;
+border-radius:10px;
 padding:7px 9px;
 text-decoration:none;
 font-size:11px;
@@ -1140,7 +1140,7 @@ gap:8px}
 .mobileBrand span{
 width:30px;
 height:30px;
-border-radius:9px;
+border-radius:10px;
 font-size:12px}
 .mobileBrand strong{
 font-size:11px}

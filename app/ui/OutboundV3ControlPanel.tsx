@@ -129,10 +129,10 @@ export default function OutboundV3ControlPanel(){
     <section style={{maxWidth:1540,margin:"0 auto 18px",padding:"0 28px"}}>
       <div style={{
         border:"1px solid rgba(94,234,160,.17)",
-        background:"linear-gradient(145deg,rgba(16,25,21,.88),rgba(7,11,9,.92))",
-        borderRadius:24,
+        background:"linear-gradient(145deg,rgba(13,22,18,.88),rgba(9,16,13,.92))",
+        borderRadius:18,
         padding:20,
-        boxShadow:"inset 0 1px 0 rgba(255,255,255,.04),0 24px 80px rgba(0,0,0,.2)",
+        boxShadow:"inset 0 1px 0 rgba(255,255,255,.04),0 24px 80px rgba(5,10,8,.2)",
       }}>
         <div style={{display:"flex",justifyContent:"space-between",gap:18,alignItems:"flex-start",flexWrap:"wrap"}}>
           <div>
@@ -195,21 +195,21 @@ export default function OutboundV3ControlPanel(){
         </div>
 
         <div style={{display:"grid",gridTemplateColumns:"minmax(0,1.35fr) minmax(280px,.65fr)",gap:12,marginTop:12}}>
-          <div style={{border:"1px solid rgba(255,255,255,.07)",borderRadius:16,overflow:"hidden"}}>
+          <div style={{border:"1px solid rgba(255,255,255,.07)",borderRadius:18,overflow:"hidden"}}>
             <div style={{padding:"11px 13px",fontSize:10,fontWeight:850,letterSpacing:".1em",color:"#849088",borderBottom:"1px solid rgba(255,255,255,.06)"}}>24H EVENT PARITY</div>
             {parityRows.map(([label,data])=>(
               <div key={label} style={{display:"grid",gridTemplateColumns:"1fr 90px 90px 90px",gap:8,padding:"10px 13px",borderBottom:"1px solid rgba(255,255,255,.045)",fontSize:11,alignItems:"center"}}>
                 <span style={{color:"#c2cbc6"}}>{label}</span>
                 <span style={{color:"#7f8c85"}}>Legacy {data?.legacy??"—"}</span>
                 <span style={{color:"#7f8c85"}}>V3 {data?.v3??"—"}</span>
-                <b style={{color:data&&data.legacy===data.v3?"#84f5c8":"#f2d98c",textAlign:"right"}}>
+                <b style={{color:data&&data.legacy===data.v3?"#5eeaa0":"#f2d98c",textAlign:"right"}}>
                   {data?data.legacy===data.v3?"MATCH":"LEARNING":"—"}
                 </b>
               </div>
             ))}
           </div>
 
-          <div style={{border:"1px solid rgba(255,255,255,.07)",borderRadius:16,padding:14}}>
+          <div style={{border:"1px solid rgba(255,255,255,.07)",borderRadius:18,padding:14}}>
             <div style={{fontSize:10,fontWeight:850,letterSpacing:".1em",color:"#849088"}}>SAFE ACTIONS</div>
             <div style={{display:"flex",gap:8,flexWrap:"wrap",marginTop:12}}>
               <button
@@ -281,13 +281,13 @@ export default function OutboundV3ControlPanel(){
 
 function ModeBadge({label,value}:{label:string;value:string}){
   const active=value==="shadow"||value==="active"||value==="enforce"||value==="assist"||value==="L2";
-  return <span style={{padding:"7px 9px",borderRadius:999,border:"1px solid rgba(255,255,255,.08)",background:active?"rgba(52,199,89,.09)":"rgba(255,255,255,.035)",fontSize:9,color:active?"#84f5c8":"#8f9b94",fontWeight:850}}>
+  return <span style={{padding:"7px 9px",borderRadius:999,border:"1px solid rgba(255,255,255,.08)",background:active?"rgba(52,199,89,.09)":"rgba(255,255,255,.035)",fontSize:9,color:active?"#5eeaa0":"#8f9b94",fontWeight:850}}>
     {label}: {value.toUpperCase()}
   </span>;
 }
 
 function Card({title,children}:{title:string;children:React.ReactNode}){
-  return <div style={{padding:14,borderRadius:16,border:"1px solid rgba(255,255,255,.07)",background:"rgba(255,255,255,.025)"}}>
+  return <div style={{padding:14,borderRadius:18,border:"1px solid rgba(255,255,255,.07)",background:"rgba(255,255,255,.025)"}}>
     <div style={{fontSize:9,fontWeight:850,letterSpacing:".1em",color:"#77837d"}}>{title.toUpperCase()}</div>
     <div style={{marginTop:7,display:"flex",flexDirection:"column",gap:3}}>{children}</div>
   </div>;
@@ -299,10 +299,10 @@ function alertStyle(kind:"error"|"warn"|"ok"):React.CSSProperties{
   const map={
     error:{border:"rgba(255,110,110,.25)",bg:"rgba(255,80,80,.07)",text:"#ffb3b3"},
     warn:{border:"rgba(242,217,140,.24)",bg:"rgba(242,217,140,.06)",text:"#f2d98c"},
-    ok:{border:"rgba(94,234,160,.22)",bg:"rgba(52,199,89,.06)",text:"#84f5c8"},
+    ok:{border:"rgba(94,234,160,.22)",bg:"rgba(52,199,89,.06)",text:"#5eeaa0"},
   }[kind];
-  return {marginTop:14,padding:"10px 12px",borderRadius:12,border:"1px solid "+map.border,background:map.bg,color:map.text,fontSize:11};
+  return {marginTop:14,padding:"10px 12px",borderRadius:14,border:"1px solid "+map.border,background:map.bg,color:map.text,fontSize:11};
 }
 function actionStyle(primary:boolean):React.CSSProperties{
-  return {border:primary?"1px solid rgba(94,234,160,.25)":"1px solid rgba(255,255,255,.1)",background:primary?"rgba(52,199,89,.1)":"rgba(255,255,255,.04)",color:primary?"#84f5c8":"#aeb9b3",padding:"9px 11px",borderRadius:10,fontSize:10,fontWeight:850,cursor:"pointer"};
+  return {border:primary?"1px solid rgba(94,234,160,.25)":"1px solid rgba(255,255,255,.1)",background:primary?"rgba(52,199,89,.1)":"rgba(255,255,255,.04)",color:primary?"#5eeaa0":"#aeb9b3",padding:"9px 11px",borderRadius:10,fontSize:10,fontWeight:850,cursor:"pointer"};
 }

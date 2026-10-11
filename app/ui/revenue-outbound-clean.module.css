@@ -36,12 +36,12 @@
 }
 
 .root > main{
-  background:radial-gradient(circle at 70% -18%,rgba(52,199,89,.035),transparent 30%),#080b0f !important;
+  background:radial-gradient(circle at 70% -18%,rgba(52,199,89,.035),transparent 30%),#09100d !important;
 }
 
 .root > main > div > aside{
   width:auto;
-  background:#090c10 !important;
+  background:#09100d !important;
   backdrop-filter:none !important;
   border-right-color:var(--clean-line) !important;
 }
@@ -62,7 +62,7 @@
 .root > main > div > aside nav button{
   min-height:38px;
   padding:9px 9px !important;
-  border-radius:8px !important;
+  border-radius:10px !important;
   transition:background .15s ease,color .15s ease;
 }
 
@@ -92,7 +92,7 @@
   min-height:58px !important;
   height:58px !important;
   padding:0 20px !important;
-  background:rgba(8,11,15,.9) !important;
+  background:rgba(9,16,13,.9) !important;
   backdrop-filter:blur(14px) !important;
   border-bottom-color:var(--clean-line) !important;
 }
@@ -134,7 +134,7 @@
 }
 
 .root article{
-  border-radius:12px !important;
+  border-radius:14px !important;
   box-shadow:none !important;
 }
 
@@ -176,7 +176,7 @@
 }
 
 .root > main > div > section > div > section:first-of-type{
-  border-radius:12px !important;
+  border-radius:14px !important;
   margin-bottom:17px !important;
   background:rgba(255,255,255,.012) !important;
   border-color:var(--clean-line) !important;

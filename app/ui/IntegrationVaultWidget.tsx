@@ -65,28 +65,28 @@ export default function IntegrationVaultWidget() {
   return <>
     <button
       onClick={() => { setOpen(true); void load(); }}
-      style={{ position: "fixed", right: "clamp(18px,3vw,48px)", top: 92, zIndex: 80, border: "1px solid #315e49", background: "rgba(7,20,17,.92)", color: "#74edb4", padding: "11px 14px", borderRadius: 13, fontWeight: 850, cursor: "pointer", boxShadow: "0 18px 45px rgba(0,0,0,.35)", backdropFilter: "blur(16px)" }}
+      style={{ position: "fixed", right: "clamp(18px,3vw,48px)", top: 92, zIndex: 80, border: "1px solid #315e49", background: "rgba(9,16,13,.92)", color: "#5eeaa0", padding: "11px 14px", borderRadius: 14, fontWeight: 850, cursor: "pointer", boxShadow: "0 18px 45px rgba(5,10,8,.35)", backdropFilter: "blur(16px)" }}
     >{agentReady ? "● DG Core verbunden" : "⚙ API-Tresor"}</button>
-    {open && <div onClick={() => setOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 100, background: "rgba(3,6,10,.82)", backdropFilter: "blur(10px)", display: "grid", placeItems: "center", padding: 20 }}>
-      <div onClick={(event) => event.stopPropagation()} style={{ width: "min(820px,100%)", maxHeight: "88vh", overflow: "auto", background: "#071115", border: "1px solid #24463b", borderRadius: 24, padding: 24, color: "#eefcf7", fontFamily: "Inter,system-ui", boxShadow: "0 35px 120px rgba(0,0,0,.55)" }}>
+    {open && <div onClick={() => setOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 100, background: "rgba(5,10,8,.82)", backdropFilter: "blur(10px)", display: "grid", placeItems: "center", padding: 20 }}>
+      <div onClick={(event) => event.stopPropagation()} style={{ width: "min(820px,100%)", maxHeight: "88vh", overflow: "auto", background: "#09100d", border: "1px solid #24463b", borderRadius: 18, padding: 24, color: "#eefcf7", fontFamily: "Inter,system-ui", boxShadow: "0 35px 120px rgba(5,10,8,.55)" }}>
         <div style={{ display: "flex", justifyContent: "space-between", gap: 20, alignItems: "start" }}>
           <div>
-            <div style={{ fontSize: 10, color: "#61e9a8", fontWeight: 850, letterSpacing: ".15em" }}>ENCRYPTED INTEGRATION VAULT</div>
+            <div style={{ fontSize: 10, color: "#5eeaa0", fontWeight: 850, letterSpacing: ".15em" }}>ENCRYPTED INTEGRATION VAULT</div>
             <h2 style={{ margin: "7px 0", fontSize: 28 }}>DG Core & Integrationen</h2>
             <p style={{ margin: 0, color: "#78938a", fontSize: 13, lineHeight: 1.55 }}>Secrets werden serverseitig AES-verschlüsselt gespeichert und nie wieder im Klartext ausgegeben.</p>
           </div>
-          <button onClick={() => setOpen(false)} style={{ border: 0, background: "#13211f", color: "#fff", width: 36, height: 36, borderRadius: 10, cursor: "pointer" }}>×</button>
+          <button onClick={() => setOpen(false)} style={{ border: 0, background: "#121d18", color: "#fff", width: 36, height: 36, borderRadius: 10, cursor: "pointer" }}>×</button>
         </div>
-        {message && <div style={{ marginTop: 16, padding: 10, borderRadius: 10, background: "#10251c", color: "#69e8ad", fontSize: 12 }}>{message}</div>}
+        {message && <div style={{ marginTop: 16, padding: 10, borderRadius: 10, background: "#121d18", color: "#5eeaa0", fontSize: 12 }}>{message}</div>}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 18 }}>
-          <button disabled={!googleReady} onClick={() => connect("google")} style={{ border: "1px solid #30483f", borderRadius: 12, padding: 13, background: "#101c1a", color: googleReady ? "#fff" : "#596e67", fontWeight: 850, cursor: googleReady ? "pointer" : "not-allowed" }}>Google-Mailbox verbinden</button>
-          <button disabled={!microsoftReady} onClick={() => connect("microsoft")} style={{ border: "1px solid #30483f", borderRadius: 12, padding: 13, background: "#101c1a", color: microsoftReady ? "#fff" : "#596e67", fontWeight: 850, cursor: microsoftReady ? "pointer" : "not-allowed" }}>Microsoft-Mailbox verbinden</button>
+          <button disabled={!googleReady} onClick={() => connect("google")} style={{ border: "1px solid #30483f", borderRadius: 14, padding: 13, background: "#0d1612", color: googleReady ? "#fff" : "#596e67", fontWeight: 850, cursor: googleReady ? "pointer" : "not-allowed" }}>Google-Mailbox verbinden</button>
+          <button disabled={!microsoftReady} onClick={() => connect("microsoft")} style={{ border: "1px solid #30483f", borderRadius: 14, padding: 13, background: "#0d1612", color: microsoftReady ? "#fff" : "#596e67", fontWeight: 850, cursor: microsoftReady ? "pointer" : "not-allowed" }}>Microsoft-Mailbox verbinden</button>
         </div>
         <div style={{ display: "grid", gap: 12, marginTop: 18 }}>
-          {fields.map(([key, label, type]) => <form key={key} onSubmit={(event) => void save(event, key)} style={{ border: "1px solid #1b332c", borderRadius: 14, padding: 14, display: "grid", gridTemplateColumns: "minmax(190px,.9fr) minmax(220px,1.5fr) auto", gap: 10, alignItems: "center" }}>
-            <div><strong style={{ fontSize: 12 }}>{label}</strong><small style={{ display: "block", marginTop: 4, color: configured.has(key) ? "#61e9a8" : "#60766f", fontSize: 10 }}>{configured.has(key) ? "✓ sicher gespeichert" : "nicht hinterlegt"}</small></div>
-            <input name="value" type={type} autoComplete="off" placeholder={configured.has(key) ? "Neuen Wert zum Ersetzen eingeben" : "Wert eintragen"} style={{ minWidth: 0, border: "1px solid #27463d", background: "#050c0b", color: "#fff", borderRadius: 10, padding: "11px 12px" }} />
-            <button style={{ border: 0, borderRadius: 10, padding: "11px 14px", background: "#5de9a7", color: "#062117", fontWeight: 900, cursor: "pointer" }}>Speichern</button>
+          {fields.map(([key, label, type]) => <form key={key} onSubmit={(event) => void save(event, key)} style={{ border: "1px solid #182420", borderRadius: 14, padding: 14, display: "grid", gridTemplateColumns: "minmax(190px,.9fr) minmax(220px,1.5fr) auto", gap: 10, alignItems: "center" }}>
+            <div><strong style={{ fontSize: 12 }}>{label}</strong><small style={{ display: "block", marginTop: 4, color: configured.has(key) ? "#5eeaa0" : "#60766f", fontSize: 10 }}>{configured.has(key) ? "✓ sicher gespeichert" : "nicht hinterlegt"}</small></div>
+            <input name="value" type={type} autoComplete="off" placeholder={configured.has(key) ? "Neuen Wert zum Ersetzen eingeben" : "Wert eintragen"} style={{ minWidth: 0, border: "1px solid #27463d", background: "#050a08", color: "#fff", borderRadius: 10, padding: "11px 12px" }} />
+            <button style={{ border: 0, borderRadius: 10, padding: "11px 14px", background: "#5eeaa0", color: "#0d1612", fontWeight: 900, cursor: "pointer" }}>Speichern</button>
           </form>)}
         </div>
       </div>
