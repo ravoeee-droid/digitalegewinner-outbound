@@ -1,7 +1,7 @@
 {
   "contractVersion": "1.0.0",
   "instance": "DG-MAIN",
-  "updatedAt": "2026-10-07",
+  "updatedAt": "2026-10-11",
   "policy": "same-task-adapt-both-directions",
   "status": "parity-realignment-in-progress",
   "sharedSurfaces": {
@@ -16,7 +16,7 @@
     "callerQueue": "local-implementation-exists-review-parity",
     "leadDetailWorkspace": "local-implementation-exists-review-parity",
     "salesBrief": "needs-parity-review",
-    "applicationFrame": "single-primary-workspace-no-parallel-pro-ui",
+    "applicationFrame": "dg-single-sidebar-shell-AppFrame-from-jj-growth-os-pattern; walkenhorst-parity-pending",
     "studioGenericV3": "peer-webmotion-v3-blocked-no-equivalent-browser-render-seam",
     "websiteBuildStreamVercelLink": "implemented-in-dg-peer-has-no-website-build-stream",
     "outboundOsV3": "dg-foundation-feature-branch-peer-parity-blocked",

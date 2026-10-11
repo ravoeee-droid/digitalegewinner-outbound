@@ -25,7 +25,7 @@ button{transition:transform .2s var(--ease),box-shadow .2s var(--ease),backgroun
 
 .health-dot,.cloudtalk-live-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 12px rgba(52,199,89,.44)}
 
-.eyebrow{font-size:8px;letter-spacing:.15em;color:var(--green-2);font-weight:850;text-transform:uppercase}
+.eyebrow{font-size:11px;letter-spacing:.15em;color:var(--green-2);font-weight:850;text-transform:uppercase}
 
 /* CloudTalk premium phone widget — floats on top of dark cockpit pages */
 .cloudtalk-shell{position:fixed;right:20px;bottom:20px;z-index:160;font-family:inherit}
@@ -33,22 +33,22 @@ button{transition:transform .2s var(--ease),box-shadow .2s var(--ease),backgroun
 .cloudtalk-launcher:hover{transform:translateY(-2px);box-shadow:0 28px 80px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,255,255,.08)}
 .cloudtalk-launcher-icon{width:36px;height:36px;border-radius:12px;background:linear-gradient(145deg,#34c759,#1f8a52);display:grid;place-items:center;color:#05130b;font-size:14px;box-shadow:inset 0 1px 0 rgba(255,255,255,.35),0 7px 18px rgba(52,199,89,.28)}
 .cloudtalk-launcher strong,.cloudtalk-launcher small{display:block}
-.cloudtalk-launcher strong{font-size:10px;color:#eef4f0}
-.cloudtalk-launcher small{font-size:8px;color:#8aa199;margin-top:2px}
+.cloudtalk-launcher strong{font-size:12px;color:#eef4f0}
+.cloudtalk-launcher small{font-size:11px;color:#8aa199;margin-top:2px}
 .cloudtalk-panel{position:absolute;right:0;bottom:64px;width:min(390px,calc(100vw - 28px));height:min(690px,calc(100vh - 110px));display:grid;grid-template-rows:auto 1fr auto;border:1px solid rgba(255,255,255,.1);border-radius:26px;overflow:hidden;background:linear-gradient(160deg,rgba(10,16,13,.97),rgba(3,6,5,.98));box-shadow:0 34px 110px rgba(0,0,0,.55),inset 0 1px 0 rgba(255,255,255,.06);backdrop-filter:blur(34px) saturate(180%);-webkit-backdrop-filter:blur(34px) saturate(180%);animation:phoneIn .26s var(--ease)}
 @keyframes phoneIn{from{opacity:0;transform:translateY(10px) scale(.98)}to{opacity:1;transform:none}}
 .cloudtalk-panel-head{display:flex;justify-content:space-between;gap:12px;align-items:center;padding:15px 16px;border-bottom:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.03)}
 .cloudtalk-panel-head strong,.cloudtalk-panel-head small{display:block}
 .cloudtalk-panel-head strong{font-size:12px;margin-top:4px;color:#eef4f0}
-.cloudtalk-panel-head small{font-size:8px;color:#7f958c;margin-top:2px}
+.cloudtalk-panel-head small{font-size:11px;color:#7f958c;margin-top:2px}
 .cloudtalk-head-actions{display:flex;gap:7px;align-items:center}
 .cloudtalk-head-actions button{width:32px;height:32px;border-radius:10px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.05);color:#c8d4cf;cursor:pointer;font-size:16px;box-shadow:inset 0 1px 0 rgba(255,255,255,.05)}
-.cloudtalk-timer{font-size:9px;font-variant-numeric:tabular-nums;padding:7px 9px;border-radius:9px;background:var(--green-soft);color:var(--green-2);font-weight:800}
+.cloudtalk-timer{font-size:11px;font-variant-numeric:tabular-nums;padding:7px 9px;border-radius:9px;background:var(--green-soft);color:var(--green-2);font-weight:800}
 .cloudtalk-frame-wrap{min-height:0;background:#050806}
 .cloudtalk-frame{width:100%;height:100%;border:0;background:#050806}
-.cloudtalk-panel-foot{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:10px 14px;border-top:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.02);font-size:8px;color:#7f958c}
+.cloudtalk-panel-foot{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:10px 14px;border-top:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.02);font-size:11px;color:#7f958c}
 .cloudtalk-panel-foot span{display:flex;align-items:center;gap:6px;font-weight:750;color:#c8d4cf}
-.cloudtalk-panel-foot small{font-size:7px;color:#5f746b}
+.cloudtalk-panel-foot small{font-size:11px;color:#5f746b}
 
 .sr-only{
   position:absolute!important;

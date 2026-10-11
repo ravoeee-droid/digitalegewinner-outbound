@@ -1,11 +1,11 @@
 .page{max-width:1700px;margin:0 auto;padding:20px 16px 90px;font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;color:#eef4f0}
 .embedded{padding:0 0 60px}
 .top{display:flex;flex-wrap:wrap;gap:16px;align-items:flex-end;justify-content:space-between;margin-bottom:14px}
-.eyebrow{font-size:10px;letter-spacing:.16em;text-transform:uppercase;font-weight:900;color:#5eeaa0}
+.eyebrow{font-size:12px;letter-spacing:.16em;text-transform:uppercase;font-weight:900;color:#5eeaa0}
 .top h1{margin:4px 0 0;font-size:clamp(22px,3vw,30px);letter-spacing:-.02em}
 .kpis{display:flex;flex-wrap:wrap;gap:8px}
 .kpis div{min-width:130px;padding:10px 13px;border:1px solid rgba(255,255,255,.1);border-radius:11px;background:rgba(255,255,255,.035);display:grid;gap:3px}
-.kpis span{font-size:10px;letter-spacing:.09em;text-transform:uppercase;color:#9aa3a9;font-weight:800}
+.kpis span{font-size:12px;letter-spacing:.09em;text-transform:uppercase;color:#9aa3a9;font-weight:800}
 .kpis strong{font-size:21px;letter-spacing:-.02em}
 .warn{border-color:rgba(255,170,60,.5)!important;background:rgba(255,170,60,.08)!important}
 .warn strong{color:#ffc983}
@@ -44,7 +44,7 @@
 .row:focus-visible{outline:2px solid #34c759}
 .stage{font-size:11px;font-weight:900;color:#7ef0a8;text-transform:uppercase;letter-spacing:.06em}
 .error{padding:10px 14px;border:1px solid rgba(255,120,120,.4);border-radius:10px;background:rgba(255,80,80,.08);color:#ffb4b4;font-size:13px}
-.drawer{position:fixed;top:44px;right:0;bottom:0;width:min(440px,100%);z-index:650;background:#070c0f;border-left:1px solid rgba(255,255,255,.12);box-shadow:-20px 0 60px rgba(0,0,0,.5);padding:16px;overflow-y:auto;display:grid;gap:12px;align-content:start}
+.drawer{position:fixed;top:0;right:0;bottom:0;width:min(440px,100%);z-index:650;background:#070c0f;border-left:1px solid rgba(255,255,255,.12);box-shadow:-20px 0 60px rgba(0,0,0,.5);padding:16px;overflow-y:auto;display:grid;gap:12px;align-content:start}
 .drawerHead{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
 .drawerHead strong{display:block;font-size:18px;letter-spacing:-.01em}
 .drawerHead small{color:#9aa3a9}

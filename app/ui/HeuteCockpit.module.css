@@ -1,10 +1,10 @@
 .page{max-width:1280px;margin:0 auto;padding:22px 18px 80px;font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;color:#eef4f0}
 .head{display:flex;flex-wrap:wrap;gap:18px;align-items:flex-end;justify-content:space-between;margin-bottom:18px}
-.eyebrow{font-size:10px;letter-spacing:.16em;text-transform:uppercase;font-weight:900;color:#5eeaa0}
+.eyebrow{font-size:12px;letter-spacing:.16em;text-transform:uppercase;font-weight:900;color:#5eeaa0}
 .head h1{margin:4px 0 0;font-size:clamp(22px,3vw,32px);letter-spacing:-.02em;text-transform:capitalize}
 .counters{display:flex;flex-wrap:wrap;gap:10px}
 .counter{min-width:150px;padding:12px 14px;border:1px solid rgba(255,255,255,.1);border-radius:12px;background:rgba(255,255,255,.035);display:grid;gap:4px}
-.label{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:#9aa3a9;font-weight:800}
+.label{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:#9aa3a9;font-weight:800}
 .counter strong{font-size:28px;line-height:1;letter-spacing:-.03em}
 .counter strong small{font-size:14px;color:#9aa3a9;font-weight:700}
 .counter em{font-style:normal;font-size:11px;color:#9aa3a9}
@@ -28,7 +28,7 @@
 .box strong{font-size:12px;word-break:break-all}
 .box p{margin:0;font-size:12px;color:#9aa3a9}
 .off{opacity:.55}
-.chip{font-size:10px;font-weight:900;padding:3px 8px;border-radius:99px;background:rgba(255,255,255,.08);color:#c9d1d6;text-transform:uppercase;letter-spacing:.06em;white-space:nowrap}
+.chip{font-size:12px;font-weight:900;padding:3px 8px;border-radius:99px;background:rgba(255,255,255,.08);color:#c9d1d6;text-transform:uppercase;letter-spacing:.06em;white-space:nowrap}
 .chip[data-status="healthy"]{background:rgba(52,199,89,.16);color:#7ef0a8}
 .chip[data-status="degraded"],.chip[data-status="paused"]{background:rgba(255,170,60,.16);color:#ffc983}
 .muted{color:#9aa3a9;font-size:13px}

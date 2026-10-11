@@ -30,7 +30,7 @@
 }
 
 .root small{
-  font-size:9px !important;
+  font-size:11px !important;
   font-weight:400 !important;
   line-height:1.4 !important;
 }
@@ -144,7 +144,7 @@
 }
 
 .root article p{
-  font-size:9px !important;
+  font-size:11px !important;
 }
 
 .root article > div:first-child span{
@@ -156,13 +156,13 @@
 }
 
 .root table th{
-  font-size:8px !important;
+  font-size:11px !important;
   font-weight:520 !important;
   letter-spacing:.045em !important;
 }
 
 .root table td{
-  font-size:10px !important;
+  font-size:12px !important;
 }
 
 .root table td strong{
@@ -187,7 +187,7 @@
 }
 
 .root > main > div > section > div > section:first-of-type span{
-  font-size:9px !important;
+  font-size:11px !important;
   font-weight:450 !important;
 }
 

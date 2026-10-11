@@ -51,7 +51,7 @@ gap:2px}
 .brand strong{
 font-size:14px}
 .brand span{
-font-size:8px;
+font-size:11px;
 letter-spacing:.16em;
 color:#8e98a6;
 font-weight:800}
@@ -76,13 +76,13 @@ background:rgba(255,255,255,.04);
 color:#fff}
 .mainNav i{
 font-style:normal;
-font-size:9px;
+font-size:11px;
 color:#586272}
 .mainNav span{
 font-size:12px;
 font-weight:730}
 .mainNav b{
-font-size:9px;
+font-size:11px;
 font-weight:850;
 color:#788493;
 white-space:nowrap}
@@ -94,7 +94,7 @@ box-shadow:inset 2px 0 0 var(--lime)}
 color:var(--lime)}
 .sideLabel{
 margin:24px 10px 9px;
-font-size:8px;
+font-size:11px;
 font-weight:900;
 letter-spacing:.18em;
 color:#515b68}
@@ -131,14 +131,14 @@ background:currentColor}
 font-size:11px}
 .productNav button small{
 grid-column:1;
-font-size:9px;
+font-size:11px;
 color:#66717f;
 padding-left:15px}
 .productNav button>b{
 grid-column:2;
 grid-row:1/3;
 align-self:center;
-font-size:10px;
+font-size:12px;
 color:#9da8b4}
 .productRecruiting{
 --product:#34c759;
@@ -160,7 +160,7 @@ flex-wrap:wrap;
 padding:14px 4px 0;
 border-top:1px solid var(--line)}
 .sideFooter a{
-font-size:9px;
+font-size:11px;
 color:#788493;
 text-decoration:none;
 padding:7px 8px;
@@ -196,7 +196,7 @@ border-radius:11px}
 border:0;
 background:transparent;
 color:#727d8b;
-font-size:10px;
+font-size:12px;
 font-weight:800;
 padding:7px 10px;
 border-radius:8px;
@@ -217,7 +217,7 @@ color:#b9c2cd;
 border-radius:10px;
 padding:9px 11px;
 text-decoration:none;
-font-size:10px;
+font-size:12px;
 font-weight:800;
 cursor:pointer}
 .topActions a{
@@ -267,14 +267,14 @@ gap:3px}
 .kpiStrip>div:last-child{
 border-right:0}
 .kpiStrip span{
-font-size:9px;
+font-size:11px;
 color:#747f8e;
 font-weight:700}
 .kpiStrip strong{
 font-size:20px;
 letter-spacing:-.04em}
 .kpiStrip small{
-font-size:8px;
+font-size:11px;
 color:#56616f}
 .todayGrid{
 display:grid;
@@ -291,7 +291,7 @@ margin:10px 0 18px}
 .sectionHead>div:first-child{
 max-width:850px}
 .sectionHead span{
-font-size:9px;
+font-size:11px;
 font-weight:900;
 letter-spacing:.17em;
 color:var(--lime)}
@@ -313,13 +313,13 @@ display:flex;
 flex-direction:column;
 gap:2px}
 .queueValue small{
-font-size:8px;
+font-size:11px;
 color:#697483}
 .queueValue strong{
 font-size:22px;
 letter-spacing:-.04em}
 .queueValue span{
-font-size:9px;
+font-size:11px;
 color:#7e8998;
 letter-spacing:0}
 .nextDeal{
@@ -355,7 +355,7 @@ color:var(--product);
 background:color-mix(in srgb,var(--product) 8%,transparent);
 padding:5px 8px;
 border-radius:999px;
-font-size:8px!important;
+font-size:11px!important;
 letter-spacing:.08em!important;
 font-weight:900}
 .nextDeal h2{
@@ -365,7 +365,7 @@ margin:10px 0 2px}
 .nextDealTop p{
 margin:0;
 color:#707b8a;
-font-size:10px}
+font-size:12px}
 .dealScore{
 text-align:right;
 display:flex;
@@ -373,14 +373,14 @@ flex-direction:column;
 align-items:flex-end}
 .dealScore small{
 color:#677281;
-font-size:8px;
+font-size:11px;
 letter-spacing:.12em}
 .dealScore strong{
 font-size:34px;
 letter-spacing:-.06em;
 color:var(--product)}
 .dealScore span{
-font-size:8px;
+font-size:11px;
 color:#707b8a}
 .signalBox{
 position:relative;
@@ -395,7 +395,7 @@ grid-template-columns:110px 1fr;
 gap:4px 14px;
 align-items:center}
 .signalBox>span{
-font-size:8px;
+font-size:11px;
 color:#687383;
 font-weight:900;
 letter-spacing:.13em}
@@ -408,7 +408,7 @@ display:flex;
 gap:6px;
 flex-wrap:wrap}
 .signalBox b{
-font-size:8px;
+font-size:11px;
 color:#a6b0bd;
 background:rgba(255,255,255,.055);
 padding:4px 7px;
@@ -432,7 +432,7 @@ display:flex;
 flex-direction:column;
 gap:3px}
 .valueGrid span{
-font-size:8px;
+font-size:11px;
 color:#697483}
 .valueGrid strong{
 font-size:16px;
@@ -450,7 +450,7 @@ color:#bcc5d0;
 border-radius:10px;
 padding:10px 11px;
 text-decoration:none;
-font-size:9px;
+font-size:11px;
 font-weight:850;
 cursor:pointer}
 .callBar .callButton{
@@ -470,7 +470,7 @@ justify-content:space-between;
 gap:12px;
 align-items:center}
 .outcomes>span{
-font-size:8px;
+font-size:11px;
 color:#687383;
 white-space:nowrap}
 .outcomes>div{
@@ -484,7 +484,7 @@ background:#11161e;
 color:#99a4b2;
 border-radius:8px;
 padding:7px 9px;
-font-size:8px;
+font-size:11px;
 font-weight:800;
 cursor:pointer}
 .outcomes button:hover{
@@ -505,14 +505,14 @@ display:flex;
 gap:8px;
 align-items:center}
 .queueHeader span{
-font-size:8px;
+font-size:11px;
 letter-spacing:.15em;
 color:#5f6b79;
 font-weight:900}
 .queueHeader strong{
 font-size:12px}
 .queueHeader small{
-font-size:8px;
+font-size:11px;
 color:#596574}
 .callQueue{
 border:1px solid var(--line);
@@ -539,7 +539,7 @@ background:rgba(255,255,255,.025)}
 .queueRow>i{
 font-style:normal;
 color:#4f5a68;
-font-size:9px}
+font-size:11px}
 .queueCompany{
 display:flex;
 flex-direction:column;
@@ -548,14 +548,14 @@ min-width:0}
 .queueCompany strong{
 font-size:11px}
 .queueCompany span{
-font-size:8px;
+font-size:11px;
 color:#687482;
 white-space:nowrap;
 overflow:hidden;
 text-overflow:ellipsis}
 .tinyProduct{
 width:max-content;
-font-size:8px;
+font-size:11px;
 font-weight:900;
 padding:4px 6px;
 border-radius:999px;
@@ -568,10 +568,10 @@ gap:1px}
 .queueRevenue strong{
 font-size:11px}
 .queueRevenue small{
-font-size:7px;
+font-size:11px;
 color:#62707e}
 .queueStage{
-font-size:8px;
+font-size:11px;
 color:#8f9aa7}
 .arrow{
 color:#596572}
@@ -579,7 +579,7 @@ color:#596572}
 padding:16px;
 text-align:center;
 color:#62707e;
-font-size:9px}
+font-size:11px}
 .rightRail{
 display:flex;
 flex-direction:column;
@@ -595,7 +595,7 @@ align-items:center;
 justify-content:space-between;
 margin-bottom:12px}
 .railHead span{
-font-size:8px;
+font-size:11px;
 letter-spacing:.14em;
 font-weight:900;
 color:#586575}
@@ -606,7 +606,7 @@ margin:11px 0}
 .progress>div:first-child{
 display:flex;
 justify-content:space-between;
-font-size:9px;
+font-size:11px;
 color:#8c97a5}
 .progressTrack{
 height:5px;
@@ -626,7 +626,7 @@ border-top:1px solid rgba(255,255,255,.06);
 display:flex;
 justify-content:space-between;
 gap:12px;
-font-size:9px}
+font-size:11px}
 .momentumLine span{
 color:#65717f}
 .momentumLine strong{
@@ -657,12 +657,12 @@ place-items:center}
 display:flex;
 flex-direction:column}
 .productPotentialCard button strong{
-font-size:9px}
+font-size:11px}
 .productPotentialCard button small{
-font-size:7px;
+font-size:11px;
 color:#5f6c7a}
 .productPotentialCard button>b{
-font-size:9px}
+font-size:11px}
 .productPotentialCard .railProductActive{
 background:linear-gradient(90deg,rgba(255,255,255,.025),transparent)}
 .playbookCard ol{
@@ -684,14 +684,14 @@ display:grid;
 place-items:center;
 background:#141b23;
 color:#75808e;
-font-size:8px}
+font-size:11px}
 .playbookCard li span{
 display:flex;
 flex-direction:column}
 .playbookCard li strong{
-font-size:9px}
+font-size:11px}
 .playbookCard li small{
-font-size:7px;
+font-size:11px;
 color:#596675;
 line-height:1.4}
 .emptyState{
@@ -707,7 +707,7 @@ color:#7a8695}
 font-size:15px;
 color:#c4cbd4}
 .emptyState span{
-font-size:9px}
+font-size:11px}
 .pipelineView,.dealsView,.multiView{
 min-width:0}
 .pipelineBoard{
@@ -738,10 +738,10 @@ display:flex;
 align-items:center;
 gap:6px}
 .columnHead span{
-font-size:9px;
+font-size:11px;
 font-weight:850}
 .columnHead b{
-font-size:8px;
+font-size:11px;
 min-width:18px;
 height:18px;
 padding:0 5px;
@@ -751,7 +751,7 @@ display:grid;
 place-items:center;
 color:#728090}
 .columnHead>strong{
-font-size:9px;
+font-size:11px;
 color:#7d8996}
 .columnBody{
 padding:8px;
@@ -772,19 +772,19 @@ display:flex;
 justify-content:space-between;
 gap:8px}
 .pipelineCardTop span{
-font-size:7px;
+font-size:11px;
 font-weight:900;
 color:var(--product);
 text-transform:uppercase;
 letter-spacing:.08em}
 .pipelineCardTop b{
-font-size:7px;
+font-size:11px;
 color:#778391}
 .pipelineCard h3{
 font-size:11px;
 margin:7px 0 4px}
 .pipelineCard p{
-font-size:7.5px;
+font-size:11px;
 color:#667382;
 line-height:1.45;
 margin:0;
@@ -798,7 +798,7 @@ margin-top:9px}
 .cardRevenue strong{
 font-size:12px}
 .cardRevenue span{
-font-size:7px;
+font-size:11px;
 color:#687482}
 .cardProgress{
 height:3px;
@@ -819,13 +819,13 @@ display:flex;
 justify-content:space-between;
 gap:8px}
 .pipelineCard footer span{
-font-size:7px;
+font-size:11px;
 color:#697684;
 white-space:nowrap;
 overflow:hidden;
 text-overflow:ellipsis}
 .pipelineCard footer b{
-font-size:8px}
+font-size:11px}
 .dropZone{
 height:72px;
 border:1px dashed rgba(255,255,255,.08);
@@ -833,7 +833,7 @@ border-radius:11px;
 display:grid;
 place-items:center;
 color:#404b58;
-font-size:8px}
+font-size:11px}
 .lostStrip{
 margin-top:6px;
 border:1px solid rgba(255,117,117,.1);
@@ -844,7 +844,7 @@ display:flex;
 gap:10px;
 align-items:center;
 color:#896d72;
-font-size:9px}
+font-size:11px}
 .lostStrip strong{
 color:#a98c91}
 .lostStrip button{
@@ -852,7 +852,7 @@ margin-left:auto;
 border:0;
 background:transparent;
 color:#9b7f84;
-font-size:8px;
+font-size:11px;
 cursor:pointer}
 .dealTableWrap{
 border:1px solid var(--line);
@@ -870,14 +870,14 @@ background:#0d1218;
 color:#596675;
 text-transform:uppercase;
 letter-spacing:.08em;
-font-size:7px;
+font-size:11px;
 text-align:left;
 padding:9px 10px;
 border-bottom:1px solid var(--line)}
 .dealTable td{
 padding:10px;
 border-bottom:1px solid rgba(255,255,255,.045);
-font-size:9px;
+font-size:11px;
 color:#919dab}
 .dealTable tr:hover td{
 background:rgba(255,255,255,.018)}
@@ -885,16 +885,16 @@ background:rgba(255,255,255,.018)}
 min-width:180px}
 .dealTable td:first-child strong{
 display:block;
-font-size:10px;
+font-size:12px;
 color:#d4dae1}
 .dealTable td:first-child small{
 display:block;
-font-size:7px;
+font-size:11px;
 color:#596675;
 margin-top:2px}
 .tableProduct{
 display:inline-flex;
-font-size:8px;
+font-size:11px;
 font-weight:900;
 border:1px solid color-mix(in srgb,var(--product) 22%,transparent);
 background:color-mix(in srgb,var(--product) 7%,transparent);
@@ -913,7 +913,7 @@ padding:4px 6px;
 border-radius:999px;
 background:#161d25;
 color:#8f9aa7;
-font-size:8px}
+font-size:11px}
 .dealTable td strong{
 color:#d7dce2}
 .dealTable td:last-child button{
@@ -956,12 +956,12 @@ font-size:18px}
 .channelGrid strong{
 font-size:12px}
 .channelGrid p{
-font-size:8px;
+font-size:11px;
 color:#65717f;
 margin:4px 0 0;
 line-height:1.5}
 .channelGrid b{
-font-size:8px;
+font-size:11px;
 color:#71808f}
 .systemFlow{
 margin-top:12px;
@@ -970,7 +970,7 @@ border:1px solid var(--line);
 border-radius:16px;
 background:rgba(255,255,255,.02)}
 .systemFlow>span{
-font-size:8px;
+font-size:11px;
 letter-spacing:.14em;
 color:#617080;
 font-weight:900}
@@ -981,7 +981,7 @@ gap:9px;
 flex-wrap:wrap;
 margin-top:12px}
 .systemFlow b{
-font-size:9px;
+font-size:11px;
 padding:7px 9px;
 border-radius:9px;
 background:#131a22;
@@ -1016,7 +1016,7 @@ font-size:23px;
 letter-spacing:-.04em;
 margin:9px 0 4px}
 .drawer>header p{
-font-size:9px;
+font-size:11px;
 color:#71808f;
 line-height:1.45;
 margin:0}
@@ -1043,7 +1043,7 @@ display:flex;
 flex-direction:column;
 gap:2px}
 .drawerValues span{
-font-size:7px;
+font-size:11px;
 color:#606d7b}
 .drawerValues strong{
 font-size:13px}
@@ -1056,7 +1056,7 @@ display:flex;
 flex-direction:column;
 gap:5px}
 .drawerForm label>span{
-font-size:8px;
+font-size:11px;
 font-weight:800;
 color:#778391}
 .drawerForm input,.drawerForm select,.drawerForm textarea{
@@ -1066,7 +1066,7 @@ background:#10161e;
 color:#d9dee4;
 border-radius:9px;
 padding:9px 10px;
-font-size:10px;
+font-size:12px;
 outline:none}
 .drawerForm input:focus,.drawerForm select:focus,.drawerForm textarea:focus{
 border-color:rgba(52,199,89,.3)}
@@ -1090,7 +1090,7 @@ border:0;
 padding:0;
 background:transparent}
 .probabilityInput b{
-font-size:8px;
+font-size:11px;
 color:#7e8997}
 .saveButton{
 border:0;
@@ -1098,7 +1098,7 @@ background:var(--lime);
 color:#0a0d08;
 border-radius:10px;
 padding:11px;
-font-size:10px;
+font-size:12px;
 font-weight:900;
 cursor:pointer}
 .drawerContact,.crossSell{
@@ -1107,7 +1107,7 @@ padding-top:13px;
 border-top:1px solid var(--line)}
 .drawerContact>span,.crossSell>span{
 display:block;
-font-size:7px;
+font-size:11px;
 letter-spacing:.13em;
 color:#596675;
 font-weight:900;
@@ -1123,7 +1123,7 @@ color:#9aa6b3;
 border-radius:8px;
 padding:7px 9px;
 text-decoration:none;
-font-size:8px;
+font-size:11px;
 font-weight:800;
 cursor:pointer}
 .drawerContact button{
@@ -1141,7 +1141,7 @@ gap:8px}
 width:30px;
 height:30px;
 border-radius:9px;
-font-size:10px}
+font-size:12px}
 .mobileBrand strong{
 font-size:11px}
 @media(max-width:1180px){
