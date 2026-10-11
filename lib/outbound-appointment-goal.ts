@@ -1,4 +1,4 @@
-import { query, readState } from "@/lib/db";
+import { query, readStateFields } from "@/lib/db";
 import { evaluateEmailSendCompliance } from "@/lib/outbound-compliance-runtime";
 import { recordOutboundEventByMode } from "@/lib/outbound-event-ledger";
 import { resolveOutboundRuntimeConfig } from "@/lib/outbound-runtime-config";
@@ -116,7 +116,7 @@ export async function getAppointmentGoalSnapshot(workspace="default") {
 
   const health = await loadSenderHealth(workspace);
 
-  const state = (await readState(workspace).catch(() => null))?.payload as State | undefined;
+  const state = (await readStateFields(["mailboxes"], workspace).catch(() => null))?.payload as State | undefined;
   const credentials = await loadMailboxCredentials().catch(() => []);
   const configuredSettings = new Map((state?.mailboxes || []).map(m => [String(m.email || "").toLowerCase(),m]));
   const active = credentials.map(cred => {
@@ -165,7 +165,7 @@ export async function ensureAppointmentGoalQueue(workspace="default") {
     return { ok:false, skipped:true, reason:"legacy_worker_disabled", snapshot:await getAppointmentGoalSnapshot(workspace) };
   }
 
-  const row = await readState(workspace);
+  const row = await readStateFields(["mailboxes", "campaigns"], workspace);
   const state = row?.payload as State | undefined;
   const campaign = (state?.campaigns || []).find(c => c.id === "pflege-starter-v2")
     || (state?.campaigns || []).find(c => c.status === "Bereit" && c.steps?.length)
