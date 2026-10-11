@@ -3,23 +3,23 @@
   "crons": [
     {
       "path": "/api/cron/appointment-goal",
-      "schedule": "* * * * *"
+      "schedule": "0 8,12,16 * * 1-5"
     },
     {
       "path": "/api/cron/send",
-      "schedule": "*/5 * * * *"
+      "schedule": "*/15 * * * 1-5"
     },
     {
       "path": "/api/cron/replies",
-      "schedule": "*/10 * * * *"
+      "schedule": "*/30 * * * *"
     },
     {
       "path": "/api/cron/enrich-call-leads",
-      "schedule": "*/2 * * * *"
+      "schedule": "0 */2 * * *"
     },
     {
       "path": "/api/cron/pflege-source",
-      "schedule": "*/2 * * * *"
+      "schedule": "0 */3 * * *"
     }
   ],
   "regions": [
