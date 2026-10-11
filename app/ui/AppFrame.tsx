@@ -126,7 +126,7 @@ export default function AppFrame({ children }: { children: ReactNode }) {
         </div>
       </aside>
 
-      <main id="main" className={styles.main}>{children}</main>
+      <div id="main" className={styles.main}>{children}</div>
     </div>
   );
 }

@@ -2,3 +2,25 @@
 @media(max-width:1100px){.shell{grid-template-columns:200px minmax(0,1fr)}.metrics,.reportMetrics{grid-template-columns:repeat(2,1fr)}.grid2,.reportSplit{grid-template-columns:1fr}.hero h2{font-size:28px}.featureGrid{grid-template-columns:1fr}.keywordHero{grid-template-columns:1fr 1fr}.row{grid-template-columns:2fr .8fr .8fr .9fr .6fr}}
 @media(max-width:760px){.shell{display:block}.sidebar{position:static;height:auto;padding:10px;border-right:0;border-bottom:1px solid rgba(232,233,238,.08)}.brand{padding-bottom:5px}.sidebar nav{display:grid;grid-template-columns:repeat(4,1fr);gap:4px}.sidebar nav button{padding:8px 7px;justify-content:center}.sidebar nav button i{display:none}.sidebar nav button span{font-size:11px}.dataCard,.backLink{display:none}.topbar{height:auto;min-height:66px;padding:12px 14px}.topbar h1{font-size:18px}.actions .quiet{display:none}.content{padding:12px}.notice{margin:10px 12px 0}.hero{padding:20px;display:block}.hero h2{font-size:25px}.scoreRing,.emptyRing{width:112px;height:112px;margin-top:18px}.heroForm,.searchRow{display:grid;grid-template-columns:1fr}.metrics,.reportMetrics,.auditGrid{grid-template-columns:1fr 1fr}.keywordHero{grid-template-columns:1fr}.row{grid-template-columns:1.8fr .8fr .8fr}.row span:nth-child(4),.row span:nth-child(5){display:none}.auditHero{display:block}.auditHero .scoreRing{margin:0 0 15px}.socialIntro,.reportControls{display:block}.reportControls>div{display:grid;grid-template-columns:1fr;margin-bottom:8px}.reportSplit{display:block}.reportHeader{padding:18px}.reportHeader h2{font-size:22px}}
 @media print{.sidebar,.topbar,.notice,.reportControls{display:none!important}.shell,.workspace,.content{display:block!important;background:#080808!important;min-height:0!important;padding:0!important;margin:0!important}.content>section:not(.report){display:none!important}.report{border:0!important;box-shadow:none!important;padding:0!important}.reportHeader{-webkit-print-color-adjust:exact;print-color-adjust:exact}.reportMetrics{grid-template-columns:repeat(4,1fr)}.reportSplit{grid-template-columns:1.1fr .9fr}.reportSection{break-inside:avoid}.reportMetrics article{break-inside:avoid}}
+
+/* Einheitlicher Look: keine hellen Flächen im dunklen Tool */
+.shell{background:transparent}
+.hero,.dataCard,.keywordHero,.socialIntro,.reportHeader,.setupBox{background:rgba(255,255,255,.04)!important;color:#eef4f0!important;border:1px solid rgba(255,255,255,.09);box-shadow:none!important}
+.hero p,.socialIntro p,.reportHeader p,.dataCard span,.setupBox span{color:#9fb3a9!important}
+.hero small,.reportHeader small,.dataCard small,.keywordHero small,.keywordHero span{color:#8aa097!important}
+.hero h2{font-size:clamp(24px,3vw,32px)}
+.hero h2 em{color:#5eeaa0}
+.heroForm input{background:rgba(255,255,255,.06)!important;color:#eef4f0!important;border-color:rgba(255,255,255,.14)!important}
+.heroForm input::placeholder{color:#6f8a7b!important}
+.heroForm button,.primary{background:#34c759!important;color:#06130a!important;border-color:#34c759!important}
+.quiet{background:rgba(255,255,255,.05)!important;color:#d4dfd9!important;border-color:rgba(255,255,255,.12)!important}
+.quiet:disabled{opacity:.55}
+.scoreRing>div,.emptyRing{background:rgba(255,255,255,.05)!important;color:#eef4f0!important}
+.emptyRing span,.scoreRing span{color:#8aa097!important}
+.sidebar nav button{color:#a9bbb1!important}
+.sidebar nav button i{color:#7f968b!important}
+.sidebar nav button:hover,.sidebar nav button.active{background:rgba(52,199,89,.12)!important;color:#fff!important}
+.brand>span,.actionList>div>span,.reportAction span,.row strong,.reportHeader>span{background:rgba(52,199,89,.16)!important;color:#8cf0b6!important}
+.backLink{color:#8aa097!important}
+
+.backLink{display:none}

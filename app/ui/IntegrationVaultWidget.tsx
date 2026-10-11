@@ -65,7 +65,7 @@ export default function IntegrationVaultWidget() {
   return <>
     <button
       onClick={() => { setOpen(true); void load(); }}
-      style={{ position: "fixed", right: 24, bottom: 24, zIndex: 80, border: "1px solid #315e49", background: "rgba(7,20,17,.92)", color: "#74edb4", padding: "11px 14px", borderRadius: 13, fontWeight: 850, cursor: "pointer", boxShadow: "0 18px 45px rgba(0,0,0,.35)", backdropFilter: "blur(16px)" }}
+      style={{ position: "fixed", right: "clamp(18px,3vw,48px)", top: 92, zIndex: 80, border: "1px solid #315e49", background: "rgba(7,20,17,.92)", color: "#74edb4", padding: "11px 14px", borderRadius: 13, fontWeight: 850, cursor: "pointer", boxShadow: "0 18px 45px rgba(0,0,0,.35)", backdropFilter: "blur(16px)" }}
     >{agentReady ? "● DG Core verbunden" : "⚙ API-Tresor"}</button>
     {open && <div onClick={() => setOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 100, background: "rgba(3,6,10,.82)", backdropFilter: "blur(10px)", display: "grid", placeItems: "center", padding: 20 }}>
       <div onClick={(event) => event.stopPropagation()} style={{ width: "min(820px,100%)", maxHeight: "88vh", overflow: "auto", background: "#071115", border: "1px solid #24463b", borderRadius: 24, padding: 24, color: "#eefcf7", fontFamily: "Inter,system-ui", boxShadow: "0 35px 120px rgba(0,0,0,.55)" }}>
