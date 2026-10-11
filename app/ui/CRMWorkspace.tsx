@@ -134,10 +134,13 @@ export default function CRMWorkspace({ embedded = false }: { embedded?: boolean 
     });
   }, [open, query, product, quick]);
 
+  // Fokus-Stufen immer zeigen, dazu jede Stufe, in der tatsächlich Chancen liegen – sonst wirkt das Board leer.
   const stages = useMemo(() => {
     const names = snap?.stages || [];
-    return allStages ? names : FOCUS.filter((s) => names.includes(s));
-  }, [snap, allStages]);
+    if (allStages) return names;
+    const used = new Set(filtered.map((o) => o.stage));
+    return names.filter((s) => FOCUS.includes(s) || used.has(s));
+  }, [snap, allStages, filtered]);
 
   const byStage = useMemo(() => {
     const map = new Map<string, Opp[]>();

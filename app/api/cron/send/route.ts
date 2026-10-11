@@ -7,7 +7,7 @@ import { evaluateEmailSendCompliance } from "@/lib/outbound-compliance-runtime";
 import { getMailboxHealthMap } from "@/lib/outbound-deliverability";
 import { recordOutboundConversationMessage } from "@/lib/outbound-conversation-intelligence";
 import { recordExperimentExposureForSend } from "@/lib/outbound-experiment-engine";
-import { trackedEmailHtml } from "@/lib/email-tracking";
+import { trackedEmailHtml, unsubscribeUrl } from "@/lib/email-tracking";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -277,27 +277,35 @@ async function run(request: Request) {
         },
       });
       const origin=new URL(request.url).origin;
-      const html=trackedEmailHtml(row.body,origin,row.id,row.lead_id);
-      const result = await sendMail({ ...credential, to:row.recipient, subject:row.subject, text:row.body, html });
+      const optOut=unsubscribeUrl(origin,row.id,row.lead_id);
+      const html=trackedEmailHtml(row.body,origin,row.id,row.lead_id,optOut);
+      const text=`${row.body}\n\n--\nKein Interesse an weiteren Nachrichten? Hier abmelden: ${optOut}`;
+      const result = await sendMail({ ...credential, to:row.recipient, subject:row.subject, text, html, headers:{ "List-Unsubscribe":`<${optOut}>`, "List-Unsubscribe-Post":"List-Unsubscribe=One-Click" } });
       await query("update er_outbox set status='sent',sent_at=now(),provider_message_id=$2,error=null where id=$1 and status='sending'", [row.id,result.id]);
-      await query("update pflege_email_outreach set status='sent',updated_at=now() where lower(email)=lower($1) and status='approved'", [row.recipient]);
-      await query("insert into er_events(workspace,lead_id,type,meta) values('default',$1,'email_sent',$2::jsonb)", [row.lead_id,JSON.stringify({ outboxId:row.id, mailboxId:row.mailbox_id, campaignId:row.campaign_id, variant:row.variant })]);
-      await recordOutboundEventByMode({
-        workspace:"default",
-        type:"provider_accepted",
-        actorType:"provider",
-        leadId:row.lead_id,
-        messageId:result.id,
-        idempotencyKey:`legacy:provider-accepted:${row.id}:${result.id}`,
-        payload:{
-          legacyOutboxId:row.id,
-          legacyCampaignId:row.campaign_id,
-          variant:row.variant,
-          mailboxId:row.mailbox_id,
-          recipient:row.recipient,
-          providerMessageId:result.id,
-        },
-      });
+      // Ab hier ist die Mail beim Provider angenommen und in er_outbox als gesendet markiert.
+      // Fehler in der Nachbearbeitung dürfen sie weder als "failed" zählen noch die Tageslimits umgehen.
+      try{
+        await query("update pflege_email_outreach set status='sent',updated_at=now() where lower(email)=lower($1) and status='approved'", [row.recipient]);
+        await query("insert into er_events(workspace,lead_id,type,meta) values('default',$1,'email_sent',$2::jsonb)", [row.lead_id,JSON.stringify({ outboxId:row.id, mailboxId:row.mailbox_id, campaignId:row.campaign_id, variant:row.variant })]);
+        await recordOutboundEventByMode({
+          workspace:"default",
+          type:"provider_accepted",
+          actorType:"provider",
+          leadId:row.lead_id,
+          messageId:result.id,
+          idempotencyKey:`legacy:provider-accepted:${row.id}:${result.id}`,
+          payload:{
+            legacyOutboxId:row.id,
+            legacyCampaignId:row.campaign_id,
+            variant:row.variant,
+            mailboxId:row.mailbox_id,
+            recipient:row.recipient,
+            providerMessageId:result.id,
+          },
+        });
+      }catch(postSendError){
+        console.error("[send-post-processing] failed",row.id,postSendError instanceof Error?postSendError.message:"unknown error");
+      }
       try{
         await recordExperimentExposureForSend({
           experimentId:row.experiment_id,

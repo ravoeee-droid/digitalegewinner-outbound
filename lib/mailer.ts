@@ -14,7 +14,7 @@ export type MailboxConfig = {
   smtpPass?: string;
 };
 
-type SendInput = MailboxConfig & { to: string; subject: string; text: string; html?: string; replyTo?: string };
+type SendInput = MailboxConfig & { to: string; subject: string; text: string; html?: string; replyTo?: string; headers?: Record<string, string> };
 
 function mimeHeader(value: string) { return value.replace(/[\r\n]+/g, " ").trim(); }
 
@@ -57,6 +57,7 @@ async function sendGmail(input: SendInput) {
     `From: ${mimeHeader(input.name || input.email)} <${input.email}>`,
     `To: ${mimeHeader(input.to)}`,
     `Subject: ${mimeHeader(input.subject)}`,
+    ...Object.entries(input.headers || {}).map(([name, value]) => `${mimeHeader(name)}: ${mimeHeader(value)}`),
     "MIME-Version: 1.0",
     `Content-Type: ${input.html ? "text/html" : "text/plain"}; charset=UTF-8`,
     "",
@@ -100,7 +101,7 @@ async function sendSmtp(input: SendInput) {
     secure: (input.smtpPort || 587) === 465,
     auth: { user: input.smtpUser, pass: input.smtpPass },
   });
-  const info = await transport.sendMail({ from: { name: input.name || input.email, address: input.email }, to: input.to, subject: input.subject, text: input.text, html: input.html, replyTo: input.replyTo });
+  const info = await transport.sendMail({ from: { name: input.name || input.email, address: input.email }, to: input.to, subject: input.subject, text: input.text, html: input.html, headers: input.headers, replyTo: input.replyTo });
   return { id: info.messageId };
 }
 
