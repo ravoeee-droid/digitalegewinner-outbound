@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { cookies } from "next/headers";
 import { adminCookieName, sessionRole } from "@/lib/admin-auth";
-import { query, readState, writeState } from "@/lib/db";
+import { query, readState, readStateFields, writeState } from "@/lib/db";
 import { loadMailboxCredentials } from "@/lib/mailbox-credentials";
 import { getMailboxHealthMap } from "@/lib/outbound-deliverability";
 import { MAILBOX_DAILY_TARGET, OUTBOUND_TARGETS } from "@/lib/outbound-engine";
@@ -43,8 +43,8 @@ async function appointmentsToday() {
 }
 
 async function emailProgress() {
-  const credentials = await loadMailboxCredentials().catch(() => []);
-  const state = ((await readState().catch(() => null))?.payload || {}) as State;
+  const credentials = await loadMailboxCredentials();
+  const state = ((await readStateFields(["mailboxes"]))?.payload || {}) as State;
   const settings = new Map((state.mailboxes || []).map((m) => [String(m.email || "").toLowerCase(), m]));
   const health = await getMailboxHealthMap("default").catch(() => new Map());
   const sentRows = await query<{ mailbox_id: string; n: string }>(
@@ -129,7 +129,7 @@ export async function POST(request: Request) {
     const role = await currentRole();
     if (role !== "admin") return Response.json({ error: "Forbidden" }, { status: 403 });
     const { limit } = postSchema.parse(await request.json());
-    const credentials = await loadMailboxCredentials().catch(() => []);
+    const credentials = await loadMailboxCredentials();
     const row = await readState();
     const state = (row?.payload || {}) as State;
     const byEmail = new Map((state.mailboxes || []).map((m) => [String(m.email || "").toLowerCase(), m]));
