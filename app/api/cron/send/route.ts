@@ -1,4 +1,4 @@
-import { query, readState } from "@/lib/db";
+import { query, readStateFields } from "@/lib/db";
 import { sendMail } from "@/lib/mailer";
 import { loadMailboxCredentials, type StoredMailboxCredential } from "@/lib/mailbox-credentials";
 import { recordOutboundEventByMode } from "@/lib/outbound-event-ledger";
@@ -71,7 +71,7 @@ async function run(request: Request) {
   try { credentials = await loadMailboxCredentials(); }
   catch { return Response.json({ error:"Mailbox Credentials JSON ist ungültig." }, { status:503 }); }
   const credMap = new Map(credentials.map((c) => [c.id,c]));
-  const state = (await readState().catch(() => null))?.payload as State | undefined;
+  const state = (await readStateFields(["mailboxes", "campaigns"]).catch(() => null))?.payload as State | undefined;
   // state.mailboxes only carries the daily-limit/enabled toggle set via the "Domains & Mail" UI
   // (a display label, not a credential) - it must be keyed by the real credential id (credMap's
   // keys, what er_outbox.mailbox_id actually holds), joined by email, not by state.mailboxes' own id.
