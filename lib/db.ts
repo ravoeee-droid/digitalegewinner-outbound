@@ -105,6 +105,19 @@ export async function ensureSchema() {
   return initPromise;
 }
 
+// Only return requested settings fields, not the full potentially large state JSON.
+// Never use partial state in a writeState operation.
+export async function readStateFields(fields: Array<"mailboxes" | "campaigns">, workspace = "default") {
+  await ensureSchema();
+  const allowed = [...new Set(fields)].filter(field => ["mailboxes", "campaigns"].includes(field));
+  if (!allowed.length) return { payload: {} as Record<string, unknown> };
+  const { rows } = await getPool().query<{ payload: Record<string, unknown> }>(
+    "select jsonb_object_agg(k, payload -> k) as payload from er_state, unnest($2::text[]) k where workspace=$1 and payload ? k",
+    [workspace, allowed],
+  );
+  return { payload: rows[0]?.payload ?? {} };
+}
+
 export async function readState(workspace = "default") {
   await ensureSchema();
   const { rows } = await getPool().query("select payload, version, updated_at from er_state where workspace=$1", [workspace]);
