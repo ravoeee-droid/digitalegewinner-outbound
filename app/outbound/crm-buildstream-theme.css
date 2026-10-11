@@ -40,7 +40,7 @@
 [class*="drawerContent"] main[class*="root"] [class*="sectionHead"]{margin:8px 0 16px!important}
 [class*="drawerContent"] main[class*="root"] [class*="sectionHead"] span,
 [class*="drawerContent"] main[class*="root"] [class*="panelHead"] span{color:#34c759!important;font-weight:950!important;letter-spacing:.16em!important}
-[class*="drawerContent"] main[class*="root"] [class*="sectionHead"] h1{color:#fff!important;font-size:clamp(30px,3vw,46px)!important;line-height:.96!important;letter-spacing:-.06em!important}
+[class*="drawerContent"] main[class*="root"] [class*="sectionHead"] h1{color:#fff!important;font-size:clamp(24px,3vw,30px)!important;line-height:1.15!important;letter-spacing:-.02em!important;font-weight:750!important}
 [class*="drawerContent"] main[class*="root"] [class*="sectionHead"] p{color:#7f8a90!important}
 [class*="drawerContent"] main[class*="root"] [class*="panel"],
 [class*="drawerContent"] main[class*="root"] [class*="nextDeal"],
