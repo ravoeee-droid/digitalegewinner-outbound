@@ -122,7 +122,7 @@ export default function HeuteCockpit({ role }: { role: "admin" | "sales" }) {
       <header className={styles.head}>
         <div>
           <span className={styles.eyebrow}>Heute</span>
-          <h1>{new Intl.DateTimeFormat("de-DE", { weekday: "long", day: "numeric", month: "long", timeZone: "Europe/Berlin" }).format(new Date())}</h1>
+          <h1 suppressHydrationWarning>{new Intl.DateTimeFormat("de-DE", { weekday: "long", day: "numeric", month: "long", timeZone: "Europe/Berlin" }).format(new Date())}</h1>
         </div>
         <div className={styles.counters}>
           <Counter label="Anrufe" value={data?.calls.done ?? 0} target={data?.calls.target ?? 50} hint={callsLeft !== null ? `noch ${callsLeft}` : undefined} />
@@ -195,7 +195,7 @@ export default function HeuteCockpit({ role }: { role: "admin" | "sales" }) {
                 </article>
               );
             })}
-            {emails && emails.mailboxes.length === 0 && <p className={styles.muted}>Keine Postfächer verbunden. Unter „Mehr → Mail“ verbinden.</p>}
+            {emails && emails.mailboxes.length === 0 && <p className={styles.muted}>Keine Postfächer verbunden. Oben unter „Mehrere Postfächer auf einmal verbinden“ oder links unter „Mail“ einrichten.</p>}
           </div>
         </section>
       )}
