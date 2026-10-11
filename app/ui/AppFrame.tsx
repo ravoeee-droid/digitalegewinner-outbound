@@ -59,11 +59,12 @@ export default function AppFrame({ children }: { children: ReactNode }) {
   const rail = RAIL_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`)) && !pinned;
 
   useEffect(() => {
+    if (bare) return; // öffentliche Seiten (Microsite, Login) brauchen weder Rolle noch Navigation
     fetch("/api/auth/me", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).then((j) => {
       setRole(j?.role || null);
       try { setPinned(localStorage.getItem("dg-nav-pinned") === "1"); } catch { /* nicht kritisch */ }
     }).catch(() => setRole(null));
-  }, []);
+  }, [bare]);
 
   if (bare) return <>{children}</>;
 
