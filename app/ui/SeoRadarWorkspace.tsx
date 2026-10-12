@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import styles from "./seo-radar-workspace.module.css";
 
@@ -46,8 +46,10 @@ function Source({ name, description, state }: { name: string; description: strin
 export default function SeoRadarWorkspace({ embedded = false }: { embedded?: boolean }) {
   const urlTab = useSearchParams().get("tab");
   const TABS: Tab[] = ["Übersicht", "Keywords", "Website Audit", "Konkurrenz", "Social Search", "Reports", "Integrationen"];
-  const [tab, setTab] = useState<Tab>(TABS.includes(urlTab as Tab) ? (urlTab as Tab) : "Übersicht");
-  useEffect(() => { if (TABS.includes(urlTab as Tab)) setTab(urlTab as Tab); }, [urlTab]); // eslint-disable-line react-hooks/exhaustive-deps
+  const [picked, setPicked] = useState<{ from: string | null; tab: Tab } | null>(null);
+  // Der URL-Tab gilt, solange nicht danach innerhalb der Seite ein anderer Tab gewählt wurde.
+  const tab: Tab = picked && picked.from === urlTab ? picked.tab : TABS.includes(urlTab as Tab) ? (urlTab as Tab) : "Übersicht";
+  const setTab = (next: Tab) => setPicked({ from: urlTab, tab: next });
   const [domain, setDomain] = useState("digitalegewinner.de");
   const [clientName, setClientName] = useState("Digitale Gewinner");
   const [keyword, setKeyword] = useState("pflegedienst stuttgart");

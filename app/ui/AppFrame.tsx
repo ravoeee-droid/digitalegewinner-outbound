@@ -87,7 +87,7 @@ function Links({ groups, pathname }: { groups: Group[]; pathname: string }) {
           {g.items.map((item) => {
             const active = isActive(item, pathname, params);
             return (
-              <Link key={item.href} href={item.href} className={`${active ? styles.linkActive : styles.link} ${item.hint ? "" : styles.compact}`} aria-current={active ? "page" : undefined} title={item.label}>
+              <Link key={item.href} href={item.href} className={`${active ? styles.linkActive : styles.link} ${item.hint ? "" : styles.compact}`} aria-current={active ? "page" : undefined} title={item.label} onClick={item.href.includes("view=finder") ? () => window.dispatchEvent(new Event("dg:open-germany-radar")) : undefined}>
                 <span className={styles.icon}><Icon name={item.icon || "dot"} /></span>
                 <span className={styles.copy}><strong>{item.label}</strong>{item.hint && <small>{item.hint}</small>}</span>
               </Link>

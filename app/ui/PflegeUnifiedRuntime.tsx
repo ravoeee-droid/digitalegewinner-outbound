@@ -15,15 +15,15 @@ function isLeadFinderTrigger(target: EventTarget | null) {
 }
 
 export default function PflegeUnifiedRuntime() {
-  const [radarOpen, setRadarOpen] = useState(false);
+  const [radarClosedFor, setRadarClosedFor] = useState<string | null>(null);
+  const [radarManual, setRadarManual] = useState(false);
   const [seoOpen, setSeoOpen] = useState(false);
   const [workspaceKey, setWorkspaceKey] = useState(0);
   const searchParams = useSearchParams();
   const view = searchParams.get("view");
-  useEffect(() => { if (view === "finder") setRadarOpen(true); }, [view]);
 
   useEffect(() => {
-    const openRadar = () => setRadarOpen(true);
+    const openRadar = () => setRadarManual(true);
     const openSeo = () => setSeoOpen(true);
     window.addEventListener("dg:open-germany-radar", openRadar);
     window.addEventListener("dg:open-seo-radar", openSeo);
@@ -37,7 +37,7 @@ export default function PflegeUnifiedRuntime() {
     if (!isLeadFinderTrigger(event.target)) return;
     event.preventDefault();
     event.stopPropagation();
-    setRadarOpen(true);
+    setRadarManual(true);
   }
 
   function crmChanged() {
@@ -54,7 +54,7 @@ export default function PflegeUnifiedRuntime() {
         <i>NEW</i>
       </button>
 
-      {radarOpen && (
+      {(radarManual || (view === "finder" && radarClosedFor !== "finder")) && (
         <div className={styles.radarLayer} role="dialog" aria-modal="true" aria-label="Deutschland Lead Finder">
           <div className={styles.radarTopbar}>
             <div>
@@ -63,7 +63,7 @@ export default function PflegeUnifiedRuntime() {
             </div>
             <div className={styles.radarActions}>
               <span>Discovery → Enrichment → Call-ready → Kontaktiert</span>
-              <button type="button" onClick={() => setRadarOpen(false)}>Zurück zum Workspace</button>
+              <button type="button" onClick={() => { setRadarManual(false); setRadarClosedFor(view); }}>Zurück zum Workspace</button>
             </div>
           </div>
           <div className={styles.radarBody}>
