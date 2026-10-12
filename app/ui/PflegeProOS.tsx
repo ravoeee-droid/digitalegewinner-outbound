@@ -1,9 +1,11 @@
 "use client";
 
 import { ChangeEvent, DragEvent, FormEvent, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import styles from "./pflege-pro-os.module.css";
 
 type Stage = "Neu" | "Research" | "Bereit" | "Kontaktiert" | "Engaged" | "Qualifiziert" | "Termin" | "Angebot" | "Verhandlung" | "Gewonnen" | "Verloren" | "Wiedervorlage";
+const VIEWS = ["command","crm","finder","calls","pipeline","followups","meetings","proposals","campaigns","inbox","intelligence","analytics","system"];
 type View = "command" | "crm" | "finder" | "calls" | "pipeline" | "followups" | "meetings" | "proposals" | "campaigns" | "inbox" | "intelligence" | "analytics" | "system";
 
 type Enrichment = {
@@ -196,7 +198,10 @@ function auditFrom(detail: ResearchDetail | null) { const value = detail?.resear
 function clamp(value: number) { return Math.max(0, Math.min(100, Math.round(value))); }
 
 export default function PflegeProOS() {
-  const [view, setView] = useState<View>("command");
+  const searchParams = useSearchParams();
+  const urlView = searchParams.get("view") as View | null;
+  const [view, setView] = useState<View>(urlView && VIEWS.includes(urlView) ? urlView : "command");
+  useEffect(() => { if (urlView && VIEWS.includes(urlView)) setView(urlView); else if (!urlView) setView("command"); }, [urlView]);
   const [data, setData] = useState<Payload>(EMPTY);
   const [store, setStore] = useState<Store>(EMPTY_STORE);
   const [inbox, setInbox] = useState<InboxItem[]>([]);

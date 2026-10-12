@@ -1,6 +1,7 @@
 "use client";
 
 import { MouseEvent, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import PflegeProRuntime from "./PflegeProRuntime";
 import GermanyCoverageRadar from "./GermanyCoverageRadar";
 import SeoRadarWorkspace from "./SeoRadarWorkspace";
@@ -17,6 +18,9 @@ export default function PflegeUnifiedRuntime() {
   const [radarOpen, setRadarOpen] = useState(false);
   const [seoOpen, setSeoOpen] = useState(false);
   const [workspaceKey, setWorkspaceKey] = useState(0);
+  const searchParams = useSearchParams();
+  const view = searchParams.get("view");
+  useEffect(() => { if (view === "finder") setRadarOpen(true); }, [view]);
 
   useEffect(() => {
     const openRadar = () => setRadarOpen(true);

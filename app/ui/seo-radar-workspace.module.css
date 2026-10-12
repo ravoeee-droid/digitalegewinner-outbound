@@ -24,3 +24,12 @@
 .backLink{color:#8aa097!important}
 
 .backLink{display:none}
+
+.sidebar{display:none!important}
+.shell{grid-template-columns:minmax(0,1fr)!important;display:block!important}
+
+.tabbar{display:flex;gap:6px;padding:12px 24px 0;overflow-x:auto;scrollbar-width:none}
+.tabbar::-webkit-scrollbar{display:none}
+.tabbar button{border:1px solid rgba(255,255,255,.09);background:rgba(255,255,255,.035);color:#a9bbb1;border-radius:10px;padding:9px 14px;font-size:14px;font-weight:700;white-space:nowrap;cursor:pointer}
+.tabbar button:hover{color:#fff}
+.tabbar .tabOn{background:#34c759;border-color:#34c759;color:#06130a}

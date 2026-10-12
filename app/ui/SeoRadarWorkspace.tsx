@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import styles from "./seo-radar-workspace.module.css";
 
 type Tab = "Übersicht" | "Keywords" | "Website Audit" | "Konkurrenz" | "Social Search" | "Reports" | "Integrationen";
@@ -43,7 +44,10 @@ function Source({ name, description, state }: { name: string; description: strin
 }
 
 export default function SeoRadarWorkspace({ embedded = false }: { embedded?: boolean }) {
-  const [tab, setTab] = useState<Tab>("Übersicht");
+  const urlTab = useSearchParams().get("tab");
+  const TABS: Tab[] = ["Übersicht", "Keywords", "Website Audit", "Konkurrenz", "Social Search", "Reports", "Integrationen"];
+  const [tab, setTab] = useState<Tab>(TABS.includes(urlTab as Tab) ? (urlTab as Tab) : "Übersicht");
+  useEffect(() => { if (TABS.includes(urlTab as Tab)) setTab(urlTab as Tab); }, [urlTab]); // eslint-disable-line react-hooks/exhaustive-deps
   const [domain, setDomain] = useState("digitalegewinner.de");
   const [clientName, setClientName] = useState("Digitale Gewinner");
   const [keyword, setKeyword] = useState("pflegedienst stuttgart");
@@ -97,6 +101,7 @@ export default function SeoRadarWorkspace({ embedded = false }: { embedded?: boo
     </aside>
 
     <section className={styles.workspace}>
+      <div className={styles.tabbar} role="tablist" aria-label="SEO Radar">{tabs.map((item) => <button type="button" role="tab" aria-selected={tab === item} key={item} className={tab === item ? styles.tabOn : undefined} onClick={() => setTab(item)}>{item}</button>)}</div>
       <header className={styles.topbar}><div><small>DIGITALE GEWINNER · SEO & SEARCH</small><h1>{tab}</h1></div><div className={styles.actions}><button type="button" className={styles.quiet} onClick={() => setTab("Reports")}>Kundenreport</button><button type="button" className={styles.primary} onClick={runAudit} disabled={auditLoading}>{auditLoading ? "Analysiere…" : "Website prüfen"}</button></div></header>
       {notice && <div className={styles.notice}>{notice}<button type="button" onClick={() => setNotice("")}>×</button></div>}
 

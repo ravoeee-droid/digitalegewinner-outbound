@@ -100,3 +100,8 @@
 #pflege-sales-os [class*="inspectorBackdrop"],#pflege-sales-os [class*="modalBackdrop"]{background:rgba(5,10,8,.66)!important}
 
 #pflege-sales-os{background:transparent!important}
+
+/* Navigation liegt zentral in der Hauptleiste: keine zweite Seitenleiste */
+#pflege-sales-os aside{display:none!important}
+#pflege-sales-os [class*="shell"]{grid-template-columns:minmax(0,1fr)!important;display:block!important}
+#pflege-sales-os [class*="mobileButton"]{display:none!important}

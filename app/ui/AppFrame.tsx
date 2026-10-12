@@ -1,35 +1,50 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState, type ReactNode } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useState, type ReactNode } from "react";
 import styles from "./AppFrame.module.css";
 
-type IconName = "today" | "crm" | "call" | "send" | "care" | "web" | "mail" | "studio" | "seo" | "draft";
-type Item = { href: string; label: string; hint: string; icon: IconName; sales?: boolean };
-type Group = { title: string; items: Item[] };
+type IconName = "today" | "crm" | "call" | "send" | "care" | "web" | "mail" | "studio" | "seo" | "draft" | "dot";
+type Item = { href: string; label: string; icon?: IconName; hint?: string; sales?: boolean };
+type Group = { title: string; items: Item[]; cols?: 2 };
 
+// Eine flache Navigation: jedes Ziel ist genau einen Klick entfernt. Unterbereiche haben eigene Deep-Links.
 const GROUPS: Group[] = [
   { title: "Täglich", items: [
-    { href: "/heute", label: "Heute", hint: "Calls, Mails, Termine", icon: "today", sales: true },
-    { href: "/crm", label: "CRM", hint: "Pipeline & Follow-ups", icon: "crm", sales: true },
-    { href: "/call", label: "Call-Cockpit", hint: "Nächster Anruf", icon: "call", sales: true },
+    { href: "/heute", label: "Heute", icon: "today", hint: "Calls, Mails, Termine", sales: true },
+    { href: "/crm", label: "CRM Pipeline", icon: "crm", hint: "Kanban & Follow-ups", sales: true },
+    { href: "/call", label: "Call-Cockpit", icon: "call", hint: "Nächster Anruf", sales: true },
   ] },
-  { title: "Gewinnen", items: [
-    { href: "/outbound", label: "Outbound", hint: "Command Center", icon: "send" },
-    { href: "/pflege", label: "Pflege Sales OS", hint: "Leads & Radar", icon: "care", sales: true },
-    { href: "/websites", label: "Websites", hint: "Builds & Vorschauen", icon: "web" },
-    { href: "/outreach", label: "Outreach", hint: "Entwürfe prüfen", icon: "draft" },
+  { title: "Pflege Leads", cols: 2, items: [
+    { href: "/pflege", label: "Übersicht", icon: "care", sales: true },
+    { href: "/pflege?view=finder", label: "Lead Finder", icon: "dot", sales: true },
+    { href: "/pflege?view=crm", label: "Research", icon: "dot", sales: true },
+    { href: "/pflege?view=calls", label: "Calls", icon: "dot", sales: true },
+    { href: "/pflege?view=followups", label: "Follow-ups", icon: "dot", sales: true },
+    { href: "/pflege?view=pipeline", label: "Pipeline", icon: "dot", sales: true },
+    { href: "/pflege?view=meetings", label: "Termine", icon: "dot", sales: true },
+    { href: "/pflege?view=proposals", label: "Angebote", icon: "dot", sales: true },
+    { href: "/pflege?view=intelligence", label: "Intelligence", icon: "dot", sales: true },
+    { href: "/pflege?view=analytics", label: "Auswertung", icon: "dot", sales: true },
+  ] },
+  { title: "Outbound", items: [
+    { href: "/outbound", label: "Command Center", icon: "send" },
+    { href: "/pflege?view=campaigns", label: "Kampagnen", icon: "dot" },
+    { href: "/outreach", label: "Outreach-Queue", icon: "draft" },
+    { href: "/mail", label: "Postfächer & Inbox", icon: "mail" },
+    { href: "/pflege?view=inbox", label: "Antworten", icon: "dot" },
+    { href: "/outbound/engine", label: "Engine & Compliance", icon: "dot" },
   ] },
   { title: "Werkzeuge", items: [
-    { href: "/mail", label: "Mail", hint: "Postfächer & Inbox", icon: "mail" },
-    { href: "/studio", label: "Studio", hint: "Videos & Landingpages", icon: "studio" },
-    { href: "/seo-radar", label: "SEO Radar", hint: "Keywords & Reports", icon: "seo" },
+    { href: "/studio", label: "Studio (Loom-Video)", icon: "studio" },
+    { href: "/websites", label: "Websites", icon: "web" },
+    { href: "/seo-radar", label: "SEO Radar", icon: "seo" },
+    { href: "/seo-radar?tab=Website+Audit", label: "Website-Audit", icon: "dot" },
+    { href: "/seo-radar?tab=Keywords", label: "Keywords", icon: "dot" },
+    { href: "/pflege?view=system", label: "Integrationen", icon: "dot", sales: true },
   ] },
 ];
-
-// Diese Seiten bringen eine eigene Seitenleiste mit: die globale Leiste wird dort zur schmalen Icon-Leiste.
-const RAIL_PREFIXES = ["/pflege", "/outbound", "/seo-radar", "/studio"];
 const BARE_PREFIXES = ["/a/", "/login"];
 
 function Icon({ name }: { name: IconName }) {
@@ -44,26 +59,57 @@ function Icon({ name }: { name: IconName }) {
     case "draft": return <svg {...p}><path d="M5 20h4l10-10-4-4L5 16v4Z" /><path d="m13.5 7.5 4 4" /></svg>;
     case "mail": return <svg {...p}><rect x="3" y="5" width="18" height="14" rx="2" /><path d="m4.5 7 7.5 6 7.5-6" /></svg>;
     case "studio": return <svg {...p}><rect x="3" y="6" width="13" height="12" rx="2.5" /><path d="m16 10.5 5-3v9l-5-3" /></svg>;
-    default: return <svg {...p}><circle cx="11" cy="11" r="7" /><path d="m20 20-4-4M8 11h6M11 8v6" /></svg>;
+    case "seo": return <svg {...p}><circle cx="11" cy="11" r="7" /><path d="m20 20-4-4M8 11h6M11 8v6" /></svg>;
+    default: return <svg {...p}><circle cx="12" cy="12" r="2.2" /></svg>;
   }
+}
+
+function isActive(item: Item, pathname: string, params: URLSearchParams) {
+  const [path, query = ""] = item.href.split("?");
+  if (pathname !== path && !(path !== "/" && pathname.startsWith(`${path}/`) && !query)) return false;
+  if (pathname !== path) return false;
+  const want = new URLSearchParams(query);
+  if (want.size === 0) {
+    // Basisseite ist nur aktiv, wenn keine Unteransicht gewählt ist
+    return !params.get("view") && !params.get("tab");
+  }
+  for (const [k, v] of want) if (params.get(k) !== v) return false;
+  return true;
+}
+
+function Links({ groups, pathname }: { groups: Group[]; pathname: string }) {
+  const params = useSearchParams();
+  return (
+    <>
+      {groups.map((g) => (
+        <div key={g.title} className={`${styles.group} ${g.cols ? styles.twoCol : ""}`}>
+          <p>{g.title}</p>
+          {g.items.map((item) => {
+            const active = isActive(item, pathname, params);
+            return (
+              <Link key={item.href} href={item.href} className={`${active ? styles.linkActive : styles.link} ${item.hint ? "" : styles.compact}`} aria-current={active ? "page" : undefined} title={item.label}>
+                <span className={styles.icon}><Icon name={item.icon || "dot"} /></span>
+                <span className={styles.copy}><strong>{item.label}</strong>{item.hint && <small>{item.hint}</small>}</span>
+              </Link>
+            );
+          })}
+        </div>
+      ))}
+    </>
+  );
 }
 
 export default function AppFrame({ children }: { children: ReactNode }) {
   const pathname = usePathname() || "/";
-  const [role, setRole] = useState<"admin" | "sales" | null>(null);
   const router = useRouter();
+  const [role, setRole] = useState<"admin" | "sales" | null>(null);
   const [openFor, setOpenFor] = useState<string | null>(null);
   const open = openFor === pathname;
-  const [pinned, setPinned] = useState(false);
   const bare = BARE_PREFIXES.some((p) => pathname.startsWith(p));
-  const rail = RAIL_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`)) && !pinned;
 
   useEffect(() => {
-    if (bare) return; // öffentliche Seiten (Microsite, Login) brauchen weder Rolle noch Navigation
-    fetch("/api/auth/me", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).then((j) => {
-      setRole(j?.role || null);
-      try { setPinned(localStorage.getItem("dg-nav-pinned") === "1"); } catch { /* nicht kritisch */ }
-    }).catch(() => setRole(null));
+    if (bare) return;
+    fetch("/api/auth/me", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).then((j) => setRole(j?.role || null)).catch(() => setRole(null));
   }, [bare]);
 
   if (bare) return <>{children}</>;
@@ -72,19 +118,12 @@ export default function AppFrame({ children }: { children: ReactNode }) {
     await fetch("/api/auth/logout", { method: "POST" }).catch(() => undefined);
     router.push("/login");
   }
-  function togglePin() {
-    const next = !pinned;
-    setPinned(next);
-    try { localStorage.setItem("dg-nav-pinned", next ? "1" : "0"); } catch { /* nicht kritisch */ }
-  }
 
   const groups = GROUPS.map((g) => ({ ...g, items: g.items.filter((i) => role !== "sales" || i.sales) })).filter((g) => g.items.length);
-  const all = groups.flatMap((g) => g.items);
-  const current = all.find((i) => pathname === i.href || pathname.startsWith(`${i.href}/`));
-  const canRail = RAIL_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+  const current = groups.flatMap((g) => g.items).find((i) => i.href.split("?")[0] === pathname);
 
   return (
-    <div className={`${styles.frame} ${rail ? styles.rail : ""}`}>
+    <div className={styles.frame}>
       <header className={styles.mobileBar}>
         <button type="button" className={styles.burger} aria-label="Menü öffnen" aria-expanded={open} aria-controls="dg-sidebar" onClick={() => setOpenFor(open ? null : pathname)}>
           <span /><span /><span />
@@ -98,24 +137,10 @@ export default function AppFrame({ children }: { children: ReactNode }) {
           <span className={styles.mark}>DG</span>
           <span className={styles.brandCopy}><strong>Digitale Gewinner</strong><small>Outbound OS</small></span>
         </Link>
-        <nav className={styles.nav} aria-label="Hauptnavigation">
-          {groups.map((g) => (
-            <div key={g.title} className={styles.group}>
-              <p>{g.title}</p>
-              {g.items.map((item) => {
-                const active = item === current;
-                return (
-                  <Link key={item.href} href={item.href} className={active ? styles.linkActive : styles.link} aria-current={active ? "page" : undefined} title={item.label}>
-                    <span className={styles.icon}><Icon name={item.icon} /></span>
-                    <span className={styles.copy}><strong>{item.label}</strong><small>{item.hint}</small></span>
-                  </Link>
-                );
-              })}
-            </div>
-          ))}
+        <nav className={styles.nav} aria-label="Hauptnavigation" onClick={() => setOpenFor(null)}>
+          <Suspense fallback={null}><Links groups={groups} pathname={pathname} /></Suspense>
         </nav>
         <div className={styles.bottom}>
-          {canRail && <button type="button" className={styles.pin} onClick={togglePin}>{pinned ? "Leiste verkleinern" : "Leiste vergrößern"}</button>}
           {role && (
             <div className={styles.user}>
               <span className={styles.avatar}>{role === "admin" ? "RH" : "VT"}</span>

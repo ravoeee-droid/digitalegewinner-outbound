@@ -65,3 +65,36 @@
   .linkActive:before{left:-14px}
 }
 @media(prefers-reduced-motion:reduce){.sidebar{transition:none}}
+/* flache Navigation: Unterpunkte kompakt */
+.compact{min-height:38px!important;padding:5px 10px!important}
+.compact .icon{width:26px;height:26px;background:transparent!important}
+.compact .icon svg{width:8px;height:8px;fill:currentColor;opacity:.6}
+.compact .copy strong{font-size:13.5px;font-weight:600}
+.nav{gap:14px}
+.group{gap:2px}
+.linkActive.compact .icon svg{opacity:1}
+@media(min-width:901px){
+  .sidebar{padding:14px 12px 10px;gap:4px}
+  .brand{padding:0 6px 10px;margin-bottom:2px}
+  .mark{width:32px;height:32px;font-size:12px;border-radius:9px}
+  .brandCopy small{display:none}
+  .nav{gap:6px;padding:4px 0}
+  .group>p{margin:0 8px 2px;font-size:10.5px}
+  .link,.linkActive{min-height:42px;padding:4px 8px;gap:10px}
+  .icon{width:30px;height:30px}
+  .compact{min-height:29px!important;padding:2px 8px!important}
+  .compact .icon{width:20px;height:20px}
+  .copy strong{font-size:13.5px}
+  .copy small{font-size:11.5px}
+  .bottom{padding-top:8px}
+  .user{padding:2px}
+}
+.twoCol{grid-template-columns:1fr 1fr;column-gap:2px}
+.twoCol>p{grid-column:1/-1}
+.twoCol .compact .copy strong{font-size:13px;white-space:nowrap}
+.twoCol .compact{padding:2px 6px!important;gap:4px!important}
+@media(min-width:901px){.compact{min-height:28px!important}}
+.compact .icon svg{display:none}
+.compact .icon:before{content:"";width:5px;height:5px;border-radius:50%;background:currentColor;opacity:.55;display:block}
+.compact .icon{display:grid;place-items:center}
+.linkActive.compact .icon:before{opacity:1;background:#34c759}
