@@ -20,6 +20,10 @@
     {
       "path": "/api/cron/pflege-source",
       "schedule": "0 */3 * * *"
+    },
+    {
+      "path": "/api/cron/linkedin",
+      "schedule": "*/5 * * * *"
     }
   ],
   "regions": [
