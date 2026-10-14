@@ -1,11 +1,11 @@
 import { query } from "./db";
 import { ensureSalesOsSchema } from "./sales-os";
 
-// Tagesziel: 50 Cold Calls im Cockpit, 200 E-Mails (10 Postfächer x 20).
-export const MAILBOX_DAILY_TARGET = 20;
+// Tagesziel: 50 Cold Calls im Cockpit, 300 E-Mails (10 Postfächer x 30).
+export const MAILBOX_DAILY_TARGET = 30;
 export const OUTBOUND_TARGETS = {
   call: 50,
-  email: 200,
+  email: 300,
   video: 30,
   linkedin: 30,
 } as const;

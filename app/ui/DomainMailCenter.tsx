@@ -208,7 +208,7 @@ export default function DomainMailCenter() {
       name: String(form.get("name") || "Raphael Hermann"),
       email,
       provider: String(form.get("provider") || "SMTP"),
-      dailyLimit: 5,
+      dailyLimit: 30,
       sentToday: 0,
       warmupDay: 1,
       health: 60,
@@ -223,7 +223,7 @@ export default function DomainMailCenter() {
       await persist({ mailboxes: next });
       setMailboxes(next);
       event.currentTarget.reset();
-      notify(`${email} angelegt · Startlimit 5/Tag.`);
+      notify(`${email} angelegt · Startlimit 30/Tag.`);
     } catch (error) {
       notify(error instanceof Error ? error.message : "Mailbox konnte nicht gespeichert werden.");
     } finally {
