@@ -8,6 +8,7 @@ import { getMailboxHealthMap } from "@/lib/outbound-deliverability";
 import { recordOutboundConversationMessage } from "@/lib/outbound-conversation-intelligence";
 import { recordExperimentExposureForSend } from "@/lib/outbound-experiment-engine";
 import { trackedEmailHtml, unsubscribeUrl } from "@/lib/email-tracking";
+import { sendAlertOnce } from "@/lib/alerts";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -365,6 +366,7 @@ async function run(request: Request) {
         },
       });
       failed++;
+      if(/auth|login|credential|535|534|550|554|refused|timeout|ECONN/i.test(message))void sendAlertOnce(`send:${row.mailbox_id}`,`⚠️ Versand über ${row.mailbox_id} fehlgeschlagen\n${message.slice(0,300)}`,6);
     }
   }
   return Response.json({

@@ -7,6 +7,8 @@ import { resolveOutboundRuntimeConfig } from "@/lib/outbound-runtime-config";
 import { recordWorkflowSignal } from "@/lib/outbound-durable-workflows";
 import { createComplianceSuppression, detectExplicitOptOut } from "@/lib/outbound-compliance-engine";
 import { ingestInboundConversationMessage } from "@/lib/outbound-conversation-intelligence";
+import { handleBookingMail } from "@/lib/appointments";
+import { sendAlert, sendAlertOnce } from "@/lib/alerts";
 
 export const runtime="nodejs";export const maxDuration=60;
 type State={leads?:Array<Record<string,unknown>>};
@@ -140,9 +142,10 @@ async function syncGmail(c:Credential){
   const from=fromHeader(headers.find(h=>h.name.toLowerCase()==="from")?.value||"");
   if(!from||from===c.email.toLowerCase())continue;
   const subject=headers.find(h=>h.name.toLowerCase()==="subject")?.value||"";
+  if(await handleBookingMail(msg.id,from,subject,msg.snippet||"",{id:c.id,email:c.email}).catch(()=>false))continue;
   const result=await recordReply(msg.id,from,subject,c.id,msg.snippet||"");
   if(result==="unsubscribe")unsubscribes++;
-  else if(result==="reply")replies++;
+  else if(result==="reply"){replies++;await sendAlert(`💬 Antwort von ${from}\n${subject}`)}
  }
  return {replies,unsubscribes};
 }
@@ -157,9 +160,10 @@ async function syncMicrosoft(c:Credential){
  for(const m of data.value||[]){
   const from=(m.from?.emailAddress?.address||"").toLowerCase();
   if(!from||from===c.email.toLowerCase())continue;
+  if(await handleBookingMail(m.id,from,m.subject||"",m.bodyPreview||"",{id:c.id,email:c.email}).catch(()=>false))continue;
   const result=await recordReply(m.id,from,m.subject||"",c.id,m.bodyPreview||"");
   if(result==="unsubscribe")unsubscribes++;
-  else if(result==="reply")replies++;
+  else if(result==="reply"){replies++;await sendAlert(`💬 Antwort von ${from}\n${m.subject||""}`)}
  }
  return {replies,unsubscribes};
 }
@@ -233,7 +237,7 @@ async function recordBounce(messageId:string,bouncedEmail:string,mailboxId:strin
  return true;
 }
 async function syncImap(c:Credential){
- const messages=await listImapMessages(c as ImapMailboxCredential,50);let replies=0,bounces=0,unsubscribes=0;
+ const messages=await listImapMessages(c as ImapMailboxCredential,50);let replies=0,bounces=0,unsubscribes=0,appointments=0;
  for(const m of messages){
   const from=m.from.toLowerCase();if(!from)continue;
   const messageId=m.messageId||`imap:${c.id}:${m.uid}`;
@@ -243,11 +247,12 @@ async function syncImap(c:Credential){
    continue;
   }
   if(from===c.email.toLowerCase())continue;
+  if(await handleBookingMail(messageId,from,m.subject,m.bodyText,{id:c.id,email:c.email}).catch(()=>false)){appointments++;continue}
   const result=await recordReply(messageId,from,m.subject,c.id,m.bodyText);
   if(result==="unsubscribe")unsubscribes++;
-  else if(result==="reply")replies++;
+  else if(result==="reply"){replies++;await sendAlert(`💬 Antwort von ${from}\n${m.subject}`)}
  }
- return {replies,bounces,unsubscribes};
+ return {replies,bounces,unsubscribes,appointments};
 }
 async function run(request:Request){
  if(!auth(request))return Response.json({error:"Unauthorized"},{status:401});
@@ -256,7 +261,7 @@ async function run(request:Request){
  }
  let credentials:Credential[]=[];
  try{credentials=await loadMailboxCredentials()}catch{return Response.json({error:"Mailbox Credentials JSON ungültig."},{status:503})}
- let replies=0,bounces=0,unsubscribes=0;
+ let replies=0,bounces=0,unsubscribes=0,appointments=0;
  const errors:string[]=[];
  const results=await Promise.allSettled(credentials.map(async c=>{
   if(c.provider==="gmail")return {id:c.id,...await syncGmail(c)};
@@ -266,12 +271,16 @@ async function run(request:Request){
  }));
  results.forEach((result,index)=>{
   if(result.status==="rejected"){
-   errors.push(`${credentials[index]?.id||"mailbox"}: ${result.reason instanceof Error?result.reason.message:"Sync Fehler"}`);
+   const msg=`${credentials[index]?.id||"mailbox"}: ${result.reason instanceof Error?result.reason.message:"Sync Fehler"}`;
+   errors.push(msg);
+   void sendAlertOnce(`sync:${credentials[index]?.id}`,`⚠️ Postfach nicht erreichbar\n${msg}`,6);
    return;
   }
   replies+=Number(result.value.replies||0);
   bounces+=Number("bounces" in result.value?result.value.bounces||0:0);
   unsubscribes+=Number(result.value.unsubscribes||0);
+  appointments+=Number("appointments" in result.value?result.value.appointments||0:0);
  });
- return Response.json({ok:true,mailboxes:credentials.length,newReplies:replies,newBounces:bounces,newUnsubscribes:unsubscribes,errors})}
+ if(bounces>=3)await sendAlertOnce("bounces",`⚠️ ${bounces} Rückläufer im letzten Lauf – Adressqualität und Absender-Domain prüfen`,6);
+ return Response.json({ok:true,mailboxes:credentials.length,newReplies:replies,newBounces:bounces,newUnsubscribes:unsubscribes,newAppointments:appointments,errors})}
 export async function GET(request:Request){return run(request)}export async function POST(request:Request){return run(request)}
