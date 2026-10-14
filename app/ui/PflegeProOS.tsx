@@ -1,9 +1,11 @@
 "use client";
 
 import { ChangeEvent, DragEvent, FormEvent, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import styles from "./pflege-pro-os.module.css";
 
 type Stage = "Neu" | "Research" | "Bereit" | "Kontaktiert" | "Engaged" | "Qualifiziert" | "Termin" | "Angebot" | "Verhandlung" | "Gewonnen" | "Verloren" | "Wiedervorlage";
+const VIEWS = ["command","crm","finder","calls","pipeline","followups","meetings","proposals","campaigns","inbox","intelligence","analytics","system"];
 type View = "command" | "crm" | "finder" | "calls" | "pipeline" | "followups" | "meetings" | "proposals" | "campaigns" | "inbox" | "intelligence" | "analytics" | "system";
 
 type Enrichment = {
@@ -196,7 +198,10 @@ function auditFrom(detail: ResearchDetail | null) { const value = detail?.resear
 function clamp(value: number) { return Math.max(0, Math.min(100, Math.round(value))); }
 
 export default function PflegeProOS() {
-  const [view, setView] = useState<View>("command");
+  const searchParams = useSearchParams();
+  const urlView = searchParams.get("view") as View | null;
+  const [view, setView] = useState<View>(urlView && VIEWS.includes(urlView) ? urlView : "command");
+  useEffect(() => { if (urlView && VIEWS.includes(urlView)) setView(urlView); else if (!urlView) setView("command"); }, [urlView]);
   const [data, setData] = useState<Payload>(EMPTY);
   const [store, setStore] = useState<Store>(EMPTY_STORE);
   const [inbox, setInbox] = useState<InboxItem[]>([]);
@@ -625,7 +630,7 @@ export default function PflegeProOS() {
 
         {view === "campaigns" && <><div className={styles.pageHead}><div><span>CAMPAIGNS</span><h2>Outbound-Sequenzen.</h2><p>Mailboxen, Versandlimit, Replies und Meetings ohne übergroße Cards.</p></div><div className={styles.pageHeadActions}><span className={styles.softBadge}>{activeMailboxes.length} active mailboxes</span><button className={styles.primaryButton} type="button" onClick={() => setCampaignGenOpen(true)}>+ Neue Kampagne</button></div></div><section className={styles.panel}><div className={styles.tableWrap}><table className={styles.campaignTable}><thead><tr><th>Campaign</th><th>Audience</th><th>Status</th><th>Sequence</th><th>Sent</th><th>Replies</th><th>Positive</th><th>Meetings</th><th></th></tr></thead><tbody>{store.campaigns.map((campaign) => { const live = data.campaignStats?.[campaign.id]; const variants = data.campaignVariantStats?.[campaign.id] || []; return [
           <tr key={campaign.id}><td><strong>{campaign.name}</strong></td><td>{campaign.audience}</td><td><span className={styles.softBadge}>{campaign.status}</span></td><td>{campaign.steps.length} steps · {campaign.dailyLimit}/d</td><td>{live?.sent ?? (campaign.id === "pflege-starter-v2" ? data.emailAnalytics?.sent_today : undefined) ?? campaign.sent ?? 0}</td><td>{live?.replies ?? (campaign.id === "pflege-starter-v2" ? data.emailAnalytics?.replied_today : undefined) ?? campaign.replies ?? 0}</td><td>{live?.positive ?? campaign.positive ?? 0}</td><td>{live?.appointments ?? (campaign.id === "pflege-starter-v2" ? data.emailAnalytics?.meetings_today : undefined) ?? campaign.appointments ?? 0}</td><td><button className={styles.primaryTiny} type="button" onClick={() => void launchCampaign(campaign)} disabled={busy === campaign.id} title={campaign.status === "Aktiv" ? "Bereits enrollte Leads werden übersprungen - nur neue Leads werden ergänzt." : undefined}>{busy === campaign.id ? "Startet…" : campaign.status === "Aktiv" ? "Neue Leads ergänzen" : "Launch"}</button></td></tr>,
-          variants.length > 1 && <tr key={`${campaign.id}-variants`}><td colSpan={9} style={{ padding: "6px 10px", fontSize: 11, color: "#6b7280", background: "rgba(0,0,0,.02)" }}>A/B Betreffzeile: {variants.map((v) => `${v.variant} ${v.sent} gesendet · ${v.replies} Antworten${v.sent ? ` (${Math.round(v.replies / v.sent * 100)}%)` : ""}`).join("  ·  ")}</td></tr>,
+          variants.length > 1 && <tr key={`${campaign.id}-variants`}><td colSpan={9} style={{ padding: "6px 10px", fontSize: 11, color: "#6b7280", background: "rgba(5,10,8,.02)" }}>A/B Betreffzeile: {variants.map((v) => `${v.variant} ${v.sent} gesendet · ${v.replies} Antworten${v.sent ? ` (${Math.round(v.replies / v.sent * 100)}%)` : ""}`).join("  ·  ")}</td></tr>,
         ]; })}</tbody></table></div></section></>}
 
         {view === "inbox" && <><div className={styles.pageHead}><div><span>UNIFIED INBOX</span><h2>Replies mit CRM-Kontext.</h2><p>Antworten direkt mit Lead und Stage verknüpft.</p></div><button className={styles.quietButton} type="button" onClick={() => void loadInbox()}>Refresh inbox</button></div><section className={styles.panel}><div className={styles.inboxList}>{inbox.map((item) => <button key={item.id} type="button" onClick={() => item.leadId && openInspector(item.leadId, "timeline")}><span>✉</span><div><strong>{item.company || item.from}</strong><p>{item.subject}</p><small>{item.from} · {fmtDate(item.createdAt, true)}</small></div><StagePill stage={(STAGES.includes(item.stage as Stage) ? item.stage : "Kontaktiert") as Stage} /></button>)}{!inbox.length && <div className={styles.empty}>Noch keine Antworten.</div>}</div></section></>}

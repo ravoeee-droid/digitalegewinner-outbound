@@ -32,14 +32,14 @@ export default function OpenOutreachSyncButton() {
         top: 20,
         zIndex: 120,
         border: "1px solid rgba(213,255,89,.3)",
-        background: "rgba(8,11,15,.92)",
+        background: "rgba(9,16,13,.92)",
         color: "#34c759",
         borderRadius: 999,
         padding: "9px 13px",
         fontSize: 11,
         fontWeight: 850,
         cursor: "pointer",
-        boxShadow: "0 12px 40px rgba(0,0,0,.35)",
+        boxShadow: "0 12px 40px rgba(5,10,8,.35)",
         backdropFilter: "blur(16px)",
       }}
       title="OpenOutreach Worker: zusätzliche Entscheider und LinkedIn-Profile in das CRM synchronisieren"

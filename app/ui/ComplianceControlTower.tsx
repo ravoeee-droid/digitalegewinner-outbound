@@ -167,10 +167,10 @@ export default function ComplianceControlTower(){
 
   return (
     <section style={{maxWidth:1540,margin:"0 auto 18px",padding:"0 28px"}}>
-      <div style={{border:"1px solid rgba(151,140,255,.18)",background:"linear-gradient(145deg,rgba(15,13,27,.92),rgba(8,9,13,.94))",borderRadius:24,padding:20}}>
+      <div style={{border:"1px solid rgba(94,234,160,.18)",background:"linear-gradient(145deg,rgba(13,22,18,.92),rgba(9,16,13,.94))",borderRadius:18,padding:20}}>
         <div style={{display:"flex",justifyContent:"space-between",gap:16,alignItems:"flex-start",flexWrap:"wrap"}}>
           <div>
-            <div style={{fontSize:10,fontWeight:900,letterSpacing:".13em",color:"#b9b0ff"}}>M4 · COMPLIANCE ENGINE</div>
+            <div style={{fontSize:10,fontWeight:900,letterSpacing:".13em",color:"#5eeaa0"}}>M4 · COMPLIANCE ENGINE</div>
             <h2 style={{fontSize:25,letterSpacing:"-.035em",margin:"7px 0 6px"}}>Permission Evidence & Hard Send Gates</h2>
             <p style={{margin:0,color:"#8f919d",fontSize:12,lineHeight:1.55,maxWidth:840}}>
               Keine Permission wird von der KI erfunden. Evidence wird dokumentiert, menschlich geprüft und am Launch sowie unmittelbar vor dem Versand erneut ausgewertet.
@@ -205,7 +205,7 @@ export default function ComplianceControlTower(){
             onClick={()=>void setEnforcement("enforce")}
             style={buttonStyle(true)}
           >Hard Gates aktivieren</button>
-          <span style={{fontSize:10,color:dashboard?.readiness.ready?"#8be9b2":"#f2d98c",alignSelf:"center"}}>
+          <span style={{fontSize:10,color:dashboard?.readiness.ready?"#5eeaa0":"#f2d98c",alignSelf:"center"}}>
             Queue: {dashboard?.readiness.allowed??0} allow · {dashboard?.readiness.blocked??0} deny
           </span>
         </div>
@@ -273,7 +273,7 @@ export default function ComplianceControlTower(){
                   <strong style={{color:"#e8e7ef"}}>{item.contact_name||item.email||item.contact_id||item.company_id}</strong>
                   <div style={subStyle}>{item.basis} · {item.status} · {item.jurisdiction}</div>
                 </div>
-                <span style={{fontSize:9,color:item.status==="verified"?"#8be9b2":"#f2d98c"}}>{item.status.toUpperCase()}</span>
+                <span style={{fontSize:9,color:item.status==="verified"?"#5eeaa0":"#f2d98c"}}>{item.status.toUpperCase()}</span>
               </div>
             )}
           </Panel>
@@ -295,7 +295,7 @@ export default function ComplianceControlTower(){
 }
 
 function Panel({title,children,top=false}:{title:string;children:React.ReactNode;top?:boolean}){
-  return <div style={{border:"1px solid rgba(255,255,255,.07)",borderRadius:16,padding:14,marginTop:top?12:0,background:"rgba(255,255,255,.018)"}}>
+  return <div style={{border:"1px solid rgba(255,255,255,.07)",borderRadius:18,padding:14,marginTop:top?12:0,background:"rgba(255,255,255,.018)"}}>
     <div style={{fontSize:10,fontWeight:850,letterSpacing:".1em",color:"#858895",marginBottom:10}}>{title.toUpperCase()}</div>
     {children}
   </div>;
@@ -307,10 +307,10 @@ function Stat({title,value}:{title:string;value:number}){
   </div>;
 }
 function Badge({label,value,active=false}:{label:string;value:string;active?:boolean}){
-  return <span style={{padding:"7px 9px",borderRadius:999,border:"1px solid rgba(255,255,255,.08)",background:active?"rgba(151,140,255,.12)":"rgba(255,255,255,.035)",fontSize:9,color:active?"#c9c2ff":"#8f919d",fontWeight:850}}>{label}: {value}</span>;
+  return <span style={{padding:"7px 9px",borderRadius:999,border:"1px solid rgba(255,255,255,.08)",background:active?"rgba(94,234,160,.12)":"rgba(255,255,255,.035)",fontSize:9,color:active?"#cef3dd":"#8f919d",fontWeight:850}}>{label}: {value}</span>;
 }
 function Notice({kind,children}:{kind:"error"|"warn"|"ok";children:React.ReactNode}){
-  const cfg=kind==="error"?["rgba(255,80,80,.08)","#ffb3b3"]:kind==="warn"?["rgba(242,217,140,.07)","#f2d98c"]:["rgba(52,199,89,.07)","#8be9b2"];
+  const cfg=kind==="error"?["rgba(255,80,80,.08)","#ffb3b3"]:kind==="warn"?["rgba(242,217,140,.07)","#f2d98c"]:["rgba(52,199,89,.07)","#5eeaa0"];
   return <div style={{marginTop:12,padding:"9px 11px",borderRadius:10,background:cfg[0],color:cfg[1],fontSize:10}}>{children}</div>;
 }
 function Empty({text}:{text:string}){return <div style={{fontSize:10,color:"#676a75",padding:"5px 0"}}>{text}</div>}
@@ -319,5 +319,5 @@ const inputStyle:React.CSSProperties={width:"100%",boxSizing:"border-box",border
 const rowStyle:React.CSSProperties={display:"flex",justifyContent:"space-between",gap:12,alignItems:"center",padding:"9px 0",borderBottom:"1px solid rgba(255,255,255,.05)",fontSize:10};
 const subStyle:React.CSSProperties={fontSize:9,color:"#747782",lineHeight:1.45};
 function buttonStyle(primary:boolean):React.CSSProperties{
-  return {border:primary?"1px solid rgba(151,140,255,.3)":"1px solid rgba(255,255,255,.1)",background:primary?"rgba(151,140,255,.12)":"rgba(255,255,255,.04)",color:primary?"#c9c2ff":"#aeb0ba",padding:"9px 11px",borderRadius:10,fontSize:10,fontWeight:850,cursor:"pointer"};
+  return {border:primary?"1px solid rgba(94,234,160,.3)":"1px solid rgba(255,255,255,.1)",background:primary?"rgba(94,234,160,.12)":"rgba(255,255,255,.04)",color:primary?"#cef3dd":"#aeb0ba",padding:"9px 11px",borderRadius:10,fontSize:10,fontWeight:850,cursor:"pointer"};
 }

@@ -12,6 +12,7 @@ function safeEqual(a:string,b:string){
 }
 function base(origin:string){return origin.replace(/\/$/,"");}
 function openValue(outboxId:string,leadId:string){return `open|${outboxId}|${leadId}`;}
+function unsubValue(outboxId:string,leadId:string){return `unsub|${outboxId}|${leadId}`;}
 function clickValue(outboxId:string,leadId:string,target:string){return `click|${outboxId}|${leadId}|${target}`;}
 export function openTrackingUrl(origin:string,outboxId:string,leadId:string){
   const sig=signature(openValue(outboxId,leadId));
@@ -22,6 +23,11 @@ export function clickTrackingUrl(origin:string,outboxId:string,leadId:string,tar
   const sig=signature(clickValue(outboxId,leadId,encoded));
   return `${base(origin)}/api/t/click?o=${encodeURIComponent(outboxId)}&l=${encodeURIComponent(leadId)}&u=${encodeURIComponent(encoded)}&s=${encodeURIComponent(sig)}`;
 }
+export function unsubscribeUrl(origin:string,outboxId:string,leadId:string){
+  const sig=signature(unsubValue(outboxId,leadId));
+  return `${base(origin)}/api/t/unsub?o=${encodeURIComponent(outboxId)}&l=${encodeURIComponent(leadId)}&s=${encodeURIComponent(sig)}`;
+}
+export function verifyUnsubscribe(outboxId:string,leadId:string,sig:string){return safeEqual(signature(unsubValue(outboxId,leadId)),sig);}
 export function verifyOpen(outboxId:string,leadId:string,sig:string){return safeEqual(signature(openValue(outboxId,leadId)),sig);}
 export function verifyClick(outboxId:string,leadId:string,encodedTarget:string,sig:string){
   return safeEqual(signature(clickValue(outboxId,leadId,encodedTarget)),sig);
@@ -36,7 +42,7 @@ export function decodeTarget(encoded:string){
 function escapeHtml(value:string){
   return value.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#039;");
 }
-export function trackedEmailHtml(text:string,origin:string,outboxId:string,leadId:string){
+export function trackedEmailHtml(text:string,origin:string,outboxId:string,leadId:string,unsubscribe?:string){
   const url=/https?:\/\/[^\s<>"']+/g;
   let cursor=0;let html="";
   for(const match of text.matchAll(url)){
@@ -47,6 +53,7 @@ export function trackedEmailHtml(text:string,origin:string,outboxId:string,leadI
     cursor=index+target.length;
   }
   html+=escapeHtml(text.slice(cursor)).replace(/\n/g,"<br>");
+  if(unsubscribe)html+=`<br><br><span style="font-size:12px;color:#666">Kein Interesse an weiteren Nachrichten? <a href="${escapeHtml(unsubscribe)}" style="color:#666">Hier abmelden</a>.</span>`;
   const pixel=openTrackingUrl(origin,outboxId,leadId);
   return `<div style="font-family:Arial,sans-serif;font-size:14px;line-height:1.55;color:#111">${html}<img src="${escapeHtml(pixel)}" width="1" height="1" alt="" style="display:block;width:1px;height:1px;border:0;opacity:.01" /></div>`;
 }

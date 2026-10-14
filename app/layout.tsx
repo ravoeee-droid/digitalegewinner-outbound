@@ -4,7 +4,7 @@ import "./launch.css";
 import "./launch-overrides.css";
 import "./wcag.css";
 import "./wcag-login.css";
-import GlobalNav from "./ui/GlobalNav";
+import AppFrame from "./ui/AppFrame";
 
 export const metadata: Metadata = {
   title: "Pflege Recruiting OS · Digitale Gewinner",
@@ -15,8 +15,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   return (
     <html lang="de">
       <body>
-        <GlobalNav />
-        {children}
+        <AppFrame>{children}</AppFrame>
       </body>
     </html>
   );

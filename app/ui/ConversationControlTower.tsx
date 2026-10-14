@@ -181,7 +181,7 @@ export default function ConversationControlTower(){
 
   return (
     <section style={{maxWidth:1540,margin:"0 auto 18px",padding:"0 28px"}}>
-      <div style={{border:"1px solid rgba(84,196,255,.18)",background:"linear-gradient(145deg,rgba(8,17,24,.94),rgba(7,10,14,.95))",borderRadius:24,padding:20}}>
+      <div style={{border:"1px solid rgba(84,196,255,.18)",background:"linear-gradient(145deg,rgba(13,22,18,.94),rgba(9,16,13,.95))",borderRadius:18,padding:20}}>
         <div style={{display:"flex",justifyContent:"space-between",gap:16,alignItems:"flex-start",flexWrap:"wrap"}}>
           <div>
             <div style={{fontSize:10,fontWeight:900,letterSpacing:".13em",color:"#7ed7ff"}}>M5 · CONVERSATION INTELLIGENCE</div>
@@ -255,7 +255,7 @@ export default function ConversationControlTower(){
                   </div>
                 </div>
 
-                <div style={{marginTop:12,padding:12,borderRadius:12,background:"rgba(255,255,255,.025)",border:"1px solid rgba(255,255,255,.06)"}}>
+                <div style={{marginTop:12,padding:12,borderRadius:14,background:"rgba(255,255,255,.025)",border:"1px solid rgba(255,255,255,.06)"}}>
                   <div style={{fontSize:9,fontWeight:850,color:"#71818b"}}>INBOUND</div>
                   <div style={{fontSize:10,color:"#aebbc2",marginTop:6,lineHeight:1.55,whiteSpace:"pre-wrap"}}>{current.body_text||current.subject}</div>
                 </div>
@@ -265,7 +265,7 @@ export default function ConversationControlTower(){
                   <Info title="Warum" value={current.reason||"—"}/>
                 </div>
 
-                <div style={{marginTop:10,padding:12,borderRadius:12,border:"1px solid rgba(126,215,255,.12)",background:"rgba(84,196,255,.035)"}}>
+                <div style={{marginTop:10,padding:12,borderRadius:14,border:"1px solid rgba(126,215,255,.12)",background:"rgba(84,196,255,.035)"}}>
                   <div style={{fontSize:9,fontWeight:850,color:"#7ed7ff"}}>KI-ENTWURF · NICHT AUTOMATISCH GESENDET</div>
                   <div style={{fontSize:10,color:"#bdc9cf",marginTop:7,lineHeight:1.55,whiteSpace:"pre-wrap"}}>
                     {current.draft_reply||"Für diese Klasse wurde bewusst kein Antwortentwurf erstellt."}
@@ -289,7 +289,7 @@ export default function ConversationControlTower(){
                   <span style={{color:"#d7e1e6"}}>{item.contact_name||item.email||item.lead_id}</span>
                   <span style={{color:"#7c8b93"}}>{item.company_name||"—"}</span>
                   <span style={{color:"#9bacb5"}}>{item.last_reply_class?labels[item.last_reply_class]:"—"}</span>
-                  <span style={{color:item.requires_human?"#f2d98c":"#79dca5"}}>{item.requires_human?"HUMAN":"OK"}</span>
+                  <span style={{color:item.requires_human?"#f2d98c":"#5eeaa0"}}>{item.requires_human?"HUMAN":"OK"}</span>
                   <span style={{color:"#73818a"}}>{item.body_text||item.subject||"—"}</span>
                 </div>
               )}
@@ -302,7 +302,7 @@ export default function ConversationControlTower(){
 }
 
 function Panel({title,children,top=false}:{title:string;children:React.ReactNode;top?:boolean}){
-  return <div style={{border:"1px solid rgba(255,255,255,.07)",borderRadius:16,padding:14,background:"rgba(255,255,255,.018)",marginTop:top?12:0}}>
+  return <div style={{border:"1px solid rgba(255,255,255,.07)",borderRadius:18,padding:14,background:"rgba(255,255,255,.018)",marginTop:top?12:0}}>
     <div style={{fontSize:10,fontWeight:850,letterSpacing:".1em",color:"#7c8991",marginBottom:10}}>{title.toUpperCase()}</div>
     {children}
   </div>;
@@ -326,7 +326,7 @@ function ClassPill({value}:{value:ReplyClass}){
   return <span style={{padding:"6px 8px",borderRadius:999,background:"rgba(84,196,255,.08)",border:"1px solid rgba(84,196,255,.14)",fontSize:9,color:"#9fe4ff",fontWeight:850}}>{labels[value]}</span>;
 }
 function Notice({kind,children}:{kind:"error"|"warn"|"ok";children:React.ReactNode}){
-  const cfg=kind==="error"?["rgba(255,80,80,.08)","#ffb3b3"]:kind==="warn"?["rgba(242,217,140,.07)","#f2d98c"]:["rgba(52,199,89,.07)","#8be9b2"];
+  const cfg=kind==="error"?["rgba(255,80,80,.08)","#ffb3b3"]:kind==="warn"?["rgba(242,217,140,.07)","#f2d98c"]:["rgba(52,199,89,.07)","#5eeaa0"];
   return <div style={{marginTop:12,padding:"9px 11px",borderRadius:10,background:cfg[0],color:cfg[1],fontSize:10}}>{children}</div>;
 }
 function Empty({text}:{text:string}){return <div style={{fontSize:10,color:"#697781",padding:"6px 0"}}>{text}</div>}

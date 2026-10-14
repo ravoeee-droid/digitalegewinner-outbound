@@ -34,10 +34,10 @@ export default function SendDraftButton({ outreachId }: { outreachId: string }) 
         disabled={state === "busy"}
         style={{
           padding: "6px 10px",
-          borderRadius: 8,
-          border: "1px solid rgba(93,240,184,.3)",
-          background: "rgba(93,240,184,.1)",
-          color: "#5df0b8",
+          borderRadius: 10,
+          border: "1px solid rgba(94,234,160,.3)",
+          background: "rgba(94,234,160,.1)",
+          color: "#5eeaa0",
           fontSize: 12,
           cursor: state === "busy" ? "default" : "pointer",
         }}

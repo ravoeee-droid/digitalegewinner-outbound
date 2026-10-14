@@ -144,7 +144,7 @@ export default function ExperimentControlTower(){
 
   return (
     <section style={{maxWidth:1540,margin:"0 auto 18px",padding:"0 28px"}}>
-      <div style={{border:"1px solid rgba(213,255,89,.16)",background:"linear-gradient(145deg,rgba(16,20,9,.93),rgba(8,10,8,.95))",borderRadius:24,padding:20}}>
+      <div style={{border:"1px solid rgba(213,255,89,.16)",background:"linear-gradient(145deg,rgba(9,16,13,.93),rgba(9,16,13,.95))",borderRadius:18,padding:20}}>
         <div style={{display:"flex",justifyContent:"space-between",gap:16,alignItems:"flex-start",flexWrap:"wrap"}}>
           <div>
             <div style={{fontSize:10,fontWeight:900,letterSpacing:".13em",color:"#d5ff59"}}>M6 · EXPERIMENT ENGINE</div>
@@ -175,7 +175,7 @@ export default function ExperimentControlTower(){
         </div>
 
         {(dashboard?.experiments||[]).length===0
-          ? <div style={{marginTop:14,padding:18,borderRadius:16,border:"1px solid rgba(255,255,255,.07)",background:"rgba(255,255,255,.02)",color:"#8f9786",fontSize:11,lineHeight:1.6}}>
+          ? <div style={{marginTop:14,padding:18,borderRadius:18,border:"1px solid rgba(255,255,255,.07)",background:"rgba(255,255,255,.02)",color:"#8f9786",fontSize:11,lineHeight:1.6}}>
               Noch kein Experiment vorhanden. Sobald eine Kampagne mindestens einen Schritt mit Varianten A/B oder A/B/C startet, legt M6 automatisch eine versionierte Experiment-Definition an. Eine bloße Zuweisung zählt noch nicht – erst die erste vom Provider akzeptierte Mail wird als Exposure gewertet.
             </div>
           : <div style={{display:"grid",gridTemplateColumns:"minmax(310px,.7fr) minmax(0,1.3fr)",gap:12,marginTop:14}}>
@@ -235,7 +235,7 @@ function ExperimentDetail({exp,busy,post,changeStatus}:{exp:Experiment;busy:stri
       <Info title="SRM p" value={ev?.srmPValue===null||ev?.srmPValue===undefined?"—":Number(ev.srmPValue).toFixed(5)}/>
     </div>
 
-    <div style={{marginTop:12,border:"1px solid rgba(255,255,255,.06)",borderRadius:12,overflow:"hidden"}}>
+    <div style={{marginTop:12,border:"1px solid rgba(255,255,255,.06)",borderRadius:14,overflow:"hidden"}}>
       <div style={{display:"grid",gridTemplateColumns:"90px 70px 90px 1fr",gap:8,padding:"9px 10px",fontSize:8,fontWeight:900,color:"#737b6d",background:"rgba(255,255,255,.02)"}}>
         <span>ARM</span><span>N</span><span>{exp.primary_metric}</span><span>EVIDENCE</span>
       </div>
@@ -268,7 +268,7 @@ function ExperimentDetail({exp,busy,post,changeStatus}:{exp:Experiment;busy:stri
       })}
     </div>}
 
-    <div style={{marginTop:12,padding:12,borderRadius:12,border:"1px solid rgba(213,255,89,.1)",background:"rgba(213,255,89,.025)"}}>
+    <div style={{marginTop:12,padding:12,borderRadius:14,border:"1px solid rgba(213,255,89,.1)",background:"rgba(213,255,89,.025)"}}>
       <div style={{fontSize:9,fontWeight:900,color:"#b7d84b"}}>EMPFEHLUNG · KEIN AUTO-WINNER</div>
       <div style={{fontSize:10,color:"#aab2a2",lineHeight:1.55,marginTop:6}}>
         {ev?.recommendation?.rationale||"Noch nicht genug Exposure für eine belastbare Empfehlung."}
@@ -286,7 +286,7 @@ function ExperimentDetail({exp,busy,post,changeStatus}:{exp:Experiment;busy:stri
 }
 
 function Panel({title,children}:{title:string;children:React.ReactNode}){
-  return <div style={{border:"1px solid rgba(255,255,255,.07)",borderRadius:16,padding:14,background:"rgba(255,255,255,.018)"}}>
+  return <div style={{border:"1px solid rgba(255,255,255,.07)",borderRadius:18,padding:14,background:"rgba(255,255,255,.018)"}}>
     <div style={{fontSize:10,fontWeight:850,letterSpacing:".1em",color:"#7c8476",marginBottom:10}}>{title.toUpperCase()}</div>
     {children}
   </div>;
@@ -307,7 +307,7 @@ function Badge({label,value,active=false}:{label:string;value:string;active?:boo
   return <span style={{padding:"7px 9px",borderRadius:999,border:"1px solid rgba(255,255,255,.08)",background:active?"rgba(213,255,89,.09)":"rgba(255,255,255,.035)",fontSize:9,color:active?"#d5ff59":"#90988a",fontWeight:850}}>{label}: {value}</span>;
 }
 function Notice({kind,children}:{kind:"error"|"warn"|"ok";children:React.ReactNode}){
-  const cfg=kind==="error"?["rgba(255,80,80,.08)","#ffb3b3"]:kind==="warn"?["rgba(242,217,140,.07)","#f2d98c"]:["rgba(52,199,89,.07)","#8be9b2"];
+  const cfg=kind==="error"?["rgba(255,80,80,.08)","#ffb3b3"]:kind==="warn"?["rgba(242,217,140,.07)","#f2d98c"]:["rgba(52,199,89,.07)","#5eeaa0"];
   return <div style={{marginTop:12,padding:"9px 11px",borderRadius:10,background:cfg[0],color:cfg[1],fontSize:10}}>{children}</div>;
 }
 function Empty({text}:{text:string}){return <div style={{fontSize:10,color:"#737b6d",padding:"6px 0"}}>{text}</div>}
