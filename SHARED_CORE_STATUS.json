@@ -1,7 +1,7 @@
 {
   "contractVersion": "1.0.0",
   "instance": "DG-MAIN",
-  "updatedAt": "2026-10-11",
+  "updatedAt": "2026-10-14",
   "policy": "same-task-adapt-both-directions",
   "status": "parity-realignment-in-progress",
   "sharedSurfaces": {
@@ -22,7 +22,8 @@
     "outboundOsV3": "dg-foundation-feature-branch-peer-parity-blocked",
     "appointmentGoalAutopilot": "dg-implemented-peer-parity-blocked",
     "dailyCockpitHeute": "dg-implemented-peer-parity-blocked",
-    "crmKanbanWorkspace": "dg-implemented-peer-parity-blocked"
+    "crmKanbanWorkspace": "dg-implemented-peer-parity-blocked",
+    "linkedinContentCockpit": "dg-specific-feature-branch-not-in-production-shared-navigation-parity-blocked"
   },
   "blockers": [
     {
@@ -54,6 +55,13 @@
       "surface": "dailyCockpitHeute",
       "peer": "CLIENT-WALKENHORST",
       "detail": "DG-MAIN: neue Tagesansicht /heute (Anrufe 50, E-Mails 200 = 10 Postfaecher x 20, Termine), Navigation mit 'Heute' + 'Mehr', Startseite leitet auf /heute. Peer-Quellcode war in dieser Session nicht lesbar; Paritaet nicht geprueft. Vor Abschluss im Peer gleichwertig pruefen. Zusaetzlich: /crm Kanban-Workspace (Drag & Drop, Detail-Drawer, Faelligkeiten, Ergebnisse) auf Basis von /api/revenue-opportunities.",
+      "resolution": "open"
+    },
+    {
+      "id": "linkedin-content-cockpit-nav-2026-10-14",
+      "surface": "applicationFrame",
+      "peer": "CLIENT-WALKENHORST",
+      "detail": "DG-MAIN adds a new DG-specific LinkedIn Content Cockpit menu link and optional official personal LinkedIn OAuth posting flow. Inspected CLIENT-WALKENHORST components/application-frame.tsx read-only: it has a customer-scoped Supabase auth shell and no LinkedIn integration or authorized user request to publish for that customer. Cross-instance adapter is intentionally not enabled; do not copy DG OAuth tokens, customer content, data or credentials. Shared application-frame parity remains pending explicit authorization and architecture review.",
       "resolution": "open"
     }
   ],
