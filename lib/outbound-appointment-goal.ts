@@ -6,9 +6,9 @@ import { ensureLegacyCampaignVersionForAttribution } from "@/lib/outbound-revenu
 import { loadMailboxCredentials } from "@/lib/mailbox-credentials";
 
 export const APPOINTMENT_GOAL_PER_DAY = 4;
-export const LEAD_BUFFER_TARGET = 200;
+export const LEAD_BUFFER_TARGET = 300;
 const FALLBACK_APPOINTMENT_RATE = 0.025;
-const MAX_RECOMMENDED_SENDS = 240;
+const MAX_RECOMMENDED_SENDS = 300;
 const MIN_DAILY_SENDS_PER_MAILBOX = 30;
 
 type CampaignStep = { waitDays:number; subject:string; body:string };
@@ -174,7 +174,7 @@ export async function ensureAppointmentGoalQueue(workspace="default") {
       name:"Pflege Recruiting NRW",
       audience:"Private Pflegebetriebe in NRW mit aktivem Personalbedarf",
       status:"Bereit",
-      dailyLimit:150,
+      dailyLimit:300,
       steps:[
         {waitDays:0,subject:"kurze Frage",body:"{{company}}"},
         {waitDays:3,subject:"noch aktuell?",body:"{{company}}"},

@@ -30,7 +30,7 @@ type OutboxRow = {
 type Credential = StoredMailboxCredential;
 type State = { mailboxes?: Array<{id:string;email?:string;enabled:boolean;dailyLimit:number}>; campaigns?: Array<{id:string;status?:string;dailyLimit?:number}> };
 const MIN_DAILY_SENDS_PER_MAILBOX=30;
-const PFLEGE_CAMPAIGN_DAILY_TARGET=150;
+const PFLEGE_CAMPAIGN_DAILY_TARGET=300;
 
 function authorized(request: Request) {
   const expected = process.env.CRON_SECRET;
@@ -191,7 +191,7 @@ async function run(request: Request) {
       limited++;
       continue;
     }
-    const campaignLimit = row.campaign_id && !row.campaign_id.startsWith("noshow:") ? (row.campaign_id==="pflege-starter-v2" ? Math.max(PFLEGE_CAMPAIGN_DAILY_TARGET,campaignLimits.get(row.campaign_id) ?? PFLEGE_CAMPAIGN_DAILY_TARGET) : (campaignLimits.get(row.campaign_id) ?? 150)) : undefined;
+    const campaignLimit = row.campaign_id && !row.campaign_id.startsWith("noshow:") ? (row.campaign_id==="pflege-starter-v2" ? Math.max(PFLEGE_CAMPAIGN_DAILY_TARGET,campaignLimits.get(row.campaign_id) ?? PFLEGE_CAMPAIGN_DAILY_TARGET) : (campaignLimits.get(row.campaign_id) ?? 300)) : undefined;
     const campaignCurrent = row.campaign_id ? campaignToday.get(row.campaign_id) ?? 0 : 0;
     if (mailboxCurrent >= mailboxLimit || (campaignLimit !== undefined && campaignCurrent >= campaignLimit)) {
       await query("update er_outbox set status='queued',attempts=greatest(attempts-1,0),scheduled_at=now()+interval '60 minutes',error=null where id=$1 and status='sending'", [row.id]);
