@@ -30,6 +30,7 @@ const GROUPS: Group[] = [
   ] },
   { title: "Outbound", items: [
     { href: "/outbound", label: "Command Center", icon: "send" },
+    { href: "/outbound/vertriebswaffen", label: "30 Vertriebswaffen", icon: "draft", hint: "Top 7 Mails & Inhalte", sales: true },
     { href: "/pflege?view=campaigns", label: "Kampagnen", icon: "dot" },
     { href: "/outreach", label: "Outreach-Queue", icon: "draft" },
     { href: "/mail", label: "Postfächer & Inbox", icon: "mail" },
