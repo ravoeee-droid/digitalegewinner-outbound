@@ -102,7 +102,7 @@ export async function PUT(request: Request) {
     merged.set(credential.id, credential);
     await setSecret("mailbox_credentials_json", JSON.stringify([...merged.values()]));
 
-    const row = await readState().catch(() => null);
+    const row = await readState();
     const state = (row?.payload || {}) as Record<string, unknown>;
     const existingMailboxes = Array.isArray(state.mailboxes) ? state.mailboxes as Array<Record<string, unknown>> : [];
     const nextMailbox = { id: credential.id, email: credential.email, enabled: true, dailyLimit: 5 };

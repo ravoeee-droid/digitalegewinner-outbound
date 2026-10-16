@@ -12,7 +12,7 @@ function parse(raw:string){
 
 export async function loadMailboxCredentials(){
  const env=parse(process.env.MAILBOX_CREDENTIALS_JSON||"");
- const storedRaw=await getSecret("mailbox_credentials_json").catch(()=>"");
+ const storedRaw=await getSecret("mailbox_credentials_json");
  const stored=parse(storedRaw||"");
  const merged=new Map<string,StoredMailboxCredential>();
  for(const item of env)merged.set(item.id,item);

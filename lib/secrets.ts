@@ -1,5 +1,7 @@
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto";
 import { query } from "@/lib/db";
+import { d1Enabled } from "./cloudflare-d1";
+import { readD1Secret, writeD1Secret, deleteD1Secret, listD1Secrets } from "./cloudflare-store";
 
 function key(){
  const source=process.env.APP_ENCRYPTION_KEY||process.env.ADMIN_PASSWORD;
@@ -14,14 +16,17 @@ function decrypt(value:string){
 }
 export async function setSecret(name:string,value:string){
  const encoded=encrypt(value);
+ if(d1Enabled()){await writeD1Secret(name,encoded);return;}
  await query(`insert into er_secrets(workspace,key,encrypted_value) values('default',$1,$2) on conflict(workspace,key) do update set encrypted_value=excluded.encrypted_value,updated_at=now()`,[name,encoded]);
 }
-export async function deleteSecret(name:string){await query("delete from er_secrets where workspace='default' and key=$1",[name])}
+export async function deleteSecret(name:string){if(d1Enabled()){await deleteD1Secret(name);return;}await query("delete from er_secrets where workspace='default' and key=$1",[name])}
 export async function getSecret(name:string){
+ if(d1Enabled()){const encoded=await readD1Secret(name);return encoded?decrypt(encoded):"";}
  const rows=await query<{encrypted_value:string}>("select encrypted_value from er_secrets where workspace='default' and key=$1",[name]);
  if(!rows[0])return "";return decrypt(rows[0].encrypted_value);
 }
 export async function secretStatus(){
+ if(d1Enabled()){return (await listD1Secrets()).map(r=>({key:r.key,configured:true,updatedAt:r.updated_at}));}
  const rows=await query<{key:string;updated_at:string}>("select key,updated_at from er_secrets where workspace='default' order by key");
  return rows.map(r=>({key:r.key,configured:true,updatedAt:r.updated_at}));
 }

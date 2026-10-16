@@ -3,6 +3,8 @@ import { loadMailboxCredentials } from "@/lib/mailbox-credentials";
 import { listImapMessages, type ImapMailboxCredential } from "@/lib/imap-client";
 import { sendMail } from "@/lib/mailer";
 import { query } from "@/lib/db";
+import { d1Enabled } from "@/lib/cloudflare-d1";
+import { listD1SentMail, saveD1SentMail, type SentMailRow } from "@/lib/cloudflare-store";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -20,6 +22,7 @@ function safeMailbox(item: ImapMailboxCredential) {
 
 let sentSchemaReady = false;
 async function ensureSentMailSchema() {
+  if (d1Enabled()) return;
   if (sentSchemaReady) return;
   await query(`
     create table if not exists mail_sent (
@@ -39,7 +42,7 @@ async function ensureSentMailSchema() {
 
 async function loadSentMessages(mailboxId: string, limit: number) {
   await ensureSentMailSchema();
-  const rows = await query<{ id: number; recipient: string; subject: string; body: string; sent_at: string }>(
+  const rows = d1Enabled() ? await listD1SentMail(mailboxId,limit) : await query<SentMailRow>(
     `select id, recipient, subject, body, sent_at from mail_sent
      where workspace='default' and mailbox_id=$1 order by sent_at desc limit $2`,
     [mailboxId, limit],
@@ -97,7 +100,9 @@ export async function POST(request: Request) {
     });
 
     await ensureSentMailSchema();
-    await query(
+    if (d1Enabled()) {
+      await saveD1SentMail({mailboxId:input.mailboxId,to:input.to,subject:input.subject || "",body:input.text,messageId:sent.id || ""});
+    } else await query(
       `insert into mail_sent(workspace, mailbox_id, recipient, subject, body, provider_message_id)
        values('default', $1, $2, $3, $4, $5)`,
       [input.mailboxId, input.to, input.subject || "", input.text, sent.id || ""],

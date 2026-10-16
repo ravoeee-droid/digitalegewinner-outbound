@@ -1,10 +1,11 @@
 {
   "contractVersion": "1.0.0",
   "instance": "DG-MAIN",
-  "updatedAt": "2026-10-11",
+  "updatedAt": "2026-10-16",
   "policy": "same-task-adapt-both-directions",
   "status": "parity-realignment-in-progress",
   "sharedSurfaces": {
+    "cloudflareD1Persistence": "native-D1-mail-vault-workspace-state-sent-mail-warmup; CRM-campaign-SQL-port-and-peer-parity-pending",
     "pflegeV2PrimaryWorkspace": "single-workspace-current",
     "germanyPflegeLeadRadar": "integrated-into-primary-workspace",
     "pflegeDailyLeadFactory": "canonical-120-call-target-160-a-plus-buffer",
@@ -25,6 +26,12 @@
     "crmKanbanWorkspace": "dg-implemented-peer-parity-blocked"
   },
   "blockers": [
+    {
+      "id": "cloudflare-d1-runtime-port-2026-10-16",
+      "surface": "cloudflareD1Persistence",
+      "peer": "CLIENT-WALKENHORST",
+      "detail": "DG mailbox vault, workspace state, sent mail and warmup use native D1. Existing DG CRM/campaign/runtime callers still use PostgreSQL-specific SQL. Peer source uses a different JSON-row Worker API rather than the DG raw-SQL contract. Full production cutover and shared-core parity are not complete. No peer runtime data, credentials or databases were accessed."
+    },
     {
       "id": "studio-webmotion-v3-2026-08-27",
       "surface": "studioGenericV3",

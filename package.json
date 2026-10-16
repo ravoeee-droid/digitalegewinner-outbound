@@ -11,7 +11,8 @@
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test": "npm run typecheck && npm run lint"
+    "test": "npm run typecheck && npm run lint",
+    "test:d1": "node --experimental-transform-types --test cloudflare/core.test.mjs"
   },
   "dependencies": {
     "@vercel/blob": "^2.8.0",
