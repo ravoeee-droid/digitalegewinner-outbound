@@ -17,7 +17,7 @@ const {readState,writeState,readStateFields}=await import('../lib/db.ts');
 const {setSecret,getSecret,secretStatus}=await import('../lib/secrets.ts');
 const {getWarmupStatus}=await import('../lib/mail-warmup.ts');
 const {saveVerifiedMailboxes,loadMailboxCredentials}=await import('../lib/mailbox-credentials.ts');
-const {verifyDgMailboxes}=await import('../lib/mailbox-verification.ts');
+const {verifyDgMailboxes,safeConnectionFailure}=await import('../lib/mailbox-verification.ts');
 const {POST:bulkPost}=await import('../app/api/mail/config/bulk/route.ts');
 const originalFetch = globalThis.fetch;
 const envKeys = ['CLOUDFLARE_ACCOUNT_ID','CLOUDFLARE_D1_DATABASE_ID','CLOUDFLARE_D1_API_TOKEN','APP_ENCRYPTION_KEY'];
@@ -153,6 +153,13 @@ test('mailbox warmup status uses D1 without sending messages or contacting mail 
   assert.equal(status.mailboxes[0].totalSent,1);
   assert.equal(status.mailboxes[0].totalSeen,1);
   assert.ok(calls.every(call=>call.url.startsWith('https://api.cloudflare.com/')));
+});
+
+test('connection diagnostics distinguish rejected passwords from network failures without leaking server text',()=>{
+  assert.match(safeConnectionFailure('SMTP',{code:'EAUTH',message:'secret-password'}),/Anmeldung.*abgelehnt/);
+  assert.match(safeConnectionFailure('IMAP',{code:'ETIMEDOUT',message:'secret-password'}),/Zeitüberschreitung/);
+  assert.match(safeConnectionFailure('IMAP',new Error('Authentication failed secret-password')),/Anmeldung.*abgelehnt/);
+  assert.ok(!safeConnectionFailure('SMTP',new Error('secret-password')).includes('secret-password'));
 });
 
 test('batch verifier checks the ten exact DG accounts with at most two simultaneous logins',async()=>{
