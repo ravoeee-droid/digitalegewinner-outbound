@@ -16,6 +16,9 @@ const { readD1State, writeD1State, readD1Secret, writeD1Secret, deleteD1Secret, 
 const {readState,writeState,readStateFields}=await import('../lib/db.ts');
 const {setSecret,getSecret,secretStatus}=await import('../lib/secrets.ts');
 const {getWarmupStatus}=await import('../lib/mail-warmup.ts');
+const {saveVerifiedMailboxes,loadMailboxCredentials}=await import('../lib/mailbox-credentials.ts');
+const {verifyDgMailboxes}=await import('../lib/mailbox-verification.ts');
+const {POST:bulkPost}=await import('../app/api/mail/config/bulk/route.ts');
 const originalFetch = globalThis.fetch;
 const envKeys = ['CLOUDFLARE_ACCOUNT_ID','CLOUDFLARE_D1_DATABASE_ID','CLOUDFLARE_D1_API_TOKEN','APP_ENCRYPTION_KEY'];
 const originalEnv = Object.fromEntries(envKeys.map(key => [key,process.env[key]]));
@@ -38,8 +41,15 @@ beforeEach(() => {
     calls.push({url,options});
     const body = JSON.parse(options.body);
     assert.ok(!Array.isArray(body), 'Cloudflare REST expects a query object or {batch}, not an array');
-    const result = (body.batch || [body]).map(({sql,params=[]}) => ({success:true,results:database.prepare(sql).all(...params)}));
-    return Response.json({success:true,result});
+    if(body.batch)database.exec('BEGIN');
+    try{
+      const result = (body.batch || [body]).map(({sql,params=[]}) => ({success:true,results:database.prepare(sql).all(...params)}));
+      if(body.batch)database.exec('COMMIT');
+      return Response.json({success:true,result});
+    }catch{
+      if(body.batch)database.exec('ROLLBACK');
+      return Response.json({success:false,errors:[{code:7500}]},{status:400});
+    }
   };
 });
 after(() => {
@@ -143,4 +153,52 @@ test('mailbox warmup status uses D1 without sending messages or contacting mail 
   assert.equal(status.mailboxes[0].totalSent,1);
   assert.equal(status.mailboxes[0].totalSeen,1);
   assert.ok(calls.every(call=>call.url.startsWith('https://api.cloudflare.com/')));
+});
+
+test('batch verifier checks the ten exact DG accounts with at most two simultaneous logins',async()=>{
+  let active=0,maxActive=0;
+  const result=await verifyDgMailboxes('test-password','Raphael',async mailbox=>{
+    active++;maxActive=Math.max(maxActive,active);
+    await new Promise(resolve=>setImmediate(resolve));
+    active--;
+    if(mailbox.email==='r.h@digitalegewinner.de')throw new Error('private-password-that-must-not-be-returned');
+  });
+  assert.equal(maxActive,2);
+  assert.equal(result.verified.length,9);
+  assert.equal(result.failures.length,1);
+  assert.equal(new Set([...result.verified.map(item=>item.email),...result.failures.map(item=>item.email)]).size,10);
+  assert.ok(!JSON.stringify(result.failures).includes('private-password'));
+});
+
+test('verified accounts preserve existing lead data and sender settings and store only ciphertext',async()=>{
+  await writeState({leads:[{id:'lead-1'}],mailboxes:[{id:'mb-existing',email:'test@example.com',enabled:false,dailyLimit:7}]});
+  await saveVerifiedMailboxes([{id:'mb-existing',provider:'smtp',email:'test@example.com',smtpPass:'private-password'}]);
+  const state=await readState();
+  assert.deepEqual(state.payload.leads,[{id:'lead-1'}]);
+  assert.equal(state.payload.mailboxes[0].enabled,false);
+  assert.equal(state.payload.mailboxes[0].dailyLimit,7);
+  assert.equal((await loadMailboxCredentials())[0].smtpPass,'private-password');
+  assert.ok(!database.prepare('SELECT encrypted_value FROM er_secrets').get().encrypted_value.includes('private-password'));
+});
+
+test('concurrent mailbox saves retry without losing either account',async()=>{
+  await Promise.all([
+    saveVerifiedMailboxes([{id:'mb-a',provider:'smtp',email:'a@example.com',smtpPass:'a'}]),
+    saveVerifiedMailboxes([{id:'mb-b',provider:'smtp',email:'b@example.com',smtpPass:'b'}]),
+  ]);
+  assert.deepEqual((await loadMailboxCredentials()).map(item=>item.id).sort(),['mb-a','mb-b']);
+  assert.equal((await readState()).payload.mailboxes.length,2);
+});
+
+test('failed vault save rolls back its associated workspace update',async()=>{
+  database.exec("CREATE TRIGGER reject_vault BEFORE INSERT ON er_secrets BEGIN SELECT RAISE(ABORT,'test failure'); END;");
+  await assert.rejects(saveVerifiedMailboxes([{id:'mb-a',provider:'smtp',email:'a@example.com'}]),/fehlgeschlagen/);
+  assert.equal(await readState(),null);
+  assert.equal(database.prepare('SELECT count(*) n FROM er_secrets').get().n,0);
+});
+
+test('bulk endpoint rejects missing passwords before touching the vault or mail servers',async()=>{
+  const response=await bulkPost(new Request('https://example.com/api/mail/config/bulk',{method:'POST',headers:{'content-type':'application/json'},body:'{}'}));
+  assert.equal(response.status,400);
+  assert.equal(calls.length,0);
 });

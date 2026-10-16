@@ -21,14 +21,20 @@ select native D1 when its configuration is present. Incomplete D1 configuration
 fails explicitly for these operations instead of falling back to PostgreSQL.
 The raw-SQL CRM and campaign engines still use PostgreSQL and are not migrated.
 
-Validation: all 12 native SQLite/transport and mailbox integration tests pass;
-project TypeScript check and production build pass. Lint passes for every changed code file.
+Validation: all 17 native SQLite/transport and mailbox integration tests pass;
+project TypeScript check and production build pass. Changed files have no lint errors
+(MailWorkspace retains its existing loadInbox effect-dependency warning).
 Whole-project lint currently fails on 23 existing errors in unchanged files.
 
-Release is pending the user's explicit main-branch/live-publication confirmation.
-Automatic approval review rejected the first direct-main commit/push attempt;
-that rejected command made no commit and did not push or deploy any change.
-Netcup login reached its emailed security-token step and requires user completion.
+User explicitly approved live publication. Commit 0f70bd0a9799a624acff74732af25646ce5713ba
+is deployed to production. Live database-status, mail/config and mail/warmup checks
+confirmed D1 access. Netcup login is complete; all ten DG mailboxes were verified
+in its mail panel, and the user confirmed they share a password.
+
+The bulk connection form accepts that password directly in the app and verifies
+each account with at most two parallel mailbox checks. Only verified accounts are
+saved. The D1 state/vault write is transactional and retries version conflicts.
+Actual IMAP/SMTP checks still require the user's password entry.
 
 ## Still required before switching production
 

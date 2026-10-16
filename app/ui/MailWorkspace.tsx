@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import styles from "./mail-workspace.module.css";
+import { DG_MAILBOX_EMAILS } from "@/lib/dg-mailboxes";
 
 type Mailbox = {
   id: string;
@@ -63,6 +64,8 @@ export default function MailWorkspace() {
   const [error, setError] = useState("");
   const [setupOpen, setSetupOpen] = useState(false);
   const [setupMode, setSetupMode] = useState<"add" | "edit">("add");
+  const [bulkSetup, setBulkSetup] = useState(true);
+  const [bulkResults,setBulkResults]=useState<Array<{email:string;error:string}>>([]);
   const [advanced, setAdvanced] = useState(false);
   const [compose, setCompose] = useState<ComposeState>(emptyCompose);
   const [sending, setSending] = useState(false);
@@ -150,6 +153,20 @@ export default function MailWorkspace() {
     event.preventDefault();
     const form = event.currentTarget;
     const data = new FormData(form);
+    if(bulkSetup && setupMode==="add") {
+      setSaving(true);setError("");setBulkResults([]);
+      try {
+        const response=await fetch("/api/mail/config/bulk",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({password:String(data.get("password")||""),name:String(data.get("name")||"Raphael Hermann")})});
+        const json=await response.json() as {connected?:number;total?:number;failures?:Array<{email:string;error:string}>;error?:string};
+        if(!response.ok||typeof json.connected!=="number")throw new Error(json.error||"Postfächer konnten nicht verbunden werden.");
+        form.reset();
+        if(json.connected>0)await loadConfig();
+        if(json.failures?.length){setBulkResults(json.failures);setError(`${json.connected} von 10 Postfächern verbunden. Bitte die fehlgeschlagenen Konten prüfen.`);}
+        else{setSetupOpen(false);notify("Alle 10 Postfächer verbunden · IMAP und SMTP geprüft.");}
+      } catch(cause){setError(cause instanceof Error?cause.message:"Postfächer konnten nicht verbunden werden.");}
+      finally{const password=form.elements.namedItem("password");if(password instanceof HTMLInputElement)password.value="";setSaving(false);}
+      return;
+    }
     const numberOrUndefined = (name: string) => {
       const value = String(data.get(name) || "").trim();
       return value ? Number(value) : undefined;
@@ -328,12 +345,14 @@ export default function MailWorkspace() {
       <section className={styles.modal} onMouseDown={(event) => event.stopPropagation()}>
         <header><div><span>NETCUP MAIL</span><h2>{setupMode === "edit" ? "Postfach bearbeiten" : "Postfach hinzufügen"}</h2><p>Die Zugangsdaten werden verschlüsselt serverseitig gespeichert und nie wieder im Klartext angezeigt.</p></div><button disabled={saving} onClick={() => setSetupOpen(false)}>×</button></header>
         <form onSubmit={saveMailbox}>
+          {setupMode==="add" && <label className={styles.bulkToggle}><input type="checkbox" checked={bulkSetup} disabled={saving} onChange={event=>{setBulkSetup(event.target.checked);setError("");setBulkResults([]);}} />Alle 10 DG-Postfächer verbinden</label>}
+          {bulkSetup && setupMode==="add" && <div className={styles.bulkAccounts}>{DG_MAILBOX_EMAILS.map(email=><span key={email}>{email}</span>)}</div>}
           {setupMode === "edit" && activeMailbox && <input type="hidden" name="id" value={activeMailbox.id} />}
           <label>Absendername<input name="name" defaultValue={setupMode === "edit" ? (activeMailbox?.name || "Raphael Hermann") : "Raphael Hermann"} autoComplete="name" /></label>
-          <label>E-Mail-Adresse<input name="email" type="email" defaultValue={setupMode === "edit" ? (activeMailbox?.email || "") : ""} placeholder="raphael@digitalegewinner.de" required autoComplete="username" /></label>
+          {(!bulkSetup || setupMode==="edit") && <label>E-Mail-Adresse<input name="email" type="email" defaultValue={setupMode === "edit" ? (activeMailbox?.email || "") : ""} placeholder="raphael@digitalegewinner.de" required autoComplete="username" /></label>}
           <label>Netcup E-Mail-Passwort<input name="password" type="password" required autoComplete="current-password" placeholder="Passwort des Postfachs" /><small>Das Passwort bleibt ausschließlich verschlüsselt im Server-Tresor.</small></label>
-          <button type="button" className={styles.advancedToggle} onClick={() => setAdvanced((value) => !value)}>{advanced ? "▾" : "▸"} Erweiterte Serverdaten</button>
-          {advanced && <div className={styles.advancedGrid}>
+          {(!bulkSetup || setupMode==="edit") && <button type="button" className={styles.advancedToggle} onClick={() => setAdvanced((value) => !value)}>{advanced ? "▾" : "▸"} Erweiterte Serverdaten</button>}
+          {advanced && (!bulkSetup || setupMode==="edit") && <div className={styles.advancedGrid}>
             <label>Benutzername<input name="username" placeholder="meist die E-Mail-Adresse" /></label>
             <label>IMAP Server<input name="imapHost" defaultValue={setupMode === "edit" ? (activeMailbox?.imapHost || "") : ""} placeholder="wird automatisch erkannt" /></label>
             <label>IMAP Port<input name="imapPort" type="number" defaultValue={setupMode === "edit" ? (activeMailbox?.imapPort || 993) : 993} /></label>
@@ -341,7 +360,8 @@ export default function MailWorkspace() {
             <label>SMTP Port<input name="smtpPort" type="number" defaultValue={setupMode === "edit" ? (activeMailbox?.smtpPort || 465) : 465} /></label>
           </div>}
           <div className={styles.modalHint}><b>Vor dem Speichern testen wir beides:</b><span>IMAP-Empfang + SMTP-Versand. Nur wenn beide funktionieren, wird das Postfach verbunden.</span></div>
-          <button className={styles.saveButton} disabled={saving}>{saving ? "Verbindung wird geprüft …" : "✓ Speichern & verbinden"}</button>
+          {error && <div className={styles.modalHint} role="alert"><b>{error}</b>{bulkResults.map(item=><span key={item.email}>{item.email}: {item.error}</span>)}</div>}
+          <button className={styles.saveButton} disabled={saving}>{saving ? (bulkSetup && setupMode==="add"?"10 Postfächer werden geprüft …":"Verbindung wird geprüft …") : (bulkSetup && setupMode==="add"?"Alle 10 Postfächer verbinden":"✓ Speichern & verbinden")}</button>
         </form>
       </section>
     </div>}

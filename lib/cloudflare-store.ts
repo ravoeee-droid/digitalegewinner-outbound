@@ -1,4 +1,4 @@
-import { d1Query } from "./cloudflare-d1";
+import { d1Query, d1Batch } from "./cloudflare-d1";
 
 export type D1State = { payload: Record<string, unknown>; version: number; updated_at: string };
 type StateRow = { payload: string; version: number; updated_at: string };
@@ -48,4 +48,19 @@ export async function listD1SentMail(mailboxId: string, limit: number, workspace
 
 export async function saveD1SentMail(input: { mailboxId: string; to: string; subject: string; body: string; messageId: string }, workspace = "default") {
   await d1Query("INSERT INTO mail_sent(workspace,mailbox_id,recipient,subject,body,provider_message_id) VALUES(?,?,?,?,?,?)", [workspace,input.mailboxId,input.to,input.subject,input.body,input.messageId]);
+}
+
+export async function readD1MailboxSnapshot(workspace="default") {
+  const [row]=await d1Query<{payload:string;version:number;ciphertext:string}>(
+    "SELECT coalesce((SELECT payload FROM er_state WHERE workspace=?),'{}') AS payload,coalesce((SELECT version FROM er_state WHERE workspace=?),0) AS version,coalesce((SELECT encrypted_value FROM er_secrets WHERE workspace=? AND key='mailbox_credentials_json'),'') AS ciphertext",[workspace,workspace,workspace]);
+  if(!row)throw new Error("Postfach-Status konnte nicht geladen werden.");
+  return {payload:JSON.parse(row.payload) as Record<string,unknown>,version:row.version,ciphertext:row.ciphertext};
+}
+
+export async function writeD1MailboxBundle(payload:Record<string,unknown>,ciphertext:string,expectedVersion:number,expectedCiphertext:string,workspace="default") {
+  const result=await d1Batch<{version:number}>([
+    {sql:`INSERT INTO er_state(workspace,payload) SELECT ?,? WHERE coalesce((SELECT encrypted_value FROM er_secrets WHERE workspace=? AND key='mailbox_credentials_json'),'')=? ON CONFLICT(workspace) DO UPDATE SET payload=excluded.payload,version=er_state.version+1,updated_at=${timestamp} WHERE er_state.version=? RETURNING version`,params:[workspace,JSON.stringify(payload),workspace,expectedCiphertext,expectedVersion]},
+    {sql:`INSERT INTO er_secrets(workspace,key,encrypted_value) SELECT ?,'mailbox_credentials_json',? WHERE changes()=1 ON CONFLICT(workspace,key) DO UPDATE SET encrypted_value=excluded.encrypted_value,updated_at=${timestamp}`,params:[workspace,ciphertext]},
+  ]);
+  return result[0].length===1;
 }
