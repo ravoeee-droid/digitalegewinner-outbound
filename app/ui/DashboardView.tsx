@@ -13,12 +13,14 @@ type Data = {
   steps: { step: number; sent: number; replied: number }[];
   recent: { lead_id: string; type: string; company: string | null; at: string }[];
   checks?: Check[];
+  source?: { status: string; reason: string; n: number; started: string }[];
 };
 
 const nf = new Intl.NumberFormat("de-DE");
 const pct = (a: number, b: number) => (b > 0 ? `${((a / b) * 100).toLocaleString("de-DE", { maximumFractionDigits: 1 })} %` : "–");
 const sum = (rows: Day[], key: keyof Day) => rows.reduce((total, row) => total + Number(row[key] || 0), 0);
 const dayLabel = (iso: string) => new Date(`${iso}T12:00:00`).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit" });
+const reasonLabel: Record<string, string> = { "excluded-employer": "Träger, Zeitarbeit oder Vermittler", "wrong-role": "keine Pflegefachkraft gesucht", "no-fulltime": "keine Vollzeit-Stelle", "under-60-days": "Anzeige jünger als 60 Tage", excluded: "aussortiert" };
 const typeLabel: Record<string, string> = { appointment: "Termin gebucht", appointment_attended: "Termin wahrgenommen", positive_reply: "Positive Antwort", reply: "Antwort" };
 
 function niceMax(value: number) {
@@ -244,6 +246,20 @@ export default function DashboardView() {
               <p className={styles.note}>Öffnungen sind ungenau, weil Mailprogramme Bilder automatisch laden. Antworten und Termine zählen.</p>
             </section>
           </div>
+
+          {data.source && data.source.length > 0 && (() => {
+            const checked = data.source.reduce((total, row) => total + row.n, 0);
+            const fit = data.source.filter((row) => row.status === "imported").reduce((total, row) => total + row.n, 0);
+            const open = data.source.filter((row) => row.status === "pending").reduce((total, row) => total + row.n, 0);
+            const dropped = data.source.filter((row) => row.status === "skipped" || row.status === "failed");
+            return (
+              <section className={`dg-panel ${styles.card} ${styles.source}`} aria-labelledby="h-source">
+                <h2 id="h-source">Lead-Suche über Stellenanzeigen</h2>
+                <p className={styles.sourceLine}><strong>{nf.format(checked)}</strong> Anzeigen im letzten Lauf · <strong>{nf.format(fit)}</strong> passend{open ? ` · ${nf.format(open)} noch offen` : ""}</p>
+                {dropped.length > 0 && <ul className={styles.reasons}>{dropped.map((row) => <li key={`${row.status}-${row.reason}`}><span>{row.status === "failed" ? "Abruf fehlgeschlagen" : reasonLabel[row.reason] || row.reason || "aussortiert"}</span><b>{nf.format(row.n)}</b></li>)}</ul>}
+              </section>
+            );
+          })()}
 
           <div className={styles.cols}>
             <section className={`dg-panel ${styles.card}`} aria-labelledby="h-box">

@@ -56,9 +56,14 @@ export async function GET(request: Request) {
       order by e.created_at desc limit 12`).catch(() => []);
 
     const checks = await buildChecks(queue);
+    const source = await query<{ status: string; reason: string; n: number; started: string }>(`
+      select j.status, coalesce(nullif(j.error,''),'') reason, count(*)::int n, max(r.started_at)::text started
+      from pflege_source_jobs j join pflege_source_sync_runs r on r.id=j.run_id
+      where j.run_id=(select id from pflege_source_sync_runs order by started_at desc limit 1)
+      group by 1,2 order by n desc`).catch(() => []);
 
     return Response.json({
-      days, daily, mailboxes, queue, steps, recent, checks,
+      days, daily, mailboxes, queue, steps, recent, checks, source,
       goalPerDay: Number(process.env.APPOINTMENT_GOAL_PER_DAY) || 4,
       dailyTarget: Number(process.env.PFLEGE_CAMPAIGN_DAILY_TARGET) || 300,
     }, { headers: { "cache-control": "no-store" } });
