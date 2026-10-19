@@ -80,7 +80,7 @@ export async function GET() {
   try {
     await ensureSalesOsSchema();
     const before = await query<{ n: number }>("select count(*)::int as n from sales_leads where workspace='default' and status='active'");
-    if (Number(before[0]?.n || 0) === 0) await seedInitialCallLeads();
+    if (Number(before[0]?.n || 0) < 10) await seedInitialCallLeads();
     await buildDailyOutboundPlan();
     const rows = await query<{ ok: number; sales_leads: string | null }>(
       "select 1 as ok, to_regclass('public.sales_leads')::text as sales_leads",

@@ -577,7 +577,7 @@ export default function PflegeProOS() {
   return <div className={styles.root}>
     {mobileNav && <button className={styles.mobileBackdrop} onClick={() => setMobileNav(false)} aria-label="Navigation schließen" />}
     <div className={styles.shell}>{nav}<section className={styles.workspace}>
-      <header className={styles.topbar}><div className={styles.topLeft}><button className={styles.mobileButton} type="button" onClick={() => setMobileNav(true)}>☰</button><div><span>PFLEGE LEADS</span><h1>{titleMap[view]}</h1></div></div><div className={styles.topActions}><button type="button" onClick={() => { setView("crm"); window.setTimeout(() => searchRef.current?.focus(), 20); }} className={styles.commandSearch}>⌕ <span>Suche im CRM</span><kbd>/</kbd></button><button className={styles.quietButton} type="button" onClick={() => void refresh()} disabled={Boolean(busy)}>Aktualisieren</button><button className={styles.primaryButton} type="button" onClick={() => setCreateOpen(true)}>Neuer Lead</button></div></header>
+      {view !== "campaigns" && <header className={styles.topbar}><div className={styles.topLeft}><button className={styles.mobileButton} type="button" onClick={() => setMobileNav(true)}>☰</button><div><span>PFLEGE LEADS</span><h1>{titleMap[view]}</h1></div></div><div className={styles.topActions}><button type="button" onClick={() => { setView("crm"); window.setTimeout(() => searchRef.current?.focus(), 20); }} className={styles.commandSearch}>⌕ <span>Suche im CRM</span><kbd>/</kbd></button><button className={styles.quietButton} type="button" onClick={() => void refresh()} disabled={Boolean(busy)}>Aktualisieren</button><button className={styles.primaryButton} type="button" onClick={() => setCreateOpen(true)}>Neuer Lead</button></div></header>}
       <main className={styles.content} id="main-sales-os">
         {error && <div className={styles.error}>{error}</div>}
 
@@ -628,10 +628,49 @@ export default function PflegeProOS() {
         {view === "meetings" && <><div className={styles.pageHead}><div><span>MEETINGS</span><h2>Vorbereitung statt Kalenderliste.</h2><p>Research und Deal-Kontext für jeden anstehenden Termin.</p></div></div><section className={styles.panel}><LeadTable rows={data.leads.filter((lead) => lead.stage === "Termin")} selectable={false} /></section></>}
         {view === "proposals" && <><div className={styles.pageHead}><div><span>PROPOSALS</span><h2>Angebote & Verhandlung.</h2><p>Offene Deals nach Wert, Probability und Next Action.</p></div></div><section className={styles.panel}><LeadTable rows={data.leads.filter((lead) => ["Angebot", "Verhandlung"].includes(lead.stage))} selectable={false} /></section></>}
 
-        {view === "campaigns" && <><div className={styles.pageHead}><div><span>KAMPAGNEN</span><h2>Mail-Kampagnen.</h2><p>Postfächer, Tageslimit, Antworten und Termine auf einen Blick.</p></div><div className={styles.pageHeadActions}><span className={styles.softBadge}>{activeMailboxes.length} aktive Postfächer</span><button className={styles.primaryButton} type="button" onClick={() => setCampaignGenOpen(true)}>+ Neue Kampagne</button></div></div><section className={styles.panel}><div className={styles.tableWrap}><table className={styles.campaignTable}><thead><tr><th>Kampagne</th><th>Zielgruppe</th><th>Status</th><th>Ablauf</th><th>Gesendet</th><th>Antworten</th><th>Positiv</th><th>Termine</th><th></th></tr></thead><tbody>{store.campaigns.map((campaign) => { const live = data.campaignStats?.[campaign.id]; const variants = data.campaignVariantStats?.[campaign.id] || []; return [
-          <tr key={campaign.id}><td><strong>{campaign.name}</strong></td><td>{campaign.audience}</td><td><span className={styles.softBadge}>{campaign.status}</span></td><td>{campaign.steps.length} steps · {campaign.dailyLimit}/d</td><td>{live?.sent ?? (campaign.id === "pflege-starter-v2" ? data.emailAnalytics?.sent_today : undefined) ?? campaign.sent ?? 0}</td><td>{live?.replies ?? (campaign.id === "pflege-starter-v2" ? data.emailAnalytics?.replied_today : undefined) ?? campaign.replies ?? 0}</td><td>{live?.positive ?? campaign.positive ?? 0}</td><td>{live?.appointments ?? (campaign.id === "pflege-starter-v2" ? data.emailAnalytics?.meetings_today : undefined) ?? campaign.appointments ?? 0}</td><td><button className={styles.primaryTiny} type="button" onClick={() => void launchCampaign(campaign)} disabled={busy === campaign.id} title={campaign.status === "Aktiv" ? "Bereits enrollte Leads werden übersprungen - nur neue Leads werden ergänzt." : undefined}>{busy === campaign.id ? "Startet…" : campaign.status === "Aktiv" ? "Neue Leads ergänzen" : "Launch"}</button></td></tr>,
-          variants.length > 1 && <tr key={`${campaign.id}-variants`}><td colSpan={9} style={{ padding: "6px 10px", fontSize: 11, color: "#6b7280", background: "rgba(5,10,8,.02)" }}>A/B Betreffzeile: {variants.map((v) => `${v.variant} ${v.sent} gesendet · ${v.replies} Antworten${v.sent ? ` (${Math.round(v.replies / v.sent * 100)}%)` : ""}`).join("  ·  ")}</td></tr>,
-        ]; })}</tbody></table></div></section></>}
+        {view === "campaigns" && <><div className={styles.pageHead}><div><span>KAMPAGNEN</span><h2>Mail-Kampagnen.</h2><p>Postfächer, Tageslimit, Antworten und Termine auf einen Blick.</p></div><div className={styles.pageHeadActions}><span className={styles.softBadge}>{activeMailboxes.length} aktive Postfächer</span><button className={styles.primaryButton} type="button" onClick={() => setCampaignGenOpen(true)}>+ Neue Kampagne</button></div></div><section className={styles.campaignList} aria-label="Kampagnen">
+          {store.campaigns.length === 0 && <div className={styles.campaignEmpty}><strong>Noch keine Kampagne.</strong><p>Legen Sie oben eine Kampagne an. Sie besteht aus einer Erstmail und zwei Nachfass-Mails.</p></div>}
+          {store.campaigns.map((campaign) => {
+            const live = data.campaignStats?.[campaign.id];
+            const variants = data.campaignVariantStats?.[campaign.id] || [];
+            const isPflege = campaign.id === "pflege-starter-v2";
+            const sent = live?.sent ?? (isPflege ? data.emailAnalytics?.sent_today : undefined) ?? campaign.sent ?? 0;
+            const replies = live?.replies ?? (isPflege ? data.emailAnalytics?.replied_today : undefined) ?? campaign.replies ?? 0;
+            const positive = live?.positive ?? campaign.positive ?? 0;
+            const appointments = live?.appointments ?? (isPflege ? data.emailAnalytics?.meetings_today : undefined) ?? campaign.appointments ?? 0;
+            const tone = campaign.status === "Aktiv" ? styles.campaignOn : campaign.status === "Pausiert" ? styles.campaignPaused : styles.campaignDraft;
+            return (
+              <article key={campaign.id} className={styles.campaignCard}>
+                <header className={styles.campaignHead}>
+                  <div><h3>{campaign.name}</h3><p>{campaign.audience}</p></div>
+                  <span className={`${styles.campaignStatus} ${tone}`}>{campaign.status}</span>
+                </header>
+                <dl className={styles.campaignStats}>
+                  <div><dt>Gesendet</dt><dd>{sent}</dd></div>
+                  <div><dt>Antworten</dt><dd>{replies}<small>{sent ? ` · ${Math.round((replies / sent) * 100)} %` : ""}</small></dd></div>
+                  <div><dt>Positiv</dt><dd>{positive}</dd></div>
+                  <div><dt>Termine</dt><dd>{appointments}</dd></div>
+                </dl>
+                <p className={styles.campaignLimit}>Tageslimit <strong>{campaign.dailyLimit} Mails</strong>{isPflege && campaign.dailyLimit < 300 ? <span> · Ziel sind 300 pro Tag, das System sendet bei dieser Kampagne trotzdem bis zu 300.</span> : null}</p>
+                <details className={styles.campaignSteps}>
+                  <summary>Ablauf anzeigen: {campaign.steps.length} {campaign.steps.length === 1 ? "Mail" : "Mails"}</summary>
+                  <ol>{campaign.steps.map((step, index) => (
+                    <li key={index}>
+                      <div><strong>{index === 0 ? "Erstmail" : `Nachfassen ${index}`}</strong><small>{step.waitDays === 0 ? "sofort" : `nach ${step.waitDays} Tagen`}</small></div>
+                      <p className={styles.stepSubject}>Betreff: {step.subject}</p>
+                      <pre>{step.body}</pre>
+                    </li>
+                  ))}</ol>
+                </details>
+                {variants.length > 1 && <p className={styles.campaignAb}>Betreffzeilen-Test: {variants.map((v) => `${v.variant}: ${v.sent} gesendet, ${v.replies} Antworten${v.sent ? ` (${Math.round(v.replies / v.sent * 100)} %)` : ""}`).join("  ·  ")}</p>}
+                <footer className={styles.campaignFoot}>
+                  <button className={styles.primaryButton} type="button" onClick={() => void launchCampaign(campaign)} disabled={busy === campaign.id} title={campaign.status === "Aktiv" ? "Bereits eingeplante Leads werden übersprungen, nur neue Leads kommen dazu." : undefined}>{busy === campaign.id ? "Startet …" : campaign.status === "Aktiv" ? "Neue Leads einplanen" : "Kampagne starten"}</button>
+                  <span>{campaign.status === "Aktiv" ? "Die Kampagne läuft automatisch Mo–Fr 8:30–17:30 Uhr." : "Nach dem Start läuft sie automatisch."}</span>
+                </footer>
+              </article>
+            );
+          })}
+        </section></>}
 
         {view === "inbox" && <><div className={styles.pageHead}><div><span>UNIFIED INBOX</span><h2>Replies mit CRM-Kontext.</h2><p>Antworten direkt mit Lead und Stage verknüpft.</p></div><button className={styles.quietButton} type="button" onClick={() => void loadInbox()}>Refresh inbox</button></div><section className={styles.panel}><div className={styles.inboxList}>{inbox.map((item) => <button key={item.id} type="button" onClick={() => item.leadId && openInspector(item.leadId, "timeline")}><span>✉</span><div><strong>{item.company || item.from}</strong><p>{item.subject}</p><small>{item.from} · {fmtDate(item.createdAt, true)}</small></div><StagePill stage={(STAGES.includes(item.stage as Stage) ? item.stage : "Kontaktiert") as Stage} /></button>)}{!inbox.length && <div className={styles.empty}>Noch keine Antworten.</div>}</div></section></>}
 

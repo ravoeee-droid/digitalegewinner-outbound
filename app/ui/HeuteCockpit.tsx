@@ -137,14 +137,13 @@ export default function HeuteCockpit({ role }: { role: "admin" | "sales" }) {
         <button type="button" role="tab" aria-selected={tab === "calls"} className={tab === "calls" ? styles.on : undefined} onClick={() => setTab("calls")}>Anrufen</button>
         {role === "admin" && <button type="button" role="tab" aria-selected={tab === "emails"} className={tab === "emails" ? styles.on : undefined} onClick={() => setTab("emails")}>E-Mails</button>}
         <button type="button" role="tab" aria-selected={tab === "crm"} className={tab === "crm" ? styles.on : undefined} onClick={() => setTab("crm")}>Pipeline</button>
-        {role === "admin" && <Link href="/content-intelligence" style={{display:"inline-flex",alignItems:"center",padding:"8px 14px",borderRadius:10,background:"#176b62",color:"#fff",fontWeight:700,textDecoration:"none"}}>✦ Content Intelligence</Link>}
       </div>
 
       {tab === "crm" ? (
         <CRMWorkspace embedded />
       ) : tab === "calls" || role === "sales" ? (
         <section aria-label="Anrufen">
-          <CallConsole />
+          <CallConsole embedded />
           <CloudTalkPhone />
         </section>
       ) : (
