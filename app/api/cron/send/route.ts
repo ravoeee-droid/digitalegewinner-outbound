@@ -1,4 +1,4 @@
-import { query, readStateFields } from "@/lib/db";
+import { query, queryIfTable, readStateFields } from "@/lib/db";
 import { sendMail } from "@/lib/mailer";
 import { loadMailboxCredentials, type StoredMailboxCredential } from "@/lib/mailbox-credentials";
 import { recordOutboundEventByMode } from "@/lib/outbound-event-ledger";
@@ -294,7 +294,7 @@ async function run(request: Request) {
       // Ab hier ist die Mail beim Provider angenommen und in er_outbox als gesendet markiert.
       // Fehler in der Nachbearbeitung dürfen sie weder als "failed" zählen noch die Tageslimits umgehen.
       try{
-        await query("update pflege_email_outreach set status='sent',updated_at=now() where lower(email)=lower($1) and status='approved'", [row.recipient]);
+        await queryIfTable("update pflege_email_outreach set status='sent',updated_at=now() where lower(email)=lower($1) and status='approved'", [row.recipient]);
         await query("insert into er_events(workspace,lead_id,type,meta) values('default',$1,'email_sent',$2::jsonb)", [row.lead_id,JSON.stringify({ outboxId:row.id, mailboxId:row.mailbox_id, campaignId:row.campaign_id, variant:row.variant })]);
         await recordOutboundEventByMode({
           workspace:"default",
