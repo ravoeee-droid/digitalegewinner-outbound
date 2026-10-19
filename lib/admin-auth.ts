@@ -14,7 +14,8 @@ function safeEqual(a:string,b:string){try{return timingSafeEqual(Buffer.from(a),
 export function authenticate(email:string,password:string):{role:AppRole;email:string}|null{
  const normalized=password.trim();
  const adminEnv=process.env.ADMIN_PASSWORD;
- if((adminEnv&&normalized===adminEnv)||hash(normalized)===FALLBACK_PASSWORD_SHA256)return {role:"admin",email:"admin"};
+ // Der eingebaute Ersatz-Zugang gilt nur, wenn kein ADMIN_PASSWORD gesetzt ist (lokale Entwicklung).
+ if(adminEnv?safeEqual(normalized,adminEnv):hash(normalized)===FALLBACK_PASSWORD_SHA256)return {role:"admin",email:"admin"};
  const salesEmail=(process.env.SALES_USER_EMAIL||"").trim().toLowerCase();
  const salesPassword=process.env.SALES_USER_PASSWORD||"";
  if(salesEmail&&salesPassword&&email.trim().toLowerCase()===salesEmail&&safeEqual(normalized,salesPassword))return {role:"sales",email:salesEmail};
@@ -23,8 +24,7 @@ export function authenticate(email:string,password:string):{role:AppRole;email:s
 export function sessionValueFor(user:{role:AppRole;email:string}){return roleSession(user.role,user.email)}
 export function sessionRole(value?:string|null):AppRole|null{
  if(!value)return null;
- const legacy=[legacySessionFor(FALLBACK_PASSWORD_SHA256)];
- if(process.env.ADMIN_PASSWORD)legacy.push(legacySessionFor(process.env.ADMIN_PASSWORD));
+ const legacy=process.env.ADMIN_PASSWORD?[legacySessionFor(process.env.ADMIN_PASSWORD)]:[legacySessionFor(FALLBACK_PASSWORD_SHA256)];
  if(legacy.some(x=>safeEqual(value,x)))return "admin";
  const salesEmail=(process.env.SALES_USER_EMAIL||"").trim().toLowerCase();
  if(salesEmail&&safeEqual(value,roleSession("sales",salesEmail)))return "sales";
