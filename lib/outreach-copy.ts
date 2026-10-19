@@ -24,16 +24,22 @@ function hash(seed: string) {
 export function firstTouch(lead: CopyLead) {
   const variant = hash(lead.lead_id || lead.company) % 2 === 0 ? "A" : "B";
   const title = cleanJobTitle(lead.title);
-  const where = lead.city.trim() ? ` in ${lead.city.trim()}` : "";
-  const hook = variant === "A"
-    ? `${lead.company} hat aktuell die Stelle ${title}${where} ausgeschrieben.`
-    : `Ich habe Ihre Stellenanzeige für ${title}${where} gesehen.`;
-  const offer = "Ich gewinne für Pflegebetriebe Bewerber über gezielte Online-Werbung.";
-  const ask = variant === "A" ? "Haben Sie diese Woche 15 Minuten für ein Gespräch?" : "Passt Ihnen dafür Dienstag oder Donnerstag?";
-  const sentences = [hook, offer, ask];
+  const city = lead.city.trim();
+  const region = city ? `in ${city}` : "in Ihrer Region";
+  const sentences = variant === "A"
+    ? [
+        `Ihre Anzeige für ${title} ${region} erreicht nur Pflegekräfte, die gerade aktiv suchen.`,
+        "Das ist die kleinste Gruppe: Die Besten haben einen Job und scrollen abends durch Instagram und Facebook.",
+        `Ich zeige Ihnen in 15 Minuten, wie Sie genau diese Pflegekräfte ${region} erreichen, danach entscheiden Sie.`,
+      ]
+    : [
+        `Wie viele Pflegekräfte ${region} haben Ihre Anzeige für ${title} diese Woche gesehen?`,
+        "Wenn Sie die Zahl nicht kennen, verschenken Sie Bewerber.",
+        "Ich zeige Ihnen in 15 Minuten, wie Sie sie messen und deutlich erhöhen, passt Ihnen Dienstag oder Donnerstag?",
+      ];
   return {
     variant,
-    subject: `${title} bei ${lead.company}`.slice(0, 78),
+    subject: (variant === "A" ? `${lead.company}: Ihre Anzeige für ${title}` : `${title} ${region}: wer sieht Ihre Anzeige?`).slice(0, 78),
     body: `${greeting(lead.contact)}\n\n${sentences.join(" ")}\n\n${SIGNATURE}`,
   };
 }
@@ -41,7 +47,7 @@ export function firstTouch(lead: CopyLead) {
 export function followUp(lead: Pick<CopyLead, "company" | "contact" | "title">, step: number) {
   const title = cleanJobTitle(lead.title);
   if (step === 1) {
-    return { subject: `Re: ${title} bei ${lead.company}`.slice(0, 78), body: `${greeting(lead.contact)}\n\nKurze Nachfrage zu Ihrer Stelle ${title}. Haben Sie dafür diese Woche 15 Minuten?\n\n${SIGNATURE}` };
+    return { subject: `Re: ${title} bei ${lead.company}`.slice(0, 78), body: `${greeting(lead.contact)}\n\nIch habe mir Ihre Anzeige für ${title} noch einmal angesehen. Die Frage von letzter Woche bleibt offen: Wie viele der richtigen Pflegekräfte erreichen Sie damit? 15 Minuten reichen, um das zu klären.\n\n${SIGNATURE}` };
   }
   return { subject: `Re: ${title} bei ${lead.company}`.slice(0, 78), body: `${greeting(lead.contact)}\n\nDas ist meine letzte Nachricht dazu. Ist die Stelle besetzt, sagen Sie es mir kurz, dann melde ich mich nicht mehr.\n\n${SIGNATURE}` };
 }
