@@ -24,6 +24,8 @@ export default function DashboardView() {
   const [days, setDays] = useState(14);
   const [data, setData] = useState<Data | null>(null);
   const [error, setError] = useState("");
+  const [starting, setStarting] = useState(false);
+  const [startMessage, setStartMessage] = useState("");
 
   const load = useCallback(async () => {
     try {
@@ -36,6 +38,21 @@ export default function DashboardView() {
       setError(err instanceof Error ? err.message : "Laden fehlgeschlagen");
     }
   }, [days]);
+
+  async function startNow() {
+    setStarting(true);
+    setStartMessage("");
+    try {
+      const response = await fetch("/api/start", { method: "POST" });
+      const json = await response.json();
+      setStartMessage(json.message || (response.ok ? "Gestartet." : "Start fehlgeschlagen."));
+    } catch {
+      setStartMessage("Start fehlgeschlagen. Bitte noch einmal versuchen.");
+    } finally {
+      setStarting(false);
+      void load();
+    }
+  }
 
   useEffect(() => {
     const first = setTimeout(load, 0);
@@ -85,7 +102,11 @@ export default function DashboardView() {
         <>
           {data.checks && data.checks.length > 0 && (
             <section className={`dg-panel ${styles.checks}`} aria-labelledby="h-start">
+              <div className={styles.checksHead}>
               <h2 id="h-start">{data.checks.every((check) => check.status === "ok") ? "Alles bereit für den automatischen Versand" : `Start-Checkliste: ${data.checks.filter((check) => check.status === "ok").length} von ${data.checks.length} erledigt`}</h2>
+              <button type="button" className="dg-btn dg-btn-primary" onClick={() => void startNow()} disabled={starting}>{starting ? "Startet …" : "Jetzt starten"}</button>
+              </div>
+              {startMessage && <p className={styles.startMessage} role="status">{startMessage}</p>}
               <ul>
                 {data.checks.map((check) => (
                   <li key={check.id} className={styles[check.status]}>

@@ -3,7 +3,7 @@
   "crons": [
     {
       "path": "/api/cron/appointment-goal",
-      "schedule": "0 8,12,16 * * 1-5"
+      "schedule": "10 6-16 * * 1-5"
     },
     {
       "path": "/api/cron/send",

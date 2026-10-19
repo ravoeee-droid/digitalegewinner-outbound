@@ -51,3 +51,4 @@
 .fail .mark{background:rgba(255,125,141,.2);color:#ff9aa6}
 .checks li .dg-btn{min-height:34px;padding:0 12px;font-size:13px}
 .checks li.warn,.checks li.fail,.checks li.ok{color:inherit;font-weight:inherit}
+.checksHead{display:flex;gap:12px;justify-content:space-between;align-items:center;flex-wrap:wrap;margin-bottom:12px}.checksHead h2{margin:0}.startMessage{margin:0 0 12px;padding:10px 14px;border-radius:12px;background:rgba(52,199,89,.1);border:1px solid rgba(52,199,89,.3);font-size:14px}
