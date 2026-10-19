@@ -22,8 +22,8 @@ export async function POST(request: Request) {
     const secret = process.env.CRON_SECRET;
     if (!goal.queuedMessages && !goal.skipped && secret) {
       searchStarted = true;
-      const target = new URL("/api/cron/pflege-source", request.url);
-      after(async () => { await fetch(target, { method: "POST", headers: { authorization: `Bearer ${secret}` } }).catch(() => null); });
+      const targets = ["/api/cron/ba-leads", "/api/cron/pflege-source"].map((path) => new URL(path, request.url));
+      after(async () => { await Promise.all(targets.map((target) => fetch(target, { method: "POST", headers: { authorization: `Bearer ${secret}` } }).catch(() => null))); });
     }
 
     let message = "";

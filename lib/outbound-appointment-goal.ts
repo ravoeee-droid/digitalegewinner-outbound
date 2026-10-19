@@ -278,7 +278,7 @@ export async function ensureAppointmentGoalQueue(workspace="default") {
         and l.stage in ('Neu','Research','Bereit')
         and coalesce(l.do_not_contact,false)=false
         and coalesce(ct.email,'')<>''
-        and lower(coalesce(c.source,''))='pflegedienstjobs24'
+        and lower(coalesce(c.source,'')) in ('pflegedienstjobs24','ba-jobboerse')
         and not exists(select 1 from er_suppressions s where s.workspace=$1 and lower(s.email)=lower(ct.email))
         and not exists(select 1 from er_outbox o where o.workspace=$1 and o.campaign_id=$2 and o.lead_id=l.id and o.status not in ('failed','suppressed'))
       order by l.priority_score desc,l.updated_at desc
