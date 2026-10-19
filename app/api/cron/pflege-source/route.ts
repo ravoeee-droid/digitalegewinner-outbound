@@ -364,6 +364,8 @@ export async function GET(request: Request) {
   try {
     const result=await runSync();
     console.log("[pflege-source-sync]",JSON.stringify(result));
+    const why=await query<{status:string;reason:string;n:number}>("select status,coalesce(nullif(error,''),'') reason,count(*)::int n from pflege_source_jobs where run_id=(select id from pflege_source_sync_runs order by started_at desc limit 1) group by 1,2 order by n desc").catch(()=>[]);
+    console.log("[pflege-source-reasons]",JSON.stringify(why));
     return Response.json(result);
   }
   catch(error){
