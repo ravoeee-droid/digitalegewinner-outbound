@@ -1,4 +1,4 @@
-// Kurze Erstmail: höchstens 3 Sätze, Sie-Form, jede Mail mit Stelle und Ort des Betriebs.
+// Kurze Erstmail: höchstens 3 Sätze, Du-Form, jede Mail mit Stelle und Ort des Betriebs.
 // Es werden nur Angaben aus dem Lead und das Angebot (20 Minuten, Strategie auch ohne Zusammenarbeit) benutzt.
 const SIGNATURE = "Raphael Hermann\nDigitale Gewinner";
 
@@ -11,8 +11,8 @@ export function cleanJobTitle(raw: string) {
 }
 
 function greeting(contact: string) {
-  const name = contact.trim();
-  return name ? `Guten Tag ${name},` : "Guten Tag,";
+  const first = contact.trim().split(/\s+/)[0];
+  return first ? `Hey ${first},` : "Hey,";
 }
 
 function hash(seed: string) {
@@ -25,21 +25,21 @@ export function firstTouch(lead: CopyLead) {
   const variant = hash(lead.lead_id || lead.company) % 2 === 0 ? "A" : "B";
   const title = cleanJobTitle(lead.title);
   const city = lead.city.trim();
-  const region = city ? `in ${city}` : "in Ihrer Region";
+  const region = city ? `in ${city}` : "in eurer Region";
   const sentences = variant === "A"
     ? [
-        `Ihre Stelle als ${title} ${region} ist ausgeschrieben, und dafür habe ich einen Plan.`,
-        "In 20 Minuten legen wir Ziel und Zeitrahmen für die Besetzung fest, danach bekommen Sie eine maßgeschneiderte Strategie, auch wenn Sie nicht mit uns arbeiten.",
-        "Passt Ihnen Dienstag oder Donnerstag?",
+        `ich hab gesehen, dass ihr eine ${title} ${region} sucht, und kenn das Problem: Stellen, die ewig offen bleiben, obwohl man schon alles probiert hat.`,
+        "Lass uns 20 Minuten telefonieren, ich schau mir eure Lage an und bau euch eine Strategie, die ihr auch ohne mich umsetzen könnt.",
+        "Dienstag oder Donnerstag?",
       ]
     : [
-        `Wie lange ist Ihre Stelle als ${title} ${region} schon offen?`,
-        "Ich zeige Ihnen in 20 Minuten, wie sie sich mit festem Ziel und Zeitrahmen besetzen lässt, die Strategie dazu behalten Sie in jedem Fall.",
-        "Passt Ihnen Dienstag oder Donnerstag?",
+        `Wie lange sucht ihr schon eine ${title} ${region}?`,
+        "Ich schau mir mit dir in 20 Minuten an, woran es hakt, und du bekommst eine Strategie dazu, egal ob wir danach zusammenarbeiten oder nicht.",
+        "Passt dir Dienstag oder Donnerstag?",
       ];
   return {
     variant,
-    subject: (variant === "A" ? `Ihre Stelle: ${title} ${region}` : `${title} ${region}: seit wann offen?`).slice(0, 78),
+    subject: (variant === "A" ? `${title} ${region}: kurz quatschen?` : `${title} ${region}: seit wann offen?`).slice(0, 78),
     body: `${greeting(lead.contact)}\n\n${sentences.join(" ")}\n\n${SIGNATURE}`,
   };
 }
@@ -48,7 +48,7 @@ export function followUp(lead: Pick<CopyLead, "company" | "contact" | "title">, 
   const title = cleanJobTitle(lead.title);
   const subject = `Re: ${title} bei ${lead.company}`.slice(0, 78);
   if (step === 1) {
-    return { subject, body: `${greeting(lead.contact)}\n\nKurz zu meiner Nachricht: 20 Minuten, danach haben Sie eine maßgeschneiderte Strategie für Ihre Stelle ${title}, unverbindlich. Passt es Ihnen diese Woche?\n\n${SIGNATURE}` };
+    return { subject, body: `${greeting(lead.contact)}\n\nKurz zu meiner Nachricht: 20 Minuten, danach hast du eine maßgeschneiderte Strategie für deine Stelle ${title}, unverbindlich. Passt es dir diese Woche?\n\n${SIGNATURE}` };
   }
-  return { subject, body: `${greeting(lead.contact)}\n\nDas ist meine letzte Nachricht dazu. Ist die Stelle besetzt, sagen Sie es mir kurz, dann melde ich mich nicht mehr.\n\n${SIGNATURE}` };
+  return { subject, body: `${greeting(lead.contact)}\n\nDas ist meine letzte Nachricht dazu. Ist die Stelle besetzt, sag mir kurz Bescheid, dann melde ich mich nicht mehr.\n\n${SIGNATURE}` };
 }
