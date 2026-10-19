@@ -11,7 +11,7 @@ import { trackedEmailHtml, unsubscribeUrl } from "@/lib/email-tracking";
 import { sendAlertOnce } from "@/lib/alerts";
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 type OutboxRow = {
   id:string;
@@ -57,6 +57,7 @@ function insideBusinessSendWindow(){
 }
 
 async function run(request: Request) {
+  const startedAt = Date.now();
   if (!authorized(request)) return Response.json({ error:"Unauthorized" }, { status:401 });
   if(!insideBusinessSendWindow()){
     return Response.json({ok:true,skipped:true,reason:"outside_berlin_business_window",window:"08:30-17:30 Europe/Berlin"});
@@ -131,6 +132,11 @@ async function run(request: Request) {
   let sent=0, failed=0, limited=0, skipped=0, deliverabilityLimited=0, deliverabilityWouldLimit=0;
   const sentThisCycle=new Map<string,number>();
   for (const row of due) {
+    // Zeitbudget: Rest der Mails sofort wieder freigeben, statt vom Plattform-Timeout mitten im Versand abgebrochen zu werden.
+    if (Date.now() - startedAt > 200_000) {
+      await query("update er_outbox set status='queued',attempts=greatest(attempts-1,0),scheduled_at=now(),error=null where id=$1 and status='sending'", [row.id]);
+      skipped++; continue;
+    }
     const credential = credMap.get(row.mailbox_id);
     if (!credential) {
       await query("update er_outbox set status='failed',error='Keine Zugangsdaten für Mailbox-ID' where id=$1 and status='sending'", [row.id]);
@@ -277,7 +283,9 @@ async function run(request: Request) {
           attempt:row.attempts,
         },
       });
-      const origin=new URL(request.url).origin;
+      // Links in Mails zeigen auf die eigene App-Adresse (nicht auf die interne Vercel-Adresse des Cron-Aufrufs).
+      const configured=(process.env.NEXT_PUBLIC_APP_URL||"").trim().replace(/\/+$/,"");
+      const origin=/^https:\/\/[^\s/]+$/i.test(configured)?configured:new URL(request.url).origin;
       const optOut=unsubscribeUrl(origin,row.id,row.lead_id);
       const html=trackedEmailHtml(row.body,origin,row.id,row.lead_id,optOut);
       const text=`${row.body}\n\n--\nKein Interesse an weiteren Nachrichten? Hier abmelden: ${optOut}`;
