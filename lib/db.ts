@@ -187,6 +187,7 @@ async function healMissingTables() {
         async () => (await import("./telephony")).ensureTelephonySchema(),
         async () => (await import("./website-projects")).ensureWebsiteProjectsSchema(),
         async () => (await import("./dg-agent-store")).ensureDgAgentSchema(),
+        async () => (await import("./v3-apply")).applyV3Schema(),
       ];
       for (const step of steps) {
         try { await step(); } catch (error) { console.error("[db] Schema anlegen fehlgeschlagen:", (error as Error)?.message); }

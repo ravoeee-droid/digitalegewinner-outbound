@@ -24,7 +24,7 @@ const QUICK=["Zeig mir die heißesten Pflege-Leads","Prüfe den Systemstatus und
 
 function money(v=0){return new Intl.NumberFormat("de-DE",{style:"currency",currency:"EUR",maximumFractionDigits:0}).format(v)}
 function label(c:Task["channel"]){return c==="call"?"Call":c==="email"?"E-Mail":c==="video"?"Video":"LinkedIn"}
-function greeting(){const h=new Date().getHours();return h<11?"Guten Morgen Raphael":h<18?"Guten Tag Raphael":"Guten Abend Raphael"}
+function greeting(){const h=Number(new Intl.DateTimeFormat("de-DE",{hour:"numeric",hourCycle:"h23",timeZone:"Europe/Berlin"}).format(new Date()));return h<11?"Guten Morgen Raphael":h<18?"Guten Tag Raphael":"Guten Abend Raphael"}
 function providerLabel(provider="",model="",fallback=false){if(!provider)return "DG Core";return `${provider==="experiential"?"Experiential":provider==="groq"?"Groq":provider} · ${model||"Auto"}${fallback?" · Fallback":""}`}
 
 export default function OutboundCommandCenter(){
@@ -55,7 +55,7 @@ export default function OutboundCommandCenter(){
   </header>
 
   <div className={styles.scrollArea}>
-  <div className={`${styles.welcome} ${premium.welcome}`}><div><span>AI REVENUE OPERATOR</span><h1>{greeting()}</h1></div></div>
+  <div className={`${styles.welcome} ${premium.welcome}`}><div><span>AI REVENUE OPERATOR</span><h1 suppressHydrationWarning>{greeting()}</h1></div></div>
 
   <section className={`${styles.stage} ${premium.stage}`}>
    <aside className={`${styles.panel} ${premium.panel} ${styles.leftTop}`}><small className={styles.eyebrow}>HEUTE</small><h2>Outbound Flow</h2><div className={styles.flow}>{(["call","video","email","linkedin"] as const).map(k=>{const r=channels[k]||{target:0,ready:0,done:0,total:0};const p=Math.min(100,Math.round(Number(r.done||0)/Math.max(1,Number(r.target||1))*100));return <div className={styles.flowRow} key={k}><div><span>{label(k)}</span><b>{r.done}/{r.target}</b></div><div className={styles.bar}><i style={{width:`${p}%`}}/></div><small>{r.ready} bereit</small></div>})}</div></aside>

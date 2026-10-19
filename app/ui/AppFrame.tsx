@@ -136,7 +136,7 @@ export default function AppFrame({ children }: { children: ReactNode }) {
           <span className={styles.mark}>DG</span>
           <span className={styles.brandCopy}><strong>Digitale Gewinner</strong><small>Outbound OS</small></span>
         </Link>
-        <nav className={styles.nav} aria-label="Hauptnavigation" onClick={() => setOpenFor(null)}>
+        <nav className={styles.nav} aria-label="Hauptnavigation" onClick={(event) => { if ((event.target as HTMLElement).closest("a")) setOpenFor(null); }}>
           <Suspense fallback={null}><Links groups={groups} pathname={pathname} /></Suspense>
         </nav>
         <div className={styles.bottom}>

@@ -220,7 +220,7 @@ export default function ConversationControlTower(){
           </span>
         </div>
 
-        <div style={{display:"grid",gridTemplateColumns:"minmax(330px,.8fr) minmax(0,1.2fr)",gap:12,marginTop:14}}>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(min(330px,100%),1fr))",gap:12,marginTop:14}}>
           <Panel title={"Human Inbox · "+(dashboard?.escalations.length??0)}>
             <div style={{maxHeight:520,overflow:"auto"}}>
               {(dashboard?.escalations||[]).length===0
