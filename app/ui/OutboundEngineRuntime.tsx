@@ -80,7 +80,7 @@ export default function OutboundEngineRuntime() {
   }
 
   return (
-    <main style={{ minHeight: "100vh", background: "#09100d", color: "#f7f8fa", fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif", padding: "28px" }}>
+    <main style={{ minHeight: "100vh", overflowX: "clip", maxWidth: "100vw", background: "#09100d", color: "#f7f8fa", fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif", padding: "28px" }}>
       <div style={{ maxWidth: 1540, margin: "0 auto" }}>
         <header style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 24, flexWrap: "wrap", marginBottom: 26 }}>
           <div>
