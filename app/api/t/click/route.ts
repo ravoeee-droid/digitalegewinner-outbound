@@ -1,5 +1,6 @@
 import { query } from "@/lib/db";
 import { decodeTarget, verifyClick } from "@/lib/email-tracking";
+import { sendAlertOnce } from "@/lib/alerts";
 
 export const runtime="nodejs";
 export const dynamic="force-dynamic";
@@ -18,5 +19,6 @@ export async function GET(request:Request){
     "insert into er_events(workspace,lead_id,type,meta) values('default',$1,'email_click',$2::jsonb)",
     [leadId,JSON.stringify({outboxId,target})],
   ).catch(()=>null);
+  await sendAlertOnce(`click:${leadId}`,`🔗 Link in E-Mail geklickt (Lead ${leadId})\n${target}`,24*30).catch(()=>null);
   return new Response(null,{status:302,headers:{location:target,"cache-control":"no-store"}});
 }
