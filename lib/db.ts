@@ -177,6 +177,7 @@ export async function writeState(payload: unknown, workspace = "default") {
 // Frische Datenbank: fehlende Tabellen werden beim ersten Zugriff aus den Schema-Funktionen der Module angelegt.
 let healing: Promise<void> | null = null;
 async function healMissingTables() {
+  lastHealAt = Date.now();
   if (!healing) {
     healing = (async () => {
       const steps: Array<() => Promise<unknown>> = [
@@ -197,6 +198,7 @@ async function healMissingTables() {
   return healing;
 }
 let insideHeal = false;
+let lastHealAt = 0;
 
 // Verständliche deutsche Meldung statt technischem Englisch. Code und Originalfehler bleiben erhalten.
 function friendlyDbError(error: unknown) {
@@ -222,11 +224,21 @@ async function runQuery<T>(text: string, values: unknown[], healed: boolean): Pr
     return result.rows as T[];
   } catch (error) {
     if (await failover(error)) return runQuery<T>(text, values, healed);
-    if ((error as { code?: string })?.code === "42P01" && !healed && !insideHeal) {
+    if ((error as { code?: string })?.code === "42P01" && !healed && !insideHeal && Date.now() - lastHealAt > 600_000) {
       insideHeal = true;
       try { await healMissingTables(); } finally { insideHeal = false; }
       return runQuery<T>(text, values, true);
     }
     throw friendlyDbError(error);
+  }
+}
+
+// Für Altlasten-Tabellen, die auf einer frischen Datenbank bewusst fehlen (z. B. pflege_email_outreach): fehlt die Tabelle, passiert nichts.
+export async function queryIfTable<T = Record<string, unknown>>(text: string, values: unknown[] = []): Promise<T[]> {
+  try {
+    return await query<T>(text, values);
+  } catch (error) {
+    if ((error as { code?: string })?.code === "42P01") return [];
+    throw error;
   }
 }

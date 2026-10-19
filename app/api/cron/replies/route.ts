@@ -1,4 +1,4 @@
-import { query, readState, writeState } from "@/lib/db";
+import { query, queryIfTable, readState, writeState } from "@/lib/db";
 import { getMailboxAccessToken } from "@/lib/mailer";
 import { loadMailboxCredentials, type StoredMailboxCredential } from "@/lib/mailbox-credentials";
 import { listImapMessages, type ImapMailboxCredential } from "@/lib/imap-client";
@@ -117,7 +117,7 @@ async function recordReply(messageId:string,from:string,subject:string,mailboxId
  }
  await query("update er_outbox set status='stopped' where workspace='default' and lead_id=$1 and status='queued'",[leadId]);
  if(!optOut.matched){
-  await query("update pflege_email_outreach set status='replied',updated_at=now() where lower(email)=lower($1) and status in ('approved','sent')",[from]);
+  await queryIfTable("update pflege_email_outreach set status='replied',updated_at=now() where lower(email)=lower($1) and status in ('approved','sent')",[from]);
   await query("update sales_leads set intent_score=least(100,intent_score+30),stage=case when stage in ('Neu','Kontaktiert') then 'Engaged' else stage end,last_contact_at=now(),updated_at=now() where id=$1 and workspace='default'",[leadId]);
   if(state?.leads){
    const leads=state.leads.map(l=>String(l.id)===leadId?{...l,intentScore:Math.min(100,Number(l.intentScore||0)+30),stage:String(l.stage)==="Neu"||String(l.stage)==="Kontaktiert"?"Engaged":l.stage}:l);
