@@ -147,16 +147,16 @@ const NAV: NavGroup[] = [
     { id: "followups", label: "Follow-ups", mark: "✓" },
   ] },
   { label: "Outbound", items: [
-    { id: "campaigns", label: "Campaigns", mark: "↗" },
+    { id: "campaigns", label: "Kampagnen", mark: "↗" },
     { label: "E-Mail", mark: "✉", href: "/mail", badge: "LIVE" },
-    { id: "inbox", label: "Replies", mark: "↩" },
+    { id: "inbox", label: "Antworten", mark: "↩" },
     { label: "Studio V3", mark: "▶", href: "/studio", badge: "V3" },
   ] },
   { label: "Revenue", items: [
-    { id: "meetings", label: "Meetings", mark: "○" },
-    { id: "proposals", label: "Proposals", mark: "◇" },
+    { id: "meetings", label: "Termine", mark: "○" },
+    { id: "proposals", label: "Angebote", mark: "◇" },
     { id: "intelligence", label: "Intelligence", mark: "◈" },
-    { id: "analytics", label: "Analytics", mark: "⌁" },
+    { id: "analytics", label: "Auswertung", mark: "⌁" },
     { label: "Engine", mark: "⚡", href: "/outbound/engine", badge: "V3" },
   ] },
   { label: "System", items: [{ id: "system", label: "Integrationen", mark: "⚙" }] },
@@ -577,7 +577,7 @@ export default function PflegeProOS() {
   return <div className={styles.root}>
     {mobileNav && <button className={styles.mobileBackdrop} onClick={() => setMobileNav(false)} aria-label="Navigation schließen" />}
     <div className={styles.shell}>{nav}<section className={styles.workspace}>
-      <header className={styles.topbar}><div className={styles.topLeft}><button className={styles.mobileButton} type="button" onClick={() => setMobileNav(true)}>☰</button><div><span>PFLEGE SALES OS</span><h1>{titleMap[view]}</h1></div></div><div className={styles.topActions}><button type="button" onClick={() => { setView("crm"); window.setTimeout(() => searchRef.current?.focus(), 20); }} className={styles.commandSearch}>⌕ <span>Search CRM</span><kbd>/</kbd></button><button className={styles.quietButton} type="button" onClick={() => void refresh()} disabled={Boolean(busy)}>Refresh</button><button className={styles.primaryButton} type="button" onClick={() => setCreateOpen(true)}>New lead</button></div></header>
+      <header className={styles.topbar}><div className={styles.topLeft}><button className={styles.mobileButton} type="button" onClick={() => setMobileNav(true)}>☰</button><div><span>PFLEGE LEADS</span><h1>{titleMap[view]}</h1></div></div><div className={styles.topActions}><button type="button" onClick={() => { setView("crm"); window.setTimeout(() => searchRef.current?.focus(), 20); }} className={styles.commandSearch}>⌕ <span>Suche im CRM</span><kbd>/</kbd></button><button className={styles.quietButton} type="button" onClick={() => void refresh()} disabled={Boolean(busy)}>Aktualisieren</button><button className={styles.primaryButton} type="button" onClick={() => setCreateOpen(true)}>Neuer Lead</button></div></header>
       <main className={styles.content} id="main-sales-os">
         {error && <div className={styles.error}>{error}</div>}
 
@@ -628,7 +628,7 @@ export default function PflegeProOS() {
         {view === "meetings" && <><div className={styles.pageHead}><div><span>MEETINGS</span><h2>Vorbereitung statt Kalenderliste.</h2><p>Research und Deal-Kontext für jeden anstehenden Termin.</p></div></div><section className={styles.panel}><LeadTable rows={data.leads.filter((lead) => lead.stage === "Termin")} selectable={false} /></section></>}
         {view === "proposals" && <><div className={styles.pageHead}><div><span>PROPOSALS</span><h2>Angebote & Verhandlung.</h2><p>Offene Deals nach Wert, Probability und Next Action.</p></div></div><section className={styles.panel}><LeadTable rows={data.leads.filter((lead) => ["Angebot", "Verhandlung"].includes(lead.stage))} selectable={false} /></section></>}
 
-        {view === "campaigns" && <><div className={styles.pageHead}><div><span>CAMPAIGNS</span><h2>Outbound-Sequenzen.</h2><p>Mailboxen, Versandlimit, Replies und Meetings ohne übergroße Cards.</p></div><div className={styles.pageHeadActions}><span className={styles.softBadge}>{activeMailboxes.length} active mailboxes</span><button className={styles.primaryButton} type="button" onClick={() => setCampaignGenOpen(true)}>+ Neue Kampagne</button></div></div><section className={styles.panel}><div className={styles.tableWrap}><table className={styles.campaignTable}><thead><tr><th>Campaign</th><th>Audience</th><th>Status</th><th>Sequence</th><th>Sent</th><th>Replies</th><th>Positive</th><th>Meetings</th><th></th></tr></thead><tbody>{store.campaigns.map((campaign) => { const live = data.campaignStats?.[campaign.id]; const variants = data.campaignVariantStats?.[campaign.id] || []; return [
+        {view === "campaigns" && <><div className={styles.pageHead}><div><span>KAMPAGNEN</span><h2>Mail-Kampagnen.</h2><p>Postfächer, Tageslimit, Antworten und Termine auf einen Blick.</p></div><div className={styles.pageHeadActions}><span className={styles.softBadge}>{activeMailboxes.length} aktive Postfächer</span><button className={styles.primaryButton} type="button" onClick={() => setCampaignGenOpen(true)}>+ Neue Kampagne</button></div></div><section className={styles.panel}><div className={styles.tableWrap}><table className={styles.campaignTable}><thead><tr><th>Kampagne</th><th>Zielgruppe</th><th>Status</th><th>Ablauf</th><th>Gesendet</th><th>Antworten</th><th>Positiv</th><th>Termine</th><th></th></tr></thead><tbody>{store.campaigns.map((campaign) => { const live = data.campaignStats?.[campaign.id]; const variants = data.campaignVariantStats?.[campaign.id] || []; return [
           <tr key={campaign.id}><td><strong>{campaign.name}</strong></td><td>{campaign.audience}</td><td><span className={styles.softBadge}>{campaign.status}</span></td><td>{campaign.steps.length} steps · {campaign.dailyLimit}/d</td><td>{live?.sent ?? (campaign.id === "pflege-starter-v2" ? data.emailAnalytics?.sent_today : undefined) ?? campaign.sent ?? 0}</td><td>{live?.replies ?? (campaign.id === "pflege-starter-v2" ? data.emailAnalytics?.replied_today : undefined) ?? campaign.replies ?? 0}</td><td>{live?.positive ?? campaign.positive ?? 0}</td><td>{live?.appointments ?? (campaign.id === "pflege-starter-v2" ? data.emailAnalytics?.meetings_today : undefined) ?? campaign.appointments ?? 0}</td><td><button className={styles.primaryTiny} type="button" onClick={() => void launchCampaign(campaign)} disabled={busy === campaign.id} title={campaign.status === "Aktiv" ? "Bereits enrollte Leads werden übersprungen - nur neue Leads werden ergänzt." : undefined}>{busy === campaign.id ? "Startet…" : campaign.status === "Aktiv" ? "Neue Leads ergänzen" : "Launch"}</button></td></tr>,
           variants.length > 1 && <tr key={`${campaign.id}-variants`}><td colSpan={9} style={{ padding: "6px 10px", fontSize: 11, color: "#6b7280", background: "rgba(5,10,8,.02)" }}>A/B Betreffzeile: {variants.map((v) => `${v.variant} ${v.sent} gesendet · ${v.replies} Antworten${v.sent ? ` (${Math.round(v.replies / v.sent * 100)}%)` : ""}`).join("  ·  ")}</td></tr>,
         ]; })}</tbody></table></div></section></>}

@@ -1,4 +1,4 @@
-import { query } from "@/lib/db";
+import { query, readStateFields } from "@/lib/db";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -55,12 +55,50 @@ export async function GET(request: Request) {
       where e.workspace='default' and e.type in ('appointment','appointment_attended','positive_reply','reply')
       order by e.created_at desc limit 12`).catch(() => []);
 
+    const checks = await buildChecks(queue);
+
     return Response.json({
-      days, daily, mailboxes, queue, steps, recent,
+      days, daily, mailboxes, queue, steps, recent, checks,
       goalPerDay: Number(process.env.APPOINTMENT_GOAL_PER_DAY) || 4,
       dailyTarget: Number(process.env.PFLEGE_CAMPAIGN_DAILY_TARGET) || 300,
     }, { headers: { "cache-control": "no-store" } });
   } catch (error) {
     return Response.json({ error: error instanceof Error ? error.message : "Dashboard konnte nicht geladen werden." }, { status: 503, headers: { "cache-control": "no-store" } });
   }
+}
+
+type Check = { id: string; label: string; status: "ok" | "warn" | "fail"; detail: string; href: string };
+
+// Start-Checkliste: prüft live, ob alles für den automatischen Versand bereit ist.
+async function buildChecks(queue: { queued: number } | undefined): Promise<Check[]> {
+  const checks: Check[] = [];
+  let state: { mailboxes?: Array<{ enabled?: boolean }>; campaigns?: Array<{ status?: string; dailyLimit?: number }> } = {};
+  try { state = ((await readStateFields(["mailboxes", "campaigns"])).payload || {}) as typeof state; } catch {}
+
+  const boxes = (state.mailboxes || []).filter((box) => box.enabled !== false).length;
+  checks.push({ id: "postfaecher", label: "Postfächer verbunden", status: boxes >= 10 ? "ok" : boxes > 0 ? "warn" : "fail", detail: boxes >= 10 ? `${boxes} aktiv` : boxes > 0 ? `${boxes} von 10 aktiv` : "Noch kein Postfach aktiv", href: "/mail" });
+
+  let leads = 0;
+  try {
+    const [row] = await query<{ n: number }>(`select count(distinct l.id)::int n from sales_leads l join sales_contacts ct on ct.company_id=l.company_id and ct.workspace=l.workspace where l.workspace='default' and l.status='active' and l.stage in ('Neu','Research','Bereit') and coalesce(ct.email,'')<>'' and not l.do_not_contact`);
+    leads = row?.n || 0;
+  } catch {}
+  checks.push({ id: "leads", label: "Leads mit E-Mail-Adresse", status: leads >= 300 ? "ok" : leads > 0 ? "warn" : "fail", detail: leads >= 300 ? `${leads} bereit` : leads > 0 ? `${leads} bereit, 300 pro Tag nötig` : "Keine Leads bereit. Im Menü unter Leads nachfüllen.", href: "/pflege?view=finder" });
+
+  const active = (state.campaigns || []).filter((campaign) => !campaign.status || ["active", "aktiv", "running"].includes(String(campaign.status).toLowerCase()));
+  const limit = Math.max(0, ...active.map((campaign) => Number(campaign.dailyLimit || 0)));
+  checks.push({ id: "kampagne", label: "Kampagne aktiv", status: active.length === 0 ? "fail" : limit >= 300 ? "ok" : "warn", detail: active.length === 0 ? "Keine aktive Kampagne" : limit >= 300 ? `Tageslimit ${limit}` : `Tageslimit ${limit || "?"}, Ziel 300`, href: "/pflege?view=campaigns" });
+
+  const queued = queue?.queued ?? 0;
+  checks.push({ id: "warteschlange", label: "Mails in der Warteschlange", status: queued > 0 ? "ok" : "warn", detail: queued > 0 ? `${queued} warten auf Versand` : "Leer. Wird nachts oder zum nächsten Termin-Lauf gefüllt.", href: "/outreach" });
+
+  try {
+    const [last] = await query<{ at: string | null }>("select max(sent_at)::text at from er_outbox where workspace='default' and status='sent'");
+    const hours = last?.at ? (Date.now() - new Date(last.at).getTime()) / 3600000 : null;
+    checks.push({ id: "versand", label: "Versand läuft", status: hours === null ? "warn" : hours < 72 ? "ok" : "warn", detail: hours === null ? "Noch nichts gesendet" : hours < 1 ? "Vor weniger als einer Stunde gesendet" : `Zuletzt vor ${Math.round(hours)} Stunden gesendet`, href: "/mail" });
+  } catch {}
+
+  const telegram = Boolean(process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_CHAT_ID);
+  checks.push({ id: "telegram", label: "Telegram-Meldungen", status: telegram ? "ok" : "warn", detail: telegram ? "Bot und Chat hinterlegt" : "Bot oder Chat fehlt in Vercel", href: "/pflege?view=system" });
+  return checks;
 }
