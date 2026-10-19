@@ -1,4 +1,3 @@
-import Link from "next/link";
 import PflegeUnifiedRuntime from "../ui/PflegeUnifiedRuntime";
 import CloudTalkPhone from "../ui/CloudTalkPhone";
 import DomainMailCenter from "../ui/DomainMailCenter";
@@ -15,31 +14,6 @@ export default async function PflegePage() {
   return (
     <>
       <a className="wcag-skip-link" href="#pflege-sales-os">Zum Hauptinhalt springen</a>
-      {!isSales && <Link
-        className="dg-revenue-launcher"
-        href="/outbound"
-        style={{
-          position: "fixed",
-          right: 18,
-          bottom: 18,
-          zIndex: 80,
-          display: "inline-flex",
-          alignItems: "center",
-          gap: 8,
-          padding: "10px 14px",
-          borderRadius: 999,
-          border: "1px solid rgba(52,199,89,.24)",
-          background: "rgba(5,10,8,.92)",
-          backdropFilter: "blur(18px)",
-          color: "#34c759",
-          textDecoration: "none",
-          fontSize: 12,
-          fontWeight: 900,
-          boxShadow: "0 14px 50px rgba(5,10,8,.38)",
-        }}
-      >
-        ⚡ Revenue Outbound OS
-      </Link>}
       <div id="pflege-sales-os">
         <PflegeUnifiedRuntime />
       </div>

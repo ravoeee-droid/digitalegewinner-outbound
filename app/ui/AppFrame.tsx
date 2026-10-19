@@ -14,13 +14,14 @@ const GROUPS: Group[] = [
   { title: "Hauptmenü", items: [
     { href: "/dashboard", label: "Dashboard", icon: "crm", hint: "Start, Versand, Termine" },
     { href: "/heute", label: "Heute", icon: "today", hint: "Was ist heute zu tun", sales: true },
-    { href: "/pflege?view=finder", label: "Leads", icon: "care", hint: "Finden und prüfen", sales: true },
+    { href: "/leads", label: "Leads", icon: "care", hint: "Alle Leads, bereit zum Anschreiben", sales: true },
     { href: "/pflege?view=campaigns", label: "Kampagnen", icon: "send", hint: "Mails und Limits" },
     { href: "/mail", label: "Postfächer", icon: "mail", hint: "Gesendet und Antworten" },
     { href: "/call", label: "Anrufe", icon: "call", hint: "Nächster Anruf", sales: true },
   ] },
   { title: "Mehr", more: true, items: [
     { href: "/crm", label: "CRM Pipeline", icon: "dot", sales: true },
+    { href: "/pflege?view=finder", label: "Deutschland-Radar", icon: "dot", sales: true },
     { href: "/pflege", label: "Pflege Übersicht", icon: "dot", sales: true },
     { href: "/pflege?view=crm", label: "Research", icon: "dot", sales: true },
     { href: "/pflege?view=followups", label: "Follow-ups", icon: "dot", sales: true },
@@ -33,6 +34,7 @@ const GROUPS: Group[] = [
     { href: "/studio", label: "Studio (Loom-Video)", icon: "dot" },
     { href: "/websites", label: "Websites", icon: "dot" },
     { href: "/seo-radar", label: "SEO Radar", icon: "dot" },
+    { href: "/content-intelligence", label: "Content Intelligence", icon: "dot" },
     { href: "/pflege?view=system", label: "Integrationen", icon: "dot", sales: true },
   ] },
 ];

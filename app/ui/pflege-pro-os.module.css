@@ -315,3 +315,35 @@
 .inspectorActions{flex-wrap:wrap}
 .inspectorActions button{white-space:nowrap}
 .inspector section,.inspector article{border-color:rgba(255,255,255,.09)!important}
+
+/* Kampagnen als Karten */
+.campaignList{display:grid;gap:16px}
+.campaignEmpty{padding:36px 16px;text-align:center;border:1px dashed var(--dg-line,rgba(255,255,255,.14));border-radius:16px;display:grid;gap:6px}
+.campaignEmpty p{margin:0;opacity:.7}
+.campaignCard{border:1px solid var(--dg-line,rgba(255,255,255,.12));background:var(--dg-panel,rgba(255,255,255,.03));border-radius:18px;padding:20px 22px;display:grid;gap:16px}
+.campaignHead{display:flex;justify-content:space-between;gap:16px;align-items:flex-start}
+.campaignHead h3{margin:0;font-size:18px;font-weight:750;letter-spacing:-.01em}
+.campaignHead p{margin:4px 0 0;font-size:14px;opacity:.7}
+.campaignStatus{padding:5px 12px;border-radius:99px;font-size:12px;font-weight:800;white-space:nowrap}
+.campaignOn{background:rgba(52,199,89,.18);color:#5eeaa0}
+.campaignPaused{background:rgba(245,197,66,.18);color:#f5c542}
+.campaignDraft{background:rgba(255,255,255,.08);color:inherit}
+.campaignStats{margin:0;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.campaignStats>div{padding:12px 14px;border-radius:12px;background:rgba(255,255,255,.04);display:grid;gap:2px}
+.campaignStats dt{font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;opacity:.65}
+.campaignStats dd{margin:0;font-size:24px;font-weight:800;letter-spacing:-.02em}
+.campaignStats small{font-size:12px;font-weight:600;opacity:.7}
+.campaignLimit{margin:0;font-size:14px;opacity:.85}
+.campaignLimit span{opacity:.7}
+.campaignSteps summary{cursor:pointer;font-weight:700;font-size:14px;padding:6px 0}
+.campaignSteps summary:focus-visible{outline:2px solid var(--dg-accent-2,#5eeaa0);outline-offset:2px;border-radius:6px}
+.campaignSteps ol{list-style:none;margin:10px 0 0;padding:0;display:grid;gap:12px}
+.campaignSteps li{padding:14px 16px;border-radius:12px;background:rgba(255,255,255,.035);display:grid;gap:8px}
+.campaignSteps li>div{display:flex;gap:10px;align-items:baseline}
+.campaignSteps li small{opacity:.65}
+.stepSubject{margin:0;font-weight:700;font-size:14px}
+.campaignSteps pre{margin:0;white-space:pre-wrap;font:inherit;font-size:14px;line-height:1.55;opacity:.9}
+.campaignAb{margin:0;font-size:13px;opacity:.7}
+.campaignFoot{display:flex;gap:14px;flex-wrap:wrap;align-items:center}
+.campaignFoot span{font-size:13px;opacity:.65}
+@media(max-width:760px){.campaignStats{grid-template-columns:repeat(2,minmax(0,1fr))}.campaignCard{padding:16px}.campaignHead{flex-direction:column}}
