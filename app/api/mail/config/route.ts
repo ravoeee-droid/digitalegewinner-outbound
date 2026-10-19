@@ -1,10 +1,7 @@
 import { promises as dns } from "node:dns";
-import nodemailer from "nodemailer";
 import { z } from "zod";
-import { loadMailboxCredentials, type StoredMailboxCredential } from "@/lib/mailbox-credentials";
-import { setSecret } from "@/lib/secrets";
-import { testImapConnection, type ImapMailboxCredential } from "@/lib/imap-client";
-import { readState, writeState } from "@/lib/db";
+import { loadMailboxCredentials, saveVerifiedMailboxes } from "@/lib/mailbox-credentials";
+import { verifyMailbox, publicMailbox, type NetcupCredential } from "@/lib/mailbox-verification";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -21,22 +18,6 @@ const setupSchema = z.object({
   smtpPort: z.number().int().min(1).max(65535).optional(),
 });
 
-type NetcupCredential = StoredMailboxCredential & ImapMailboxCredential;
-
-function publicMailbox(item: NetcupCredential) {
-  return {
-    id: item.id,
-    name: item.name || "",
-    email: item.email,
-    provider: item.provider,
-    imapHost: item.imapHost || "",
-    imapPort: Number(item.imapPort || 993),
-    smtpHost: item.smtpHost || "",
-    smtpPort: Number(item.smtpPort || 465),
-    configured: Boolean(item.imapHost && (item.imapPass || item.smtpPass) && item.smtpHost && item.smtpPass),
-  };
-}
-
 async function detectMailHost(email: string) {
   const domain = email.split("@")[1]?.toLowerCase();
   if (!domain) throw new Error("E-Mail-Domain fehlt.");
@@ -44,22 +25,6 @@ async function detectMailHost(email: string) {
   const best = [...records].sort((a, b) => a.priority - b.priority)[0]?.exchange?.replace(/\.$/, "");
   if (!best) throw new Error("Mailserver konnte nicht automatisch erkannt werden. Öffne 'Erweiterte Serverdaten' und trage den Netcup-Mailserver ein.");
   return best;
-}
-
-async function verifySmtp(credential: NetcupCredential) {
-  if (!credential.smtpHost || !credential.smtpUser || !credential.smtpPass) throw new Error("SMTP-Zugangsdaten fehlen.");
-  const port = Number(credential.smtpPort || 465);
-  const transport = nodemailer.createTransport({
-    host: credential.smtpHost,
-    port,
-    secure: port === 465,
-    auth: { user: credential.smtpUser, pass: credential.smtpPass },
-    connectionTimeout: 12_000,
-    greetingTimeout: 12_000,
-    socketTimeout: 15_000,
-  });
-  await transport.verify();
-  transport.close();
 }
 
 export async function GET() {
@@ -94,23 +59,9 @@ export async function PUT(request: Request) {
       imapPass: input.password,
     };
 
-    await Promise.all([testImapConnection(credential), verifySmtp(credential)]);
-
-    const current = await loadMailboxCredentials();
-    const merged = new Map<string, StoredMailboxCredential>();
-    for (const item of current) merged.set(item.id, item);
-    merged.set(credential.id, credential);
-    await setSecret("mailbox_credentials_json", JSON.stringify([...merged.values()]));
-
-    const row = await readState().catch(() => null);
-    const state = (row?.payload || {}) as Record<string, unknown>;
-    const existingMailboxes = Array.isArray(state.mailboxes) ? state.mailboxes as Array<Record<string, unknown>> : [];
+    await verifyMailbox(credential);
+    await saveVerifiedMailboxes([credential]);
     const nextMailbox = { id: credential.id, email: credential.email, enabled: true, dailyLimit: 30 };
-    const nextMailboxes = [
-      ...existingMailboxes.filter((item) => String(item.email || "").toLowerCase() !== credential.email.toLowerCase() && String(item.id || "") !== credential.id),
-      nextMailbox,
-    ];
-    await writeState({ ...state, mailboxes: nextMailboxes });
 
     return Response.json({ ok: true, mailbox: publicMailbox(credential), campaignMailbox: nextMailbox });
   } catch (error) {

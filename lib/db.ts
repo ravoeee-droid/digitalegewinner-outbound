@@ -1,4 +1,6 @@
 import { Pool } from "pg";
+import { d1Enabled } from "./cloudflare-d1";
+import { readD1State, writeD1State } from "./cloudflare-store";
 
 let pool: Pool | null = null;
 let initialized = false;
@@ -108,6 +110,14 @@ export async function ensureSchema() {
 // Only return requested settings fields, not the full potentially large state JSON.
 // Never use partial state in a writeState operation.
 export async function readStateFields(fields: Array<"mailboxes" | "campaigns">, workspace = "default") {
+  if (d1Enabled()) {
+    const row = await readD1State(workspace);
+    const payload: Record<string, unknown> = {};
+    for (const field of new Set(fields)) {
+      if ((field === "mailboxes" || field === "campaigns") && row && Object.hasOwn(row.payload, field)) payload[field] = row.payload[field];
+    }
+    return { payload };
+  }
   await ensureSchema();
   const allowed = [...new Set(fields)].filter(field => ["mailboxes", "campaigns"].includes(field));
   if (!allowed.length) return { payload: {} as Record<string, unknown> };
@@ -119,12 +129,17 @@ export async function readStateFields(fields: Array<"mailboxes" | "campaigns">, 
 }
 
 export async function readState(workspace = "default") {
+  if (d1Enabled()) return readD1State(workspace);
   await ensureSchema();
   const { rows } = await getPool().query("select payload, version, updated_at from er_state where workspace=$1", [workspace]);
   return rows[0] ?? null;
 }
 
 export async function writeState(payload: unknown, workspace = "default") {
+  if (d1Enabled()) {
+    if (!payload || typeof payload !== "object" || Array.isArray(payload)) throw new Error("Ungültiger Workspace-Status.");
+    return writeD1State(payload as Record<string, unknown>, workspace);
+  }
   await ensureSchema();
   const { rows } = await getPool().query(
     `insert into er_state(workspace,payload) values($1,$2::jsonb)

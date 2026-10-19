@@ -1,11 +1,24 @@
 import { query } from "./db";
+import { d1Enabled, d1Batch, d1Query, type D1Value } from "./cloudflare-d1";
 import { loadMailboxCredentials, type StoredMailboxCredential } from "./mailbox-credentials";
 import { sendMail } from "./mailer";
 import { markSeenBySubjectToken, type ImapMailboxCredential } from "./imap-client";
 
 let schemaReady = false;
+async function warmupQuery<T = Record<string, unknown>>(postgresSql: string, sqliteSql: string, values: D1Value[] = []) {
+  return d1Enabled() ? d1Query<T>(sqliteSql, values) : query<T>(postgresSql, values);
+}
+
 export async function ensureWarmupSchema() {
   if (schemaReady) return;
+  if(d1Enabled()) {
+    await d1Batch([
+      {sql:"CREATE TABLE IF NOT EXISTS mail_warmup_events (id INTEGER PRIMARY KEY AUTOINCREMENT,workspace TEXT NOT NULL DEFAULT 'default',sender_mailbox_id TEXT NOT NULL,recipient_mailbox_id TEXT NOT NULL,token TEXT NOT NULL,sent_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),seen_at TEXT,error TEXT NOT NULL DEFAULT '')"},
+      {sql:"CREATE INDEX IF NOT EXISTS mail_warmup_sender_idx ON mail_warmup_events(workspace,sender_mailbox_id,sent_at DESC)"},
+    ]);
+    schemaReady=true;
+    return;
+  }
   await query(`
     create table if not exists mail_warmup_events (
       id bigserial primary key,
@@ -62,8 +75,9 @@ function isWarmupCapable(item: StoredMailboxCredential) {
 }
 
 async function dailyTargetFor(workspace: string, mailboxId: string) {
-  const [row] = await query<{ first_sent: string | null }>(
+  const [row] = await warmupQuery<{ first_sent: string | null }>(
     `select min(sent_at) as first_sent from mail_warmup_events where workspace=$1 and sender_mailbox_id=$2`,
+    "SELECT min(sent_at) AS first_sent FROM mail_warmup_events WHERE workspace=? AND sender_mailbox_id=?",
     [workspace, mailboxId],
   );
   if (!row?.first_sent) return RAMP[0].perDay;
@@ -74,9 +88,10 @@ async function dailyTargetFor(workspace: string, mailboxId: string) {
 }
 
 async function sentTodayCount(workspace: string, mailboxId: string) {
-  const [row] = await query<{ count: string }>(
+  const [row] = await warmupQuery<{ count: string | number }>(
     `select count(*)::text as count from mail_warmup_events
      where workspace=$1 and sender_mailbox_id=$2 and sent_at >= date_trunc('day', now())`,
+    "SELECT count(*) AS count FROM mail_warmup_events WHERE workspace=? AND sender_mailbox_id=? AND sent_at >= strftime('%Y-%m-%dT00:00:00.000Z','now')",
     [workspace, mailboxId],
   );
   return Number(row?.count || 0);
@@ -108,9 +123,10 @@ export async function runWarmupCycle(workspace = "default") {
       const body = pick(BODIES);
       try {
         const result = await sendMail({ ...sender, to: recipient.email, subject, text: body });
-        await query(
+        await warmupQuery(
           `insert into mail_warmup_events(workspace, sender_mailbox_id, recipient_mailbox_id, token, error)
            values($1,$2,$3,$4,'')`,
+          "INSERT INTO mail_warmup_events(workspace,sender_mailbox_id,recipient_mailbox_id,token,error) VALUES(?,?,?,?,'')",
           [workspace, sender.id, recipient.id, token],
         );
         sent += 1;
@@ -120,8 +136,9 @@ export async function runWarmupCycle(workspace = "default") {
         try {
           const seen = await markSeenBySubjectToken(recipient, `[wu-${token}]`);
           if (seen) {
-            await query(
+            await warmupQuery(
               `update mail_warmup_events set seen_at=now() where workspace=$1 and token=$2`,
+              "UPDATE mail_warmup_events SET seen_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE workspace=? AND token=?",
               [workspace, token],
             );
           }
@@ -131,9 +148,10 @@ export async function runWarmupCycle(workspace = "default") {
         void result;
       } catch (error) {
         const message = error instanceof Error ? error.message : "Warmup-Versand fehlgeschlagen.";
-        await query(
+        await warmupQuery(
           `insert into mail_warmup_events(workspace, sender_mailbox_id, recipient_mailbox_id, token, error)
            values($1,$2,$3,$4,$5)`,
+          "INSERT INTO mail_warmup_events(workspace,sender_mailbox_id,recipient_mailbox_id,token,error) VALUES(?,?,?,?,?)",
           [workspace, sender.id, recipient.id, token, message],
         );
         results.push({ from: sender.email, to: recipient.email, ok: false, error: message });
@@ -152,9 +170,10 @@ export async function getWarmupStatus(workspace = "default") {
   const stats = await Promise.all(pool.map(async (mailbox) => {
     const target = await dailyTargetFor(workspace, mailbox.id);
     const today = await sentTodayCount(workspace, mailbox.id);
-    const [totals] = await query<{ total: string; seen: string; first_sent: string | null }>(
+    const [totals] = await warmupQuery<{ total: string | number; seen: string | number; first_sent: string | null }>(
       `select count(*)::text as total, count(*) filter(where seen_at is not null)::text as seen, min(sent_at) as first_sent
        from mail_warmup_events where workspace=$1 and sender_mailbox_id=$2`,
+      "SELECT count(*) AS total,count(*) FILTER(WHERE seen_at IS NOT NULL) AS seen,min(sent_at) AS first_sent FROM mail_warmup_events WHERE workspace=? AND sender_mailbox_id=?",
       [workspace, mailbox.id],
     );
     const days = totals?.first_sent ? Math.floor((Date.now() - new Date(totals.first_sent).getTime()) / 86_400_000) : 0;
