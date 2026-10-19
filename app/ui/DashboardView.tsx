@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import styles from "./DashboardView.module.css";
 
 type Day = { day: string; sent: number; opened: number; replied: number; positive: number; meetings: number; bounces: number; unsubscribed: number };
@@ -10,6 +11,7 @@ type Data = {
   queue: { queued: number; due: number; next_at: string | null; failed_open: number };
   steps: { step: number; sent: number; replied: number }[];
   recent: { lead_id: string; type: string; company: string | null; at: string }[];
+  checks?: { id: string; label: string; status: "ok" | "warn" | "fail"; detail: string; href: string }[];
 };
 
 const nf = new Intl.NumberFormat("de-DE");
@@ -81,6 +83,21 @@ export default function DashboardView() {
 
       {data && (
         <>
+          {data.checks && data.checks.length > 0 && (
+            <section className={`dg-panel ${styles.checks}`} aria-labelledby="h-start">
+              <h2 id="h-start">{data.checks.every((check) => check.status === "ok") ? "Alles bereit für den automatischen Versand" : `Start-Checkliste: ${data.checks.filter((check) => check.status === "ok").length} von ${data.checks.length} erledigt`}</h2>
+              <ul>
+                {data.checks.map((check) => (
+                  <li key={check.id} className={styles[check.status]}>
+                    <span className={styles.mark} aria-hidden="true">{check.status === "ok" ? "✓" : check.status === "warn" ? "!" : "✕"}</span>
+                    <span><strong>{check.label}</strong><small>{check.detail}</small></span>
+                    {check.status !== "ok" && <Link href={check.href} className="dg-btn">Öffnen</Link>}
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+
           <section className={styles.hero} aria-label="Heute">
             <div className={`dg-panel ${styles.goal}`}>
               <span className={styles.k}>Termine heute</span>

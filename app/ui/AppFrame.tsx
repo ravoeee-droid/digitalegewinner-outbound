@@ -7,43 +7,32 @@ import styles from "./AppFrame.module.css";
 
 type IconName = "today" | "crm" | "call" | "send" | "care" | "web" | "mail" | "studio" | "seo" | "draft" | "dot";
 type Item = { href: string; label: string; icon?: IconName; hint?: string; sales?: boolean };
-type Group = { title: string; items: Item[]; cols?: 2 };
+type Group = { title: string; items: Item[]; cols?: 2; more?: boolean };
 
 // Eine flache Navigation: jedes Ziel ist genau einen Klick entfernt. Unterbereiche haben eigene Deep-Links.
 const GROUPS: Group[] = [
-  { title: "Täglich", items: [
-    { href: "/dashboard", label: "Dashboard", icon: "crm", hint: "Versand, Antworten, Termine" },
-    { href: "/heute", label: "Heute", icon: "today", hint: "Calls, Mails, Termine", sales: true },
-    { href: "/crm", label: "CRM Pipeline", icon: "crm", hint: "Kanban & Follow-ups", sales: true },
-    { href: "/call", label: "Call-Cockpit", icon: "call", hint: "Nächster Anruf", sales: true },
+  { title: "Hauptmenü", items: [
+    { href: "/dashboard", label: "Dashboard", icon: "crm", hint: "Start, Versand, Termine" },
+    { href: "/heute", label: "Heute", icon: "today", hint: "Was ist heute zu tun", sales: true },
+    { href: "/pflege?view=finder", label: "Leads", icon: "care", hint: "Finden und prüfen", sales: true },
+    { href: "/pflege?view=campaigns", label: "Kampagnen", icon: "send", hint: "Mails und Limits" },
+    { href: "/mail", label: "Postfächer", icon: "mail", hint: "Gesendet und Antworten" },
+    { href: "/call", label: "Anrufe", icon: "call", hint: "Nächster Anruf", sales: true },
   ] },
-  { title: "Pflege Leads", cols: 2, items: [
-    { href: "/pflege", label: "Übersicht", icon: "care", sales: true },
-    { href: "/pflege?view=finder", label: "Lead Finder", icon: "dot", sales: true },
+  { title: "Mehr", more: true, items: [
+    { href: "/crm", label: "CRM Pipeline", icon: "dot", sales: true },
+    { href: "/pflege", label: "Pflege Übersicht", icon: "dot", sales: true },
     { href: "/pflege?view=crm", label: "Research", icon: "dot", sales: true },
-    { href: "/pflege?view=calls", label: "Calls", icon: "dot", sales: true },
     { href: "/pflege?view=followups", label: "Follow-ups", icon: "dot", sales: true },
-    { href: "/pflege?view=pipeline", label: "Pipeline", icon: "dot", sales: true },
     { href: "/pflege?view=meetings", label: "Termine", icon: "dot", sales: true },
     { href: "/pflege?view=proposals", label: "Angebote", icon: "dot", sales: true },
-    { href: "/pflege?view=intelligence", label: "Intelligence", icon: "dot", sales: true },
-    { href: "/pflege?view=analytics", label: "Auswertung", icon: "dot", sales: true },
-  ] },
-  { title: "Outbound", items: [
-    { href: "/outbound", label: "Command Center", icon: "send" },
-    { href: "/outbound/vertriebswaffen", label: "30 Vertriebswaffen", icon: "draft", hint: "Top 7 Mails & Inhalte", sales: true },
-    { href: "/pflege?view=campaigns", label: "Kampagnen", icon: "dot" },
-    { href: "/outreach", label: "Outreach-Queue", icon: "draft" },
-    { href: "/mail", label: "Postfächer & Inbox", icon: "mail" },
     { href: "/pflege?view=inbox", label: "Antworten", icon: "dot" },
+    { href: "/outbound", label: "Command Center", icon: "dot" },
     { href: "/outbound/engine", label: "Engine & Compliance", icon: "dot" },
-  ] },
-  { title: "Werkzeuge", items: [
-    { href: "/studio", label: "Studio (Loom-Video)", icon: "studio" },
-    { href: "/websites", label: "Websites", icon: "web" },
-    { href: "/seo-radar", label: "SEO Radar", icon: "seo" },
-    { href: "/seo-radar?tab=Website+Audit", label: "Website-Audit", icon: "dot" },
-    { href: "/seo-radar?tab=Keywords", label: "Keywords", icon: "dot" },
+    { href: "/outbound/vertriebswaffen", label: "Vertriebswaffen", icon: "dot", sales: true },
+    { href: "/studio", label: "Studio (Loom-Video)", icon: "dot" },
+    { href: "/websites", label: "Websites", icon: "dot" },
+    { href: "/seo-radar", label: "SEO Radar", icon: "dot" },
     { href: "/pflege?view=system", label: "Integrationen", icon: "dot", sales: true },
   ] },
 ];
@@ -81,20 +70,26 @@ function isActive(item: Item, pathname: string, params: URLSearchParams) {
 
 function Links({ groups, pathname }: { groups: Group[]; pathname: string }) {
   const params = useSearchParams();
+  const renderItem = (item: Item) => {
+    const active = isActive(item, pathname, params);
+    return (
+      <Link key={item.href} href={item.href} className={`${active ? styles.linkActive : styles.link} ${item.hint ? "" : styles.compact}`} aria-current={active ? "page" : undefined} title={item.label} onClick={item.href.includes("view=finder") ? () => window.dispatchEvent(new Event("dg:open-germany-radar")) : undefined}>
+        <span className={styles.icon}><Icon name={item.icon || "dot"} /></span>
+        <span className={styles.copy}><strong>{item.label}</strong>{item.hint && <small>{item.hint}</small>}</span>
+      </Link>
+    );
+  };
   return (
     <>
-      {groups.map((g) => (
+      {groups.map((g) => g.more ? (
+        <details key={g.title} className={`${styles.group} ${styles.more}`} open={g.items.some((item) => isActive(item, pathname, params))}>
+          <summary>{g.title} ({g.items.length})</summary>
+          {g.items.map(renderItem)}
+        </details>
+      ) : (
         <div key={g.title} className={`${styles.group} ${g.cols ? styles.twoCol : ""}`}>
           <p>{g.title}</p>
-          {g.items.map((item) => {
-            const active = isActive(item, pathname, params);
-            return (
-              <Link key={item.href} href={item.href} className={`${active ? styles.linkActive : styles.link} ${item.hint ? "" : styles.compact}`} aria-current={active ? "page" : undefined} title={item.label} onClick={item.href.includes("view=finder") ? () => window.dispatchEvent(new Event("dg:open-germany-radar")) : undefined}>
-                <span className={styles.icon}><Icon name={item.icon || "dot"} /></span>
-                <span className={styles.copy}><strong>{item.label}</strong>{item.hint && <small>{item.hint}</small>}</span>
-              </Link>
-            );
-          })}
+          {g.items.map(renderItem)}
         </div>
       ))}
     </>

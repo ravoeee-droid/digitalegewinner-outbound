@@ -197,6 +197,18 @@ async function healMissingTables() {
 }
 let insideHeal = false;
 
+// Verständliche deutsche Meldung statt technischem Englisch. Code und Originalfehler bleiben erhalten.
+function friendlyDbError(error: unknown) {
+  const err = error as { code?: string; message?: string } | null;
+  const text = String(err?.message || "");
+  let message = "";
+  if (err?.code === "53000" || /exceeded the .*quota/i.test(text)) message = "Die Datenbank hat ihr Kontingent erreicht. Bitte Datenbank-Zugang in Vercel prüfen.";
+  else if (err?.code === "42P01" || /relation .* does not exist/i.test(text)) message = "Die Datenbank wird gerade eingerichtet. Bitte in einer Minute neu laden.";
+  else if (/ECONNREFUSED|ETIMEDOUT|ENOTFOUND|Connection terminated|timeout expired/i.test(text)) message = "Die Datenbank antwortet nicht. Bitte gleich noch einmal versuchen.";
+  if (!message) return error;
+  return Object.assign(new Error(message), { code: err?.code, cause: error });
+}
+
 export async function query<T = Record<string, unknown>>(text: string, values: unknown[] = []): Promise<T[]> {
   return runQuery<T>(text, values, false);
 }
@@ -214,6 +226,6 @@ async function runQuery<T>(text: string, values: unknown[], healed: boolean): Pr
       try { await healMissingTables(); } finally { insideHeal = false; }
       return runQuery<T>(text, values, true);
     }
-    throw error;
+    throw friendlyDbError(error);
   }
 }
