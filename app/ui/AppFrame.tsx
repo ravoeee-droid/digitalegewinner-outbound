@@ -12,6 +12,7 @@ type Group = { title: string; items: Item[]; cols?: 2 };
 // Eine flache Navigation: jedes Ziel ist genau einen Klick entfernt. Unterbereiche haben eigene Deep-Links.
 const GROUPS: Group[] = [
   { title: "Täglich", items: [
+    { href: "/dashboard", label: "Dashboard", icon: "crm", hint: "Versand, Antworten, Termine" },
     { href: "/heute", label: "Heute", icon: "today", hint: "Calls, Mails, Termine", sales: true },
     { href: "/crm", label: "CRM Pipeline", icon: "crm", hint: "Kanban & Follow-ups", sales: true },
     { href: "/call", label: "Call-Cockpit", icon: "call", hint: "Nächster Anruf", sales: true },
