@@ -174,14 +174,46 @@ export async function writeState(payload: unknown, workspace = "default") {
   return rows[0];
 }
 
+// Frische Datenbank: fehlende Tabellen werden beim ersten Zugriff aus den Schema-Funktionen der Module angelegt.
+let healing: Promise<void> | null = null;
+async function healMissingTables() {
+  if (!healing) {
+    healing = (async () => {
+      const steps: Array<() => Promise<unknown>> = [
+        async () => (await import("./sales-os")).ensureSalesOsSchema(),
+        async () => (await import("./outbound-engine")).ensureOutboundEngineSchema(),
+        async () => (await import("./revenue-opportunities")).ensureRevenueOpportunitySchema(),
+        async () => (await import("./mail-warmup")).ensureWarmupSchema(),
+        async () => (await import("./telephony")).ensureTelephonySchema(),
+        async () => (await import("./website-projects")).ensureWebsiteProjectsSchema(),
+        async () => (await import("./dg-agent-store")).ensureDgAgentSchema(),
+      ];
+      for (const step of steps) {
+        try { await step(); } catch (error) { console.error("[db] Schema anlegen fehlgeschlagen:", (error as Error)?.message); }
+      }
+    })().finally(() => { healing = null; });
+  }
+  return healing;
+}
+let insideHeal = false;
+
 export async function query<T = Record<string, unknown>>(text: string, values: unknown[] = []): Promise<T[]> {
+  return runQuery<T>(text, values, false);
+}
+
+async function runQuery<T>(text: string, values: unknown[], healed: boolean): Promise<T[]> {
   try {
     await ensureSchema();
     const result = values.length ? await getPool().query(text, values) : await getPool().query(text);
     if (Array.isArray(result)) return ((result.at(-1)?.rows ?? []) as T[]);
     return result.rows as T[];
   } catch (error) {
-    if (await failover(error)) return query<T>(text, values);
+    if (await failover(error)) return runQuery<T>(text, values, healed);
+    if ((error as { code?: string })?.code === "42P01" && !healed && !insideHeal) {
+      insideHeal = true;
+      try { await healMissingTables(); } finally { insideHeal = false; }
+      return runQuery<T>(text, values, true);
+    }
     throw error;
   }
 }
