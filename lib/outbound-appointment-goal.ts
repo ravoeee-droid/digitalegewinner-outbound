@@ -4,6 +4,7 @@ import { recordOutboundEventByMode } from "@/lib/outbound-event-ledger";
 import { resolveOutboundRuntimeConfig } from "@/lib/outbound-runtime-config";
 import { ensureLegacyCampaignVersionForAttribution } from "@/lib/outbound-revenue-attribution";
 import { loadMailboxCredentials } from "@/lib/mailbox-credentials";
+import { firstTouch, followUp } from "@/lib/outreach-copy";
 
 export const APPOINTMENT_GOAL_PER_DAY = 4;
 export const LEAD_BUFFER_TARGET = 300;
@@ -56,34 +57,21 @@ type PflegeLeadPayload = {
   signals?:{jobTitles?:string[];websiteAudit?:{finding?:string}};
 };
 
-function stableVariant(seed:string) {
-  let hash=2166136261;
-  for(let i=0;i<seed.length;i++){hash^=seed.charCodeAt(i);hash=Math.imul(hash,16777619);}
-  return (hash>>>0)%2===0 ? "A" : "B";
-}
-
 function cleanFinding(value:string) {
   return value.replace(/[–—]/g,",").replace(/\s+/g," ").replace(/[.!?]+$/,"").trim();
 }
 
 function personalizedFirstTouch(lead:{lead_id:string;company:string;contact:string;city:string;lead_payload:PflegeLeadPayload|null}) {
   const payload=lead.lead_payload||{};
-  const title=String(payload.jobReferences?.[0]?.title||payload.signals?.jobTitles?.[0]||"Pflegefachkräfte").trim();
-  const finding=cleanFinding(String(payload.signals?.websiteAudit?.finding||""));
-  const greeting=lead.contact.trim() ? "Hallo "+lead.contact.trim().split(/\s+/)[0]+"," : "Hallo,";
-  const variant=stableVariant(lead.lead_id||lead.company);
-  if(variant==="B"){
-    const area=lead.city.trim() ? " aus "+lead.city.trim() : " aus eurer Gegend";
-    return {variant,subject:"kurze Frage",body:greeting+"\n\nWir sprechen gerade mit Pflegefachkräften"+area+", die offen für einen Wechsel sind. Sucht ihr aktuell noch Verstärkung?"};
-  }
-  const websitePart=finding ? " und habe kurz auf euren Karriereauftritt geschaut, "+finding.charAt(0).toLowerCase()+finding.slice(1) : "";
-  return {variant,subject:title.length<80?title:"kurze Frage zur offenen Stelle",body:greeting+"\n\nBin gerade über eure Stelle für "+title+" gestolpert"+websitePart+". Läuft die Besetzung gerade zäh?"};
+  return firstTouch({
+    lead_id:lead.lead_id,company:lead.company,contact:lead.contact,city:lead.city,
+    title:String(payload.jobReferences?.[0]?.title||payload.signals?.jobTitles?.[0]||""),
+  });
 }
 
-function conciseFollowUp(lead:{contact:string},stepIndex:number) {
-  const greeting=lead.contact.trim() ? "Hallo "+lead.contact.trim().split(/\s+/)[0]+"," : "Hallo,";
-  if(stepIndex===1)return {subject:"noch aktuell?",body:greeting+"\n\nIst das Thema bei euch noch aktuell? Wenn nicht, hake ich es direkt ab."};
-  return {subject:"soll ich es abhaken?",body:greeting+"\n\nSoll ich das Thema bei euch erstmal abhaken oder sucht ihr noch?"};
+function conciseFollowUp(lead:{company:string;contact:string;lead_payload:PflegeLeadPayload|null},stepIndex:number) {
+  const payload=lead.lead_payload||{};
+  return followUp({company:lead.company,contact:lead.contact,title:String(payload.jobReferences?.[0]?.title||payload.signals?.jobTitles?.[0]||"")},stepIndex);
 }
 
 export async function getAppointmentGoalSnapshot(workspace="default") {
