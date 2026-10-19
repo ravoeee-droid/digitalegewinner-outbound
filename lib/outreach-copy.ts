@@ -10,8 +10,17 @@ export function cleanJobTitle(raw: string) {
   return title && title.length <= 70 ? title : "Pflegefachkraft";
 }
 
+// Aus Webseiten gelesene Namen enthalten oft Beiwerk ("Kontakt Telefon", "Stellv", "Mobile Pflege Judith Schenz").
+// Nur ein sauberer Name aus 2 bis 3 Wörtern kommt in die Anrede, sonst bleibt sie neutral.
+const NAME_NOISE = /^(kontakt|telefon|tel|fax|mail|stellv|stellvertretung|ihre|ihr|ansprechpartner|ansprechpartnerin|mobile|mobil|pflege|pflegedienst|stationär|stationaer|ambulant|ambulante|leitung|geschäftsleitung|geschaeftsleitung|geschäftsführer|geschäftsführerin|inhaber|inhaberin|team|fr|frau|herr|hr|dr|prof|und|oder|pdl|gmbh|gbr|kg|co)\.?$/i;
+export function cleanPersonName(raw: string) {
+  const words = String(raw || "").replace(/[,;:|()\/\d]/g, " ").split(/\s+/).filter(Boolean).filter((word) => !NAME_NOISE.test(word));
+  const valid = words.length >= 2 && words.length <= 3 && words.every((word) => /^[A-ZÄÖÜ][a-zäöüßéèá'-]{1,}$/.test(word));
+  return valid ? words.join(" ") : "";
+}
+
 function greeting(contact: string) {
-  const name = contact.trim();
+  const name = cleanPersonName(contact);
   return name ? `Guten Tag ${name},` : "Guten Tag,";
 }
 
