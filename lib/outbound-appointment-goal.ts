@@ -236,7 +236,7 @@ export async function ensureAppointmentGoalQueue(workspace="default") {
     candidates = await query<{
       queue_id:string;lead_id:string;email:string;company:string;contact:string;city:string;lead_payload:PflegeLeadPayload|null
     }>(`
-      select q.id::text queue_id,l.id lead_id,ct.email,c.name company,coalesce(ct.name,'') contact,coalesce(c.city,'') city,q.lead lead_payload
+      select q.id::text queue_id,l.id lead_id,ct.email,c.name company,case when ct.source='public-research' and coalesce(ct.metadata->'enrichment'->>'decisionMakerRole','')='' then '' else coalesce(ct.name,'') end contact,coalesce(c.city,'') city,q.lead lead_payload
       from pflege_email_outreach q
       join sales_contacts ct on lower(ct.email)=lower(q.email) and ct.workspace=$1
       join sales_leads l on l.contact_id=ct.id and l.workspace=$1
@@ -264,7 +264,7 @@ export async function ensureAppointmentGoalQueue(workspace="default") {
         l.id lead_id,
         ct.email,
         c.name company,
-        coalesce(ct.name,'') contact,
+        case when ct.source='public-research' and coalesce(ct.metadata->'enrichment'->>'decisionMakerRole','')='' then '' else coalesce(ct.name,'') end contact,
         coalesce(c.city,'') city,
         jsonb_build_object(
           'jobReferences',jsonb_build_array(jsonb_build_object('title',coalesce(nullif(c.metadata->>'jobTitle',''),'Pflegefachkräfte'))),
