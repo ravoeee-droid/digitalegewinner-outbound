@@ -1,17 +1,18 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import { useCallback, useEffect, useRef, useState } from "react";
 import styles from "./DashboardView.module.css";
 
 type Day = { day: string; sent: number; opened: number; replied: number; positive: number; meetings: number; bounces: number; unsubscribed: number };
+type Check = { id: string; label: string; status: "ok" | "warn" | "fail"; detail: string; href: string };
 type Data = {
   days: number; daily: Day[]; goalPerDay: number; dailyTarget: number;
   mailboxes: { mailbox_id: string; sent_today: number; sent_period: number; failed_period: number; queued: number }[];
   queue: { queued: number; due: number; next_at: string | null; failed_open: number };
   steps: { step: number; sent: number; replied: number }[];
   recent: { lead_id: string; type: string; company: string | null; at: string }[];
-  checks?: { id: string; label: string; status: "ok" | "warn" | "fail"; detail: string; href: string }[];
+  checks?: Check[];
 };
 
 const nf = new Intl.NumberFormat("de-DE");
@@ -19,6 +20,79 @@ const pct = (a: number, b: number) => (b > 0 ? `${((a / b) * 100).toLocaleString
 const sum = (rows: Day[], key: keyof Day) => rows.reduce((total, row) => total + Number(row[key] || 0), 0);
 const dayLabel = (iso: string) => new Date(`${iso}T12:00:00`).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit" });
 const typeLabel: Record<string, string> = { appointment: "Termin gebucht", appointment_attended: "Termin wahrgenommen", positive_reply: "Positive Antwort", reply: "Antwort" };
+
+function niceMax(value: number) {
+  if (value <= 10) return 10;
+  const magnitude = 10 ** Math.floor(Math.log10(value));
+  const step = [1, 2, 2.5, 5, 10].find((factor) => factor * magnitude >= value) || 10;
+  return step * magnitude;
+}
+
+// Zahl zählt beim Laden hoch; bei reduzierter Bewegung wird sie sofort gezeigt.
+function useCountUp(target: number) {
+  const [value, setValue] = useState(target);
+  const from = useRef(target);
+  useEffect(() => {
+    if (typeof window === "undefined" || window.matchMedia("(prefers-reduced-motion: reduce)").matches || from.current === target) { from.current = target; const t = setTimeout(() => setValue(target), 0); return () => clearTimeout(t); }
+    const start = from.current; const began = performance.now(); let frame = 0;
+    const tick = (now: number) => {
+      const progress = Math.min(1, (now - began) / 700);
+      setValue(Math.round(start + (target - start) * (1 - (1 - progress) ** 3)));
+      if (progress < 1) frame = requestAnimationFrame(tick); else from.current = target;
+    };
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+  }, [target]);
+  return value;
+}
+
+function Ring({ label, value, goal, unit, tone }: { label: string; value: number; goal: number; unit: string; tone: "green" | "gold" }) {
+  const shown = useCountUp(value);
+  const radius = 52; const circumference = 2 * Math.PI * radius;
+  const ratio = Math.min(1, goal > 0 ? value / goal : 0);
+  return (
+    <div className={`dg-panel ${styles.ring}`}>
+      <svg viewBox="0 0 120 120" role="img" aria-label={`${label}: ${value} von ${goal}`}>
+        <circle cx="60" cy="60" r={radius} className={styles.ringTrack} />
+        <circle cx="60" cy="60" r={radius} className={`${styles.ringBar} ${tone === "gold" ? styles.gold : ""}`} strokeDasharray={circumference} strokeDashoffset={circumference * (1 - ratio)} transform="rotate(-90 60 60)" />
+        <text x="60" y="58" textAnchor="middle" className={styles.ringValue}>{nf.format(shown)}</text>
+        <text x="60" y="76" textAnchor="middle" className={styles.ringGoal}>von {nf.format(goal)}</text>
+      </svg>
+      <div><span className={styles.k}>{label}</span><p>{unit}</p></div>
+    </div>
+  );
+}
+
+function Chart({ rows, days }: { rows: Day[]; days: number }) {
+  const [hover, setHover] = useState<number | null>(null);
+  const max = niceMax(Math.max(1, ...rows.map((row) => row.sent)));
+  const ticks = [max, max / 2, 0];
+  const active = hover !== null ? rows[hover] : null;
+  return (
+    <div className={styles.chartWrap}>
+      <div className={styles.axis} aria-hidden="true">{ticks.map((tick) => <span key={tick}>{nf.format(tick)}</span>)}</div>
+      <div className={styles.plot} role="img" aria-label={`Mails und Termine pro Tag, letzte ${days} Tage`} onMouseLeave={() => setHover(null)}>
+        <div className={styles.grid} aria-hidden="true"><i /><i /><i /></div>
+        {rows.map((row, index) => (
+          <div key={row.day} className={`${styles.col} ${hover === index ? styles.colOn : ""}`} onMouseEnter={() => setHover(index)} onFocus={() => setHover(index)} tabIndex={0} aria-label={`${dayLabel(row.day)}: ${row.sent} Mails, ${row.replied} Antworten, ${row.meetings} Termine`}>
+            <i className={styles.bar} style={{ height: `${(row.sent / max) * 100}%` }} />
+            {row.meetings > 0 && <b className={styles.dot}>{row.meetings}</b>}
+            {(days <= 14 || index % Math.ceil(days / 14) === 0) && <span className={styles.xl}>{dayLabel(row.day)}</span>}
+          </div>
+        ))}
+        {active && (
+          <div className={styles.tip} style={{ left: `${((hover as number) + 0.5) / rows.length * 100}%` }}>
+            <strong>{dayLabel(active.day)}</strong>
+            <span>{nf.format(active.sent)} Mails</span>
+            <span>{active.replied} Antworten</span>
+            <span>{active.meetings} Termine</span>
+          </div>
+        )}
+      </div>
+      <p className={styles.legend}><i className={styles.swatch} /> Mails pro Tag <b className={styles.dot}>1</b> gebuchte Termine</p>
+    </div>
+  );
+}
 
 export default function DashboardView() {
   const [days, setDays] = useState(14);
@@ -69,9 +143,13 @@ export default function DashboardView() {
   const meetings = sum(rows, "meetings");
   const bounces = sum(rows, "bounces");
   const unsub = sum(rows, "unsubscribed");
-  const max = Math.max(1, ...rows.map((row) => row.sent));
   const goal = data?.goalPerDay || 4;
   const target = data?.dailyTarget || 300;
+  const checks = data?.checks || [];
+  const okCount = checks.filter((check) => check.status === "ok").length;
+  const worst = checks.some((check) => check.status === "fail") ? "bad" : checks.some((check) => check.status === "warn") ? "warn" : "ok";
+  const hour = Number(new Intl.DateTimeFormat("de-DE", { hour: "numeric", hourCycle: "h23", timeZone: "Europe/Berlin" }).format(new Date()));
+  const greeting = hour < 11 ? "Guten Morgen" : hour < 18 ? "Guten Tag" : "Guten Abend";
   const funnel = [
     { label: "Mails gesendet", value: sent, rate: "" },
     { label: "Geöffnet", value: opened, rate: pct(opened, sent) },
@@ -84,14 +162,15 @@ export default function DashboardView() {
     <main className="dg-page">
       <header className="dg-head">
         <div className="dg-head-copy">
-          <span className="dg-eyebrow">Auswertung</span>
-          <h1 className="dg-title">Dashboard</h1>
-          <p className="dg-lead">Versand, Antworten und Termine auf einen Blick. Aktualisiert sich jede Minute.</p>
+          <span className="dg-eyebrow" suppressHydrationWarning>{new Intl.DateTimeFormat("de-DE", { weekday: "long", day: "numeric", month: "long", timeZone: "Europe/Berlin" }).format(new Date())}</span>
+          <h1 className="dg-title" suppressHydrationWarning>{greeting}.</h1>
+          <p className="dg-lead">{checks.length ? (worst === "ok" ? "Alles läuft. Hier ist Ihr Stand für heute." : `${checks.length - okCount} Punkte brauchen noch Ihre Aufmerksamkeit.`) : "Ihr Stand für heute."}</p>
         </div>
-        <div className="dg-actions" role="group" aria-label="Zeitraum">
-          {[7, 14, 30, 90].map((value) => (
-            <button key={value} type="button" className={`dg-btn ${days === value ? "dg-btn-primary" : ""}`} aria-pressed={days === value} onClick={() => setDays(value)}>{value} Tage</button>
-          ))}
+        <div className="dg-actions">
+          {checks.length > 0 && <span className={`dg-pill dg-pill-${worst}`}><i />{worst === "ok" ? "Alles läuft" : worst === "warn" ? "Fast bereit" : "Aktion nötig"}</span>}
+          <div className="dg-seg" role="group" aria-label="Zeitraum">
+            {[7, 14, 30, 90].map((value) => <button key={value} type="button" aria-pressed={days === value} onClick={() => setDays(value)}>{value} Tage</button>)}
+          </div>
         </div>
       </header>
 
@@ -100,15 +179,29 @@ export default function DashboardView() {
 
       {data && (
         <>
-          {data.checks && data.checks.length > 0 && (
+          <section className={styles.hero} aria-label="Heute">
+            <Ring label="Termine heute" value={todayRow?.meetings ?? 0} goal={goal} unit="Ziel pro Tag" tone="gold" />
+            <Ring label="Mails heute" value={todayRow?.sent ?? 0} goal={target} unit="Ziel pro Tag" tone="green" />
+            <div className={`dg-panel ${styles.queue}`}>
+              <span className={styles.k}>Warteschlange</span>
+              <strong>{nf.format(data.queue?.queued ?? 0)}</strong>
+              <p>{data.queue?.due ?? 0} jetzt fällig{data.queue?.next_at ? ` · nächste ${new Date(data.queue.next_at).toLocaleString("de-DE", { weekday: "short", hour: "2-digit", minute: "2-digit" })}` : ""}</p>
+              <button type="button" className="dg-btn dg-btn-primary" onClick={() => void startNow()} disabled={starting}>{starting ? "Startet …" : "Jetzt starten"}</button>
+            </div>
+          </section>
+
+          {startMessage && <p className={styles.startMessage} role="status">{startMessage}</p>}
+          {(data.queue?.failed_open ?? 0) > 0 && <p className="dg-notice" role="alert">{data.queue.failed_open} Mails sind in den letzten 3 Tagen fehlgeschlagen. Bitte Postfächer prüfen.</p>}
+
+          {checks.length > 0 && worst !== "ok" && (
             <section className={`dg-panel ${styles.checks}`} aria-labelledby="h-start">
               <div className={styles.checksHead}>
-              <h2 id="h-start">{data.checks.every((check) => check.status === "ok") ? "Alles bereit für den automatischen Versand" : `Start-Checkliste: ${data.checks.filter((check) => check.status === "ok").length} von ${data.checks.length} erledigt`}</h2>
-              <button type="button" className="dg-btn dg-btn-primary" onClick={() => void startNow()} disabled={starting}>{starting ? "Startet …" : "Jetzt starten"}</button>
+                <h2 id="h-start">Startklar machen</h2>
+                <span>{okCount} von {checks.length} erledigt</span>
               </div>
-              {startMessage && <p className={styles.startMessage} role="status">{startMessage}</p>}
+              <div className={styles.checkBar} aria-hidden="true"><i style={{ width: `${(okCount / checks.length) * 100}%` }} /></div>
               <ul>
-                {data.checks.map((check) => (
+                {checks.map((check) => (
                   <li key={check.id} className={styles[check.status]}>
                     <span className={styles.mark} aria-hidden="true">{check.status === "ok" ? "✓" : check.status === "warn" ? "!" : "✕"}</span>
                     <span><strong>{check.label}</strong><small>{check.detail}</small></span>
@@ -118,26 +211,6 @@ export default function DashboardView() {
               </ul>
             </section>
           )}
-
-          <section className={styles.hero} aria-label="Heute">
-            <div className={`dg-panel ${styles.goal}`}>
-              <span className={styles.k}>Termine heute</span>
-              <strong className={styles.big}>{todayRow?.meetings ?? 0}<small> / {goal}</small></strong>
-              <div className={styles.bar} role="progressbar" aria-valuemin={0} aria-valuemax={goal} aria-valuenow={Math.min(goal, todayRow?.meetings ?? 0)} aria-label="Fortschritt Tagesziel Termine"><i style={{ width: `${Math.min(100, ((todayRow?.meetings ?? 0) / goal) * 100)}%` }} /></div>
-            </div>
-            <div className={`dg-panel ${styles.goal}`}>
-              <span className={styles.k}>Mails heute</span>
-              <strong className={styles.big}>{nf.format(todayRow?.sent ?? 0)}<small> / {nf.format(target)}</small></strong>
-              <div className={styles.bar} role="progressbar" aria-valuemin={0} aria-valuemax={target} aria-valuenow={Math.min(target, todayRow?.sent ?? 0)} aria-label="Fortschritt Tagesziel Mails"><i style={{ width: `${Math.min(100, ((todayRow?.sent ?? 0) / target) * 100)}%` }} /></div>
-            </div>
-            <div className={`dg-panel ${styles.goal}`}>
-              <span className={styles.k}>Warteschlange</span>
-              <strong className={styles.big}>{nf.format(data.queue?.queued ?? 0)}</strong>
-              <p className={styles.sub}>{data.queue?.due ?? 0} jetzt fällig{data.queue?.next_at ? ` · nächste ${new Date(data.queue.next_at).toLocaleString("de-DE", { weekday: "short", hour: "2-digit", minute: "2-digit" })}` : ""}</p>
-            </div>
-          </section>
-
-          {(data.queue?.failed_open ?? 0) > 0 && <p className="dg-notice" role="alert">{data.queue.failed_open} Mails sind in den letzten 3 Tagen fehlgeschlagen. Postfächer prüfen.</p>}
 
           <section className={styles.kpis} aria-label={`Kennzahlen ${days} Tage`}>
             {[
@@ -155,26 +228,16 @@ export default function DashboardView() {
           <div className={styles.cols}>
             <section className={`dg-panel ${styles.card}`} aria-labelledby="h-verlauf">
               <h2 id="h-verlauf">Mails pro Tag</h2>
-              <div className={styles.chart} role="img" aria-label={`Mails pro Tag der letzten ${days} Tage`}>
-                {rows.map((row) => (
-                  <div key={row.day} className={styles.col} title={`${dayLabel(row.day)}: ${row.sent} Mails, ${row.replied} Antworten, ${row.meetings} Termine`}>
-                    <i className={styles.barSent} style={{ height: `${(row.sent / max) * 100}%` }} />
-                    {row.meetings > 0 && <b className={styles.dot}>{row.meetings}</b>}
-                    {days <= 30 && <span>{dayLabel(row.day)}</span>}
-                  </div>
-                ))}
-              </div>
-              <p className={styles.legend}><i className={styles.barSent} /> Mails <b className={styles.dot}>1</b> Termine</p>
+              <Chart rows={rows} days={days} />
             </section>
 
             <section className={`dg-panel ${styles.card}`} aria-labelledby="h-trichter">
-              <h2 id="h-trichter">Trichter ({days} Tage)</h2>
+              <h2 id="h-trichter">Vom Versand zum Termin</h2>
               <ol className={styles.funnel}>
-                {funnel.map((step) => (
+                {funnel.map((step, index) => (
                   <li key={step.label}>
-                    <span>{step.label}</span>
-                    <div className={styles.fbar}><i style={{ width: `${sent > 0 ? Math.max(2, (step.value / sent) * 100) : 0}%` }} /></div>
-                    <strong>{nf.format(step.value)}</strong><em>{step.rate}</em>
+                    <div className={styles.fhead}><span>{step.label}</span><strong>{nf.format(step.value)}</strong><em>{step.rate}</em></div>
+                    <div className={styles.fbar}><i style={{ width: `${sent > 0 ? Math.max(step.value ? 3 : 0, (step.value / sent) * 100) : 0}%`, opacity: 1 - index * 0.12 }} /></div>
                   </li>
                 ))}
               </ol>
@@ -187,11 +250,11 @@ export default function DashboardView() {
               <h2 id="h-box">Postfächer</h2>
               <div className={styles.scroll}>
                 <table className={styles.table}>
-                  <thead><tr><th>Postfach</th><th>Heute</th><th>{days} Tage</th><th>Fehler</th><th>Wartend</th></tr></thead>
+                  <thead><tr><th scope="col">Postfach</th><th scope="col">Heute</th><th scope="col">{days} Tage</th><th scope="col">Fehler</th><th scope="col">Wartend</th></tr></thead>
                   <tbody>
                     {data.mailboxes.length === 0 && <tr><td colSpan={5}>Noch nichts gesendet.</td></tr>}
                     {data.mailboxes.map((box) => (
-                      <tr key={box.mailbox_id}><td>{box.mailbox_id}</td><td>{box.sent_today}</td><td>{box.sent_period}</td><td className={box.failed_period > 0 ? styles.warn : ""}>{box.failed_period}</td><td>{box.queued}</td></tr>
+                      <tr key={box.mailbox_id}><td>{box.mailbox_id}</td><td>{box.sent_today}</td><td>{box.sent_period}</td><td className={box.failed_period > 0 ? styles.warnCell : ""}>{box.failed_period}</td><td>{box.queued}</td></tr>
                     ))}
                   </tbody>
                 </table>
@@ -202,11 +265,11 @@ export default function DashboardView() {
               <h2 id="h-seq">Welche Mail bringt Antworten?</h2>
               <div className={styles.scroll}>
                 <table className={styles.table}>
-                  <thead><tr><th>Mail</th><th>Gesendet</th><th>Antwortquote</th></tr></thead>
+                  <thead><tr><th scope="col">Mail</th><th scope="col">Gesendet</th><th scope="col">Antwortquote</th></tr></thead>
                   <tbody>
                     {data.steps.length === 0 && <tr><td colSpan={3}>Noch keine Daten.</td></tr>}
                     {data.steps.map((step) => (
-                      <tr key={step.step}><td>{step.step === 1 ? "Erstmail" : `Follow-up ${step.step - 1}`}</td><td>{nf.format(step.sent)}</td><td>{pct(step.replied, step.sent)}</td></tr>
+                      <tr key={step.step}><td>{step.step === 1 ? "Erstmail" : `Nachfassen ${step.step - 1}`}</td><td>{nf.format(step.sent)}</td><td>{pct(step.replied, step.sent)}</td></tr>
                     ))}
                   </tbody>
                 </table>
