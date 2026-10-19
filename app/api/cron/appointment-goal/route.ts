@@ -1,4 +1,6 @@
 import { ensureAppointmentGoalQueue } from "@/lib/outbound-appointment-goal";
+import { seedCallLeadsIfEmpty } from "@/lib/seed-call-leads";
+import { ensureSalesOsSchema } from "@/lib/sales-os";
 
 export const runtime="nodejs";
 export const maxDuration=60;
@@ -11,6 +13,8 @@ function authorized(request:Request){
 async function run(request:Request){
   if(!authorized(request))return Response.json({error:"Unauthorized"},{status:401});
   try{
+    // Frische Datenbank: erst Grund-Leads einspielen, damit die Warteschlange gefüllt werden kann.
+    await ensureSalesOsSchema().then(()=>seedCallLeadsIfEmpty()).catch(()=>null);
     const result=await ensureAppointmentGoalQueue("default");
     return Response.json(result,{status:result.ok?200:503});
   }catch(error){
