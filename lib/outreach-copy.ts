@@ -1,5 +1,5 @@
-// Kurze Erstmail: höchstens 3 Sätze, Sie-Form, jede Mail mit Firma, Ort und konkreter Stelle.
-// Es werden nur Angaben aus dem Lead benutzt, keine erfundenen Zahlen oder Referenzen.
+// Kurze Erstmail: höchstens 3 Sätze, Sie-Form, jede Mail mit Stelle und Ort des Betriebs.
+// Es werden nur Angaben aus dem Lead und das Angebot (20 Minuten, Strategie auch ohne Zusammenarbeit) benutzt.
 const SIGNATURE = "Raphael Hermann\nDigitale Gewinner";
 
 export type CopyLead = { lead_id: string; company: string; contact: string; city: string; title: string };
@@ -28,26 +28,27 @@ export function firstTouch(lead: CopyLead) {
   const region = city ? `in ${city}` : "in Ihrer Region";
   const sentences = variant === "A"
     ? [
-        `Ihre Anzeige für ${title} ${region} erreicht nur Pflegekräfte, die gerade aktiv suchen.`,
-        "Das ist die kleinste Gruppe: Die Besten haben einen Job und scrollen abends durch Instagram und Facebook.",
-        `Ich zeige Ihnen in 15 Minuten, wie Sie genau diese Pflegekräfte ${region} erreichen, danach entscheiden Sie.`,
+        `Ihre Stelle als ${title} ${region} ist ausgeschrieben, und dafür habe ich einen Plan.`,
+        "In 20 Minuten legen wir Ziel und Zeitrahmen für die Besetzung fest, danach bekommen Sie eine maßgeschneiderte Strategie, auch wenn Sie nicht mit uns arbeiten.",
+        "Passt Ihnen Dienstag oder Donnerstag?",
       ]
     : [
-        `Wie viele Pflegekräfte ${region} haben Ihre Anzeige für ${title} diese Woche gesehen?`,
-        "Wenn Sie die Zahl nicht kennen, verschenken Sie Bewerber.",
-        "Ich zeige Ihnen in 15 Minuten, wie Sie sie messen und deutlich erhöhen, passt Ihnen Dienstag oder Donnerstag?",
+        `Wie lange ist Ihre Stelle als ${title} ${region} schon offen?`,
+        "Ich zeige Ihnen in 20 Minuten, wie sie sich mit festem Ziel und Zeitrahmen besetzen lässt, die Strategie dazu behalten Sie in jedem Fall.",
+        "Passt Ihnen Dienstag oder Donnerstag?",
       ];
   return {
     variant,
-    subject: (variant === "A" ? `${lead.company}: Ihre Anzeige für ${title}` : `${title} ${region}: wer sieht Ihre Anzeige?`).slice(0, 78),
+    subject: (variant === "A" ? `Ihre Stelle: ${title} ${region}` : `${title} ${region}: seit wann offen?`).slice(0, 78),
     body: `${greeting(lead.contact)}\n\n${sentences.join(" ")}\n\n${SIGNATURE}`,
   };
 }
 
 export function followUp(lead: Pick<CopyLead, "company" | "contact" | "title">, step: number) {
   const title = cleanJobTitle(lead.title);
+  const subject = `Re: ${title} bei ${lead.company}`.slice(0, 78);
   if (step === 1) {
-    return { subject: `Re: ${title} bei ${lead.company}`.slice(0, 78), body: `${greeting(lead.contact)}\n\nIch habe mir Ihre Anzeige für ${title} noch einmal angesehen. Die Frage von letzter Woche bleibt offen: Wie viele der richtigen Pflegekräfte erreichen Sie damit? 15 Minuten reichen, um das zu klären.\n\n${SIGNATURE}` };
+    return { subject, body: `${greeting(lead.contact)}\n\nKurz zu meiner Nachricht: 20 Minuten, danach haben Sie eine maßgeschneiderte Strategie für Ihre Stelle ${title}, unverbindlich. Passt es Ihnen diese Woche?\n\n${SIGNATURE}` };
   }
-  return { subject: `Re: ${title} bei ${lead.company}`.slice(0, 78), body: `${greeting(lead.contact)}\n\nDas ist meine letzte Nachricht dazu. Ist die Stelle besetzt, sagen Sie es mir kurz, dann melde ich mich nicht mehr.\n\n${SIGNATURE}` };
+  return { subject, body: `${greeting(lead.contact)}\n\nDas ist meine letzte Nachricht dazu. Ist die Stelle besetzt, sagen Sie es mir kurz, dann melde ich mich nicht mehr.\n\n${SIGNATURE}` };
 }
