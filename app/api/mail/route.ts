@@ -47,8 +47,18 @@ async function loadSentMessages(mailboxId: string, limit: number) {
      where workspace='default' and mailbox_id=$1 order by sent_at desc limit $2`,
     [mailboxId, limit],
   );
-  return rows.map((row) => ({
-    uid: row.id,
+  // Kampagnen-Mails laufen über den Versand-Cron und stehen nur in der Warteschlange (er_outbox), nicht in der Gesendet-Tabelle.
+  const campaign = await query<{ id: string; recipient: string; subject: string; body: string; sent_at: string }>(
+    `select id::text as id, recipient, subject, body, sent_at::text as sent_at from er_outbox
+     where workspace='default' and status='sent' and mailbox_id=$1 order by sent_at desc limit $2`,
+    [mailboxId, limit],
+  ).catch(() => []);
+  const all = [
+    ...rows.map((row) => ({ uid: row.id as number | string, recipient: row.recipient, subject: row.subject, body: row.body, sent_at: row.sent_at })),
+    ...campaign.map((row) => ({ uid: row.id as number | string, recipient: row.recipient, subject: row.subject, body: row.body, sent_at: row.sent_at })),
+  ].sort((a, b) => new Date(b.sent_at).getTime() - new Date(a.sent_at).getTime()).slice(0, limit);
+  return all.map((row) => ({
+    uid: row.uid as number,
     from: "",
     fromName: "",
     to: row.recipient,
