@@ -25,8 +25,32 @@ function productionConnectionString(raw: string) {
   }
 }
 
+// Zwei Verbindungen möglich: bei Kontingent-/Verbindungsfehlern der ersten wird automatisch auf die zweite gewechselt.
+let activeIndex = 0;
+function connectionStrings() {
+  return [...new Set([process.env.POSTGRES_URL, process.env.DATABASE_URL].filter((value): value is string => Boolean(value)))];
+}
+
+function isFailoverError(error: unknown) {
+  const err = error as { code?: string; message?: string } | null;
+  return err?.code === "53000" || /exceeded the .*quota|compute time quota|data transfer quota|ENOTFOUND|ECONNREFUSED|ETIMEDOUT|Connection terminated|timeout expired/i.test(String(err?.message || ""));
+}
+
+async function failover(error: unknown) {
+  const all = connectionStrings();
+  if (!isFailoverError(error) || activeIndex >= all.length - 1) return false;
+  activeIndex += 1;
+  const old = pool;
+  pool = null;
+  initialized = false;
+  initPromise = null;
+  try { await old?.end(); } catch {}
+  console.error(`[db] Wechsel auf Ausweich-Datenbank (${activeIndex + 1}/${all.length}) wegen: ${(error as Error)?.message}`);
+  return true;
+}
+
 function getPool() {
-  const raw = process.env.POSTGRES_URL || process.env.DATABASE_URL;
+  const raw = connectionStrings()[activeIndex];
   if (!raw) throw new Error("Keine Postgres-Verbindung konfiguriert.");
   if (!pool) pool = new Pool({
     // Vercel Postgres/Neon is the operational fallback while the Supabase
@@ -150,9 +174,14 @@ export async function writeState(payload: unknown, workspace = "default") {
   return rows[0];
 }
 
-export async function query<T = Record<string, unknown>>(text: string, values: unknown[] = []) {
-  await ensureSchema();
-  const result = values.length ? await getPool().query(text, values) : await getPool().query(text);
-  if (Array.isArray(result)) return ((result.at(-1)?.rows ?? []) as T[]);
-  return result.rows as T[];
+export async function query<T = Record<string, unknown>>(text: string, values: unknown[] = []): Promise<T[]> {
+  try {
+    await ensureSchema();
+    const result = values.length ? await getPool().query(text, values) : await getPool().query(text);
+    if (Array.isArray(result)) return ((result.at(-1)?.rows ?? []) as T[]);
+    return result.rows as T[];
+  } catch (error) {
+    if (await failover(error)) return query<T>(text, values);
+    throw error;
+  }
 }
