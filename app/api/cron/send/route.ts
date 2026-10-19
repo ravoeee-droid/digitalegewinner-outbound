@@ -8,6 +8,7 @@ import { getMailboxHealthMap } from "@/lib/outbound-deliverability";
 import { recordOutboundConversationMessage } from "@/lib/outbound-conversation-intelligence";
 import { recordExperimentExposureForSend } from "@/lib/outbound-experiment-engine";
 import { trackedEmailHtml, unsubscribeUrl } from "@/lib/email-tracking";
+import { sendAlertOnce } from "@/lib/alerts";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -29,7 +30,7 @@ type OutboxRow = {
 type Credential = StoredMailboxCredential;
 type State = { mailboxes?: Array<{id:string;email?:string;enabled:boolean;dailyLimit:number}>; campaigns?: Array<{id:string;status?:string;dailyLimit?:number}> };
 const MIN_DAILY_SENDS_PER_MAILBOX=30;
-const PFLEGE_CAMPAIGN_DAILY_TARGET=150;
+const PFLEGE_CAMPAIGN_DAILY_TARGET=300;
 
 function authorized(request: Request) {
   const expected = process.env.CRON_SECRET;
@@ -190,7 +191,7 @@ async function run(request: Request) {
       limited++;
       continue;
     }
-    const campaignLimit = row.campaign_id && !row.campaign_id.startsWith("noshow:") ? (row.campaign_id==="pflege-starter-v2" ? Math.max(PFLEGE_CAMPAIGN_DAILY_TARGET,campaignLimits.get(row.campaign_id) ?? PFLEGE_CAMPAIGN_DAILY_TARGET) : (campaignLimits.get(row.campaign_id) ?? 150)) : undefined;
+    const campaignLimit = row.campaign_id && !row.campaign_id.startsWith("noshow:") ? (row.campaign_id==="pflege-starter-v2" ? Math.max(PFLEGE_CAMPAIGN_DAILY_TARGET,campaignLimits.get(row.campaign_id) ?? PFLEGE_CAMPAIGN_DAILY_TARGET) : (campaignLimits.get(row.campaign_id) ?? 300)) : undefined;
     const campaignCurrent = row.campaign_id ? campaignToday.get(row.campaign_id) ?? 0 : 0;
     if (mailboxCurrent >= mailboxLimit || (campaignLimit !== undefined && campaignCurrent >= campaignLimit)) {
       await query("update er_outbox set status='queued',attempts=greatest(attempts-1,0),scheduled_at=now()+interval '60 minutes',error=null where id=$1 and status='sending'", [row.id]);
@@ -365,6 +366,7 @@ async function run(request: Request) {
         },
       });
       failed++;
+      if(/auth|login|credential|535|534|550|554|refused|timeout|ECONN/i.test(message))void sendAlertOnce(`send:${row.mailbox_id}`,`⚠️ Versand über ${row.mailbox_id} fehlgeschlagen\n${message.slice(0,300)}`,6);
     }
   }
   return Response.json({

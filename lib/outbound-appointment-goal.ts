@@ -4,11 +4,12 @@ import { recordOutboundEventByMode } from "@/lib/outbound-event-ledger";
 import { resolveOutboundRuntimeConfig } from "@/lib/outbound-runtime-config";
 import { ensureLegacyCampaignVersionForAttribution } from "@/lib/outbound-revenue-attribution";
 import { loadMailboxCredentials } from "@/lib/mailbox-credentials";
+import { firstTouch, followUp } from "@/lib/outreach-copy";
 
 export const APPOINTMENT_GOAL_PER_DAY = 4;
-export const LEAD_BUFFER_TARGET = 200;
+export const LEAD_BUFFER_TARGET = 300;
 const FALLBACK_APPOINTMENT_RATE = 0.025;
-const MAX_RECOMMENDED_SENDS = 240;
+const MAX_RECOMMENDED_SENDS = 300;
 const MIN_DAILY_SENDS_PER_MAILBOX = 30;
 
 type CampaignStep = { waitDays:number; subject:string; body:string };
@@ -56,34 +57,21 @@ type PflegeLeadPayload = {
   signals?:{jobTitles?:string[];websiteAudit?:{finding?:string}};
 };
 
-function stableVariant(seed:string) {
-  let hash=2166136261;
-  for(let i=0;i<seed.length;i++){hash^=seed.charCodeAt(i);hash=Math.imul(hash,16777619);}
-  return (hash>>>0)%2===0 ? "A" : "B";
-}
-
 function cleanFinding(value:string) {
   return value.replace(/[–—]/g,",").replace(/\s+/g," ").replace(/[.!?]+$/,"").trim();
 }
 
 function personalizedFirstTouch(lead:{lead_id:string;company:string;contact:string;city:string;lead_payload:PflegeLeadPayload|null}) {
   const payload=lead.lead_payload||{};
-  const title=String(payload.jobReferences?.[0]?.title||payload.signals?.jobTitles?.[0]||"Pflegefachkräfte").trim();
-  const finding=cleanFinding(String(payload.signals?.websiteAudit?.finding||""));
-  const greeting=lead.contact.trim() ? "Hallo "+lead.contact.trim().split(/\s+/)[0]+"," : "Hallo,";
-  const variant=stableVariant(lead.lead_id||lead.company);
-  if(variant==="B"){
-    const area=lead.city.trim() ? " aus "+lead.city.trim() : " aus eurer Gegend";
-    return {variant,subject:"kurze Frage",body:greeting+"\n\nWir sprechen gerade mit Pflegefachkräften"+area+", die offen für einen Wechsel sind. Sucht ihr aktuell noch Verstärkung?"};
-  }
-  const websitePart=finding ? " und habe kurz auf euren Karriereauftritt geschaut, "+finding.charAt(0).toLowerCase()+finding.slice(1) : "";
-  return {variant,subject:title.length<80?title:"kurze Frage zur offenen Stelle",body:greeting+"\n\nBin gerade über eure Stelle für "+title+" gestolpert"+websitePart+". Läuft die Besetzung gerade zäh?"};
+  return firstTouch({
+    lead_id:lead.lead_id,company:lead.company,contact:lead.contact,city:lead.city,
+    title:String(payload.jobReferences?.[0]?.title||payload.signals?.jobTitles?.[0]||""),
+  });
 }
 
-function conciseFollowUp(lead:{contact:string},stepIndex:number) {
-  const greeting=lead.contact.trim() ? "Hallo "+lead.contact.trim().split(/\s+/)[0]+"," : "Hallo,";
-  if(stepIndex===1)return {subject:"noch aktuell?",body:greeting+"\n\nIst das Thema bei euch noch aktuell? Wenn nicht, hake ich es direkt ab."};
-  return {subject:"soll ich es abhaken?",body:greeting+"\n\nSoll ich das Thema bei euch erstmal abhaken oder sucht ihr noch?"};
+function conciseFollowUp(lead:{company:string;contact:string;lead_payload:PflegeLeadPayload|null},stepIndex:number) {
+  const payload=lead.lead_payload||{};
+  return followUp({company:lead.company,contact:lead.contact,title:String(payload.jobReferences?.[0]?.title||payload.signals?.jobTitles?.[0]||"")},stepIndex);
 }
 
 export async function getAppointmentGoalSnapshot(workspace="default") {
@@ -174,7 +162,7 @@ export async function ensureAppointmentGoalQueue(workspace="default") {
       name:"Pflege Recruiting NRW",
       audience:"Private Pflegebetriebe in NRW mit aktivem Personalbedarf",
       status:"Bereit",
-      dailyLimit:150,
+      dailyLimit:300,
       steps:[
         {waitDays:0,subject:"kurze Frage",body:"{{company}}"},
         {waitDays:3,subject:"noch aktuell?",body:"{{company}}"},
@@ -248,7 +236,7 @@ export async function ensureAppointmentGoalQueue(workspace="default") {
     candidates = await query<{
       queue_id:string;lead_id:string;email:string;company:string;contact:string;city:string;lead_payload:PflegeLeadPayload|null
     }>(`
-      select q.id::text queue_id,l.id lead_id,ct.email,c.name company,coalesce(ct.name,'') contact,coalesce(c.city,'') city,q.lead lead_payload
+      select q.id::text queue_id,l.id lead_id,ct.email,c.name company,case when ct.source='public-research' and coalesce(ct.metadata->'enrichment'->>'decisionMakerRole','')='' then '' else coalesce(ct.name,'') end contact,coalesce(c.city,'') city,q.lead lead_payload
       from pflege_email_outreach q
       join sales_contacts ct on lower(ct.email)=lower(q.email) and ct.workspace=$1
       join sales_leads l on l.contact_id=ct.id and l.workspace=$1
@@ -276,7 +264,7 @@ export async function ensureAppointmentGoalQueue(workspace="default") {
         l.id lead_id,
         ct.email,
         c.name company,
-        coalesce(ct.name,'') contact,
+        case when ct.source='public-research' and coalesce(ct.metadata->'enrichment'->>'decisionMakerRole','')='' then '' else coalesce(ct.name,'') end contact,
         coalesce(c.city,'') city,
         jsonb_build_object(
           'jobReferences',jsonb_build_array(jsonb_build_object('title',coalesce(nullif(c.metadata->>'jobTitle',''),'Pflegefachkräfte'))),

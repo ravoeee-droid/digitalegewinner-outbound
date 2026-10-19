@@ -10,8 +10,8 @@
 .counter em{font-style:normal;font-size:11px;color:#9aa3a9}
 .track{height:6px;border-radius:99px;background:rgba(255,255,255,.1);overflow:hidden}
 .track i{display:block;height:100%;background:linear-gradient(90deg,#34c759,#5eeaa0);border-radius:99px;transition:width .6s}
-.tabs{display:inline-flex;gap:4px;padding:4px;border:1px solid rgba(255,255,255,.1);border-radius:14px;background:rgba(255,255,255,.035);margin-bottom:16px}
-.tabs button{min-height:40px;padding:0 20px;border:0;border-radius:10px;background:transparent;color:#9aa3a9;font-weight:900;font-size:13px;cursor:pointer}
+.tabs{display:flex;max-width:100%;overflow-x:auto;gap:4px;padding:4px;border:1px solid rgba(255,255,255,.1);border-radius:14px;background:rgba(255,255,255,.035);margin-bottom:16px}
+.tabs button{min-height:40px;padding:0 16px;white-space:nowrap;flex:0 0 auto;border:0;border-radius:10px;background:transparent;color:#9aa3a9;font-weight:900;font-size:13px;cursor:pointer}
 .tabs button.on{background:#34c759;color:#0d1612}
 .error{padding:10px 14px;border:1px solid rgba(255,120,120,.4);border-radius:10px;background:rgba(255,80,80,.08);color:#ffb4b4;font-size:13px}
 .notice{padding:10px 14px;border:1px solid rgba(52,199,89,.35);border-radius:10px;background:rgba(52,199,89,.08);color:#5eeaa0;font-size:13px}

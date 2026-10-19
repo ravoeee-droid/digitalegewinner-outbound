@@ -61,7 +61,7 @@ export async function PUT(request: Request) {
 
     await verifyMailbox(credential);
     await saveVerifiedMailboxes([credential]);
-    const nextMailbox = { id: credential.id, email: credential.email, enabled: true, dailyLimit: 5 };
+    const nextMailbox = { id: credential.id, email: credential.email, enabled: true, dailyLimit: 30 };
 
     return Response.json({ ok: true, mailbox: publicMailbox(credential), campaignMailbox: nextMailbox });
   } catch (error) {
