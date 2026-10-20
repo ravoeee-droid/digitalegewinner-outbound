@@ -4,13 +4,21 @@ import { recordOutboundEventByMode } from "@/lib/outbound-event-ledger";
 import { resolveOutboundRuntimeConfig } from "@/lib/outbound-runtime-config";
 import { ensureLegacyCampaignVersionForAttribution } from "@/lib/outbound-revenue-attribution";
 import { loadMailboxCredentials } from "@/lib/mailbox-credentials";
-import { firstTouch, followUp } from "@/lib/outreach-copy";
+import { firstTouch, followUp, pvFirstTouch, pvFollowUp } from "@/lib/outreach-copy";
 
 export const APPOINTMENT_GOAL_PER_DAY = 4;
 export const LEAD_BUFFER_TARGET = 300;
 const FALLBACK_APPOINTMENT_RATE = 0.025;
 const MAX_RECOMMENDED_SENDS = 300;
 const MIN_DAILY_SENDS_PER_MAILBOX = 30;
+
+// Zwei Kampagnen teilen sich die Postfächer: je 150 Mails pro Tag.
+export type CampaignDef={key:"pflege"|"pv";id:string;name:string;audience:string;sources:string[];dailyCap:number};
+export const CAMPAIGN_DEFS:CampaignDef[]=[
+  {key:"pflege",id:"pflege-starter-v2",name:"Pflege Recruiting",audience:"Ambulante Pflegedienste mit offener Stelle",sources:["pflegedienstjobs24","ba-jobboerse"],dailyCap:150},
+  {key:"pv",id:"pv-starter-v1",name:"PV Kundengewinnung",audience:"Photovoltaik-Betriebe",sources:["ba-pv"],dailyCap:150},
+];
+let ACTIVE_DEF:CampaignDef=CAMPAIGN_DEFS[0];
 
 type CampaignStep = { waitDays:number; subject:string; body:string };
 type Campaign = {
@@ -62,6 +70,7 @@ function cleanFinding(value:string) {
 }
 
 function personalizedFirstTouch(lead:{lead_id:string;company:string;contact:string;city:string;lead_payload:PflegeLeadPayload|null}) {
+  if(ACTIVE_DEF.key==="pv")return pvFirstTouch(lead);
   const payload=lead.lead_payload||{};
   return firstTouch({
     lead_id:lead.lead_id,company:lead.company,contact:lead.contact,city:lead.city,
@@ -70,6 +79,7 @@ function personalizedFirstTouch(lead:{lead_id:string;company:string;contact:stri
 }
 
 function conciseFollowUp(lead:{company:string;contact:string;lead_payload:PflegeLeadPayload|null},stepIndex:number) {
+  if(ACTIVE_DEF.key==="pv")return pvFollowUp(lead,stepIndex);
   const payload=lead.lead_payload||{};
   return followUp({company:lead.company,contact:lead.contact,title:String(payload.jobReferences?.[0]?.title||payload.signals?.jobTitles?.[0]||"")},stepIndex);
 }
@@ -147,7 +157,8 @@ export async function getAppointmentGoalSnapshot(workspace="default") {
   };
 }
 
-export async function ensureAppointmentGoalQueue(workspace="default") {
+async function ensureCampaignQueue(workspace:string,def:CampaignDef) {
+  ACTIVE_DEF=def;
   const runtime = await resolveOutboundRuntimeConfig();
   if (runtime.v3Mode === "active") {
     return { ok:false, skipped:true, reason:"legacy_worker_disabled", snapshot:await getAppointmentGoalSnapshot(workspace) };
@@ -155,20 +166,17 @@ export async function ensureAppointmentGoalQueue(workspace="default") {
 
   const row = await readStateFields(["mailboxes", "campaigns"], workspace);
   const state = row?.payload as State | undefined;
-  const campaign = (state?.campaigns || []).find(c => c.id === "pflege-starter-v2")
-    || (state?.campaigns || []).find(c => c.status === "Bereit" && c.steps?.length)
-    || {
-      id:"pflege-starter-v2",
-      name:"Pflege Recruiting NRW",
-      audience:"Private Pflegebetriebe in NRW mit aktivem Personalbedarf",
-      status:"Bereit",
-      dailyLimit:300,
-      steps:[
-        {waitDays:0,subject:"kurze Frage",body:"{{company}}"},
-        {waitDays:3,subject:"noch aktuell?",body:"{{company}}"},
-        {waitDays:7,subject:"soll ich es abhaken?",body:"{{company}}"},
-      ],
-    };
+  const defaultSteps=[
+    {waitDays:0,subject:"kurze Frage",body:"{{company}}"},
+    {waitDays:3,subject:"noch aktuell?",body:"{{company}}"},
+    {waitDays:7,subject:"soll ich es abhaken?",body:"{{company}}"},
+  ];
+  const campaign:Campaign = def.key==="pflege"
+    ? ((state?.campaigns || []).find(c => c.id === def.id)
+      || (state?.campaigns || []).find(c => c.status === "Bereit" && c.steps?.length)
+      || {id:def.id,name:def.name,audience:def.audience,status:"Bereit",dailyLimit:def.dailyCap,steps:defaultSteps})
+    : ((state?.campaigns || []).find(c => c.id === def.id)
+      || {id:def.id,name:def.name,audience:def.audience,status:"Aktiv",dailyLimit:def.dailyCap,steps:defaultSteps});
 
   const credentials = await loadMailboxCredentials().catch(() => []);
   const configured = new Map((state?.mailboxes || []).map(m => [String(m.email || "").toLowerCase(),m]));
@@ -215,6 +223,14 @@ export async function ensureAppointmentGoalQueue(workspace="default") {
     remainingByMailbox.set(m.id,Math.max(0,safe-(used.get(m.id)||0)));
   }
   let remainingCapacity = [...remainingByMailbox.values()].reduce((a,b)=>a+b,0);
+  // Jede Kampagne darf pro Tag höchstens ihren Anteil (z. B. 150) belegen: heute gesendet plus heute noch geplant.
+  const [campaignUsed] = await query<{n:number}>(`
+    select count(*)::int n from er_outbox
+    where workspace=$1 and campaign_id=$2
+      and ((status='sent' and ${berlinDaySql("sent_at")})
+        or (status='queued' and scheduled_at < date_trunc('day', now() at time zone 'Europe/Berlin') + interval '1 day'))
+  `,[workspace,def.id]);
+  remainingCapacity=Math.min(remainingCapacity,Math.max(0,def.dailyCap-Number(campaignUsed?.n||0)));
   const enrollmentCapacity=remainingCapacity;
   if (remainingCapacity <= 0) {
     return { ok:true, queuedLeads:0, queuedMessages:0, reason:"safe_capacity_used", snapshot:await getAppointmentGoalSnapshot(workspace) };
@@ -233,6 +249,7 @@ export async function ensureAppointmentGoalQueue(workspace="default") {
     queue_id:string;lead_id:string;email:string;company:string;contact:string;city:string;lead_payload:PflegeLeadPayload|null
   }>=[];
   try {
+    if(def.key!=="pflege")throw new Error("crm-only");
     candidates = await query<{
       queue_id:string;lead_id:string;email:string;company:string;contact:string;city:string;lead_payload:PflegeLeadPayload|null
     }>(`
@@ -278,12 +295,12 @@ export async function ensureAppointmentGoalQueue(workspace="default") {
         and l.stage in ('Neu','Research','Bereit')
         and coalesce(l.do_not_contact,false)=false
         and coalesce(ct.email,'')<>''
-        and lower(coalesce(c.source,'')) in ('pflegedienstjobs24','ba-jobboerse')
+        and lower(coalesce(c.source,''))=any($3::text[])
         and not exists(select 1 from er_suppressions s where s.workspace=$1 and lower(s.email)=lower(ct.email))
         and not exists(select 1 from er_outbox o where o.workspace=$1 and o.campaign_id=$2 and o.lead_id=l.id and o.status not in ('failed','suppressed'))
       order by l.priority_score desc,l.updated_at desc
       limit 250
-    `, [workspace,campaign.id]);
+    `, [workspace,campaign.id,def.sources]);
   }
 
   let queuedLeads=0, queuedMessages=0, complianceBlocked=0;
@@ -381,5 +398,26 @@ export async function ensureAppointmentGoalQueue(workspace="default") {
     queuedMessages,
     complianceBlocked,
     snapshot:await getAppointmentGoalSnapshot(workspace),
+  };
+}
+
+// Beide Kampagnen nacheinander planen; Ergebnis zusammenfassen.
+export async function ensureAppointmentGoalQueue(workspace="default") {
+  const results: Array<Awaited<ReturnType<typeof ensureCampaignQueue>> & Record<string,unknown>> = [];
+  for (const def of CAMPAIGN_DEFS) {
+    try { results.push(await ensureCampaignQueue(workspace,def) as never); }
+    catch (error) { console.error("[appointment-goal] Kampagne fehlgeschlagen",def.id,error instanceof Error?error.message:"Fehler"); results.push({ok:false,error:error instanceof Error?error.message:"Fehler",campaignId:def.id} as never); }
+  }
+  const sum=(key:string)=>results.reduce((total,r)=>total+Number((r as Record<string,unknown>)[key]||0),0);
+  const first=results[0] as Record<string,unknown>;
+  const skipped=results.every(r=>(r as Record<string,unknown>).skipped);
+  return {
+    ...first,
+    ok:results.some(r=>(r as Record<string,unknown>).ok),
+    skipped:skipped||undefined,
+    queuedLeads:sum("queuedLeads"),
+    queuedMessages:sum("queuedMessages"),
+    complianceBlocked:sum("complianceBlocked"),
+    campaigns:results.map(r=>({id:(r as Record<string,unknown>).campaignId,queuedLeads:(r as Record<string,unknown>).queuedLeads,queuedMessages:(r as Record<string,unknown>).queuedMessages,reason:(r as Record<string,unknown>).reason,error:(r as Record<string,unknown>).error})),
   };
 }

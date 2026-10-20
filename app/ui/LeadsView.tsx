@@ -21,6 +21,7 @@ function status(row: Row) {
 
 export default function LeadsView() {
   const [filter, setFilter] = useState("bereit");
+  const [segment, setSegment] = useState("");
   const [q, setQ] = useState("");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
@@ -29,7 +30,7 @@ export default function LeadsView() {
 
   const load = useCallback(async () => {
     try {
-      const response = await fetch(`/api/leads/overview?filter=${filter}&q=${encodeURIComponent(search)}&page=${page}`, { cache: "no-store" });
+      const response = await fetch(`/api/leads/overview?filter=${filter}&q=${encodeURIComponent(search)}&page=${page}&segment=${segment}`, { cache: "no-store" });
       const json = await response.json();
       if (!response.ok) throw new Error(json.error || "Laden fehlgeschlagen");
       setData(json);
@@ -37,7 +38,7 @@ export default function LeadsView() {
     } catch (err) {
       setError(err instanceof Error ? err.message : "Laden fehlgeschlagen");
     }
-  }, [filter, search, page]);
+  }, [filter, search, page, segment]);
 
   useEffect(() => {
     const timer = setTimeout(load, 0);
@@ -77,6 +78,11 @@ export default function LeadsView() {
 
       <section className={`dg-panel ${styles.listPanel}`}>
         <div className={styles.toolbar}>
+          <div className={styles.chips} role="group" aria-label="Kampagne">
+            {[["", "Alle Kampagnen"], ["pflege", "Pflege"], ["pv", "Photovoltaik"]].map(([key, label]) => (
+              <button key={key} type="button" className={segment === key ? styles.chipOn : styles.chip} aria-pressed={segment === key} onClick={() => { setSegment(key); setPage(1); }}>{label}</button>
+            ))}
+          </div>
           <div className={styles.chips} role="group" aria-label="Filter">
             {FILTERS.map(([key, label]) => (
               <button key={key} type="button" className={filter === key ? styles.chipOn : styles.chip} aria-pressed={filter === key} onClick={() => { setFilter(key); setPage(1); }}>{label}</button>

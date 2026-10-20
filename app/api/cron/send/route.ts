@@ -1,5 +1,5 @@
 import { query, queryIfTable, readStateFields } from "@/lib/db";
-import { withSignatureLink } from "@/lib/outreach-copy";
+import { resolveSlots, withSignatureLink } from "@/lib/outreach-copy";
 import { sendMail } from "@/lib/mailer";
 import { loadMailboxCredentials, type StoredMailboxCredential } from "@/lib/mailbox-credentials";
 import { recordOutboundEventByMode } from "@/lib/outbound-event-ledger";
@@ -31,7 +31,8 @@ type OutboxRow = {
 type Credential = StoredMailboxCredential;
 type State = { mailboxes?: Array<{id:string;email?:string;enabled:boolean;dailyLimit:number}>; campaigns?: Array<{id:string;status?:string;dailyLimit?:number}> };
 const MIN_DAILY_SENDS_PER_MAILBOX=30;
-const PFLEGE_CAMPAIGN_DAILY_TARGET=300;
+const PFLEGE_CAMPAIGN_DAILY_TARGET=150;
+const KNOWN_CAMPAIGN_IDS=new Set(["pflege-starter-v2","pv-starter-v1"]);
 
 function authorized(request: Request) {
   const expected = process.env.CRON_SECRET;
@@ -199,7 +200,7 @@ async function run(request: Request) {
       limited++;
       return;
     }
-    const campaignLimit = row.campaign_id && !row.campaign_id.startsWith("noshow:") ? (row.campaign_id==="pflege-starter-v2" ? Math.max(PFLEGE_CAMPAIGN_DAILY_TARGET,campaignLimits.get(row.campaign_id) ?? PFLEGE_CAMPAIGN_DAILY_TARGET) : (campaignLimits.get(row.campaign_id) ?? 300)) : undefined;
+    const campaignLimit = row.campaign_id && !row.campaign_id.startsWith("noshow:") ? (KNOWN_CAMPAIGN_IDS.has(row.campaign_id) ? PFLEGE_CAMPAIGN_DAILY_TARGET : (campaignLimits.get(row.campaign_id) ?? 300)) : undefined;
     const campaignCurrent = row.campaign_id ? campaignToday.get(row.campaign_id) ?? 0 : 0;
     if (mailboxCurrent >= mailboxLimit || (campaignLimit !== undefined && campaignCurrent >= campaignLimit)) {
       await query("update er_outbox set status='queued',attempts=greatest(attempts-1,0),scheduled_at=now()+interval '60 minutes',error=null where id=$1 and status='sending'", [row.id]);
@@ -289,7 +290,7 @@ async function run(request: Request) {
       const configured=(process.env.NEXT_PUBLIC_APP_URL||"").trim().replace(/\/+$/,"");
       const origin=/^https:\/\/[^\s/]+$/i.test(configured)?configured:new URL(request.url).origin;
       const optOut=unsubscribeUrl(origin,row.id,row.lead_id);
-      const mailBody=withSignatureLink(row.body);
+      const mailBody=resolveSlots(withSignatureLink(row.body));
       const html=trackedEmailHtml(mailBody,origin,row.id,row.lead_id,optOut);
       const text=`${mailBody}\n\n--\nKein Interesse an weiteren Nachrichten? Hier abmelden: ${optOut}`;
       const result = await sendMail({ ...credential, to:row.recipient, subject:row.subject, text, html, headers:{ "List-Unsubscribe":`<${optOut}>`, "List-Unsubscribe-Post":"List-Unsubscribe=One-Click" } });
