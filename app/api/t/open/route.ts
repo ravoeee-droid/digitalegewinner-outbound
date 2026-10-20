@@ -12,7 +12,7 @@ async function notifyOpen(outboxId:string,leadId:string){
   try{
     const [row]=await query<{recipient:string;subject:string;age:number}>(
       "select recipient,subject,extract(epoch from (now()-sent_at))::int age from er_outbox where id::text=$1 limit 1",[outboxId]);
-    if(!row||row.age<60)return;
+    if(!row||row.age<120)return;
     await sendAlertOnce(`open:${leadId}`,`👀 E-Mail geöffnet\n${row.recipient}\n„${row.subject}"`,24*30);
   }catch{}
 }
