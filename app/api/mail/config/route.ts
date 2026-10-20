@@ -1,4 +1,5 @@
 import { promises as dns } from "node:dns";
+import { createHash } from "node:crypto";
 import { z } from "zod";
 import { loadMailboxCredentials, saveVerifiedMailboxes } from "@/lib/mailbox-credentials";
 import { verifyMailbox, publicMailbox, type NetcupCredential } from "@/lib/mailbox-verification";
@@ -44,8 +45,14 @@ export async function PUT(request: Request) {
     const input = setupSchema.parse(await request.json());
     const detectedHost = (!input.imapHost || !input.smtpHost) ? await detectMailHost(input.email) : "";
     const username = input.username || input.email;
+    const existing = await loadMailboxCredentials();
+    const sameEmail = existing.find(item => item.email.toLowerCase() === input.email.toLowerCase());
+    const id = input.id || sameEmail?.id || `mb-${createHash("sha256").update(input.email.toLowerCase()).digest("hex").slice(0, 32)}`;
+    if (existing.some(item => item.id === id && item.email.toLowerCase() !== input.email.toLowerCase())) {
+      return Response.json({ error: "Diese Postfachkennung gehört zu einer anderen E-Mail-Adresse. Bitte ein neues Postfach hinzufügen." }, { status: 409 });
+    }
     const credential: NetcupCredential = {
-      id: input.id || `mb-${input.email.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}`,
+      id,
       provider: "smtp",
       email: input.email.toLowerCase(),
       name: input.name || "Raphael Hermann",
