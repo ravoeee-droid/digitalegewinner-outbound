@@ -11,7 +11,7 @@ export type TerritoryEvidence = {
   verification: "manual";
 };
 export type TerritoryCandidate = {
-  id: string; county: string; state: string; name: string; city: string; website: string; phone: string;
+  id: string; source: string; county: string; state: string; name: string; city: string; website: string; phone: string;
   source_url: string; source_id: string; source_tags: Record<string, string>;
   evidence: TerritoryEvidence[]; score: number; crm_lead_id: string | null; updated_at: string;
 };
@@ -124,7 +124,7 @@ export async function listTerritory(county = "", state = "", workspace = "defaul
      from dg_territory_scans where workspace=$1 order by created_at desc limit 15`, [workspace],
   );
   const candidates = await query<TerritoryCandidate>(
-    `select id,county,state,name,city,website,phone,source_url,source_id,source_tags,evidence,score,crm_lead_id,updated_at
+    `select id,source,county,state,name,city,website,phone,source_url,source_id,source_tags,evidence,score,crm_lead_id,updated_at
      from dg_territory_candidates where workspace=$1
        and ($2::text='' or county=$2) and ($3::text='' or state=$3)
      order by score desc, updated_at desc limit 350`, [workspace, county, state],
@@ -195,7 +195,7 @@ export async function scanCounty(county: string, state: string, workspace = "def
 export async function addTerritoryEvidence(id: string, kind: EvidenceKind, url: string, note: string, workspace = "default") {
   await ensureTerritorySchema();
   const rows = await query<TerritoryCandidate>(
-    `select id,county,state,name,city,website,phone,source_url,source_id,source_tags,evidence,score,crm_lead_id,updated_at
+    `select id,source,county,state,name,city,website,phone,source_url,source_id,source_tags,evidence,score,crm_lead_id,updated_at
      from dg_territory_candidates where workspace=$1 and id=$2 limit 1`, [workspace, id],
   );
   const row = rows[0];
@@ -206,13 +206,17 @@ export async function addTerritoryEvidence(id: string, kind: EvidenceKind, url: 
   const score = evidenceScore({ ...row, evidence: next });
   await query(`update dg_territory_candidates set evidence=$3::jsonb,score=$4,updated_at=now() where workspace=$1 and id=$2`,
     [workspace, id, JSON.stringify(next), score]);
+  if (row.crm_lead_id) {
+    await query(`update sales_leads set priority_score=greatest(priority_score,$3),updated_at=now()
+      where workspace=$1 and id=$2 and status='active'`, [workspace, row.crm_lead_id, score]);
+  }
   return { score, evidence: next };
 }
 
 export async function importTerritoryCandidate(id: string, workspace = "default") {
   await ensureTerritorySchema();
   const rows = await query<TerritoryCandidate>(
-    `select id,county,state,name,city,website,phone,source_url,source_id,source_tags,evidence,score,crm_lead_id,updated_at
+    `select id,source,county,state,name,city,website,phone,source_url,source_id,source_tags,evidence,score,crm_lead_id,updated_at
      from dg_territory_candidates where workspace=$1 and id=$2 limit 1`, [workspace, id],
   );
   const row = rows[0];
@@ -220,18 +224,19 @@ export async function importTerritoryCandidate(id: string, workspace = "default"
   if (row.crm_lead_id) return { leadId: row.crm_lead_id, alreadyImported: true };
   // Existing CRM record: never overwrite call notes, exclusions or lead stage.
   const domain = (() => { try { return row.website ? new URL(row.website).hostname.replace(/^www\./, "").toLowerCase() : ""; } catch { return ""; } })();
+  const sourceId = row.source === "openstreetmap" ? `osm:${row.source_id}` : `manual:${row.source_id}`;
   const existing = await query<{ id: string }>(
     `select l.id from sales_leads l join sales_companies c on c.id=l.company_id
      where l.workspace=$1 and l.status='active' and
-       ((c.source='openstreetmap' and c.source_id=$2) or ($3::text<>'' and c.domain=$3))
-     limit 1`, [workspace, `osm:${row.source_id}`, domain],
+       ((c.source=$2 and c.source_id=$3) or ($4::text<>'' and c.domain=$4))
+     limit 1`, [workspace, row.source, sourceId, domain],
   );
   let leadId = existing[0]?.id;
   if (!leadId) {
     const result = await persistRadarLead({
-      id: `osm:${row.source_id}`, company: row.name, city: row.city || row.county,
+      id: sourceId, company: row.name, city: row.city || row.county,
       website: row.website, phone: row.phone, industry: "Photovoltaik / Elektro",
-      source: "openstreetmap",
+      source: row.source,
     }, {});
     leadId = result.leadId;
     await query(`update sales_leads set notes=$3 where workspace=$1 and id=$2`,
@@ -239,6 +244,8 @@ export async function importTerritoryCandidate(id: string, workspace = "default"
   }
   await query(`update dg_territory_candidates set crm_lead_id=$3,updated_at=now() where workspace=$1 and id=$2`,
     [workspace, id, leadId]);
+  await query(`update sales_leads set priority_score=greatest(priority_score,$3),updated_at=now()
+    where workspace=$1 and id=$2 and status='active'`, [workspace, leadId, row.score]);
   return { leadId, alreadyImported: Boolean(existing.length) };
 }
 
