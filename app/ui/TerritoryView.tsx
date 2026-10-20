@@ -14,6 +14,8 @@ type Candidate = {
 type Scan = { id: string; county: string; state: string; status: string; found_count: number;
   inserted_count: number; message: string; created_at: string; finished_at: string | null };
 type Data = { scans: Scan[]; candidates: Candidate[]; capped: boolean };
+type ImportCompany = { county: string; state: string; name: string; city?: string; website?: string; phone?: string; sourceUrl: string };
+type ImportResult = { name: string; ok: boolean; leadId?: string; alreadyImported?: boolean; error?: string };
 const states = [
   "Baden-Württemberg", "Bayern", "Berlin", "Brandenburg", "Bremen", "Hamburg",
   "Hessen", "Mecklenburg-Vorpommern", "Niedersachsen", "Nordrhein-Westfalen",
@@ -55,6 +57,58 @@ export default function TerritoryView({ canEdit }: { canEdit: boolean }) {
   const [addWebsite, setAddWebsite] = useState("");
   const [addPhone, setAddPhone] = useState("");
   const [addSource, setAddSource] = useState("");
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const [bulkInput, setBulkInput] = useState("");
+  const [bulkProgress, setBulkProgress] = useState("");
+  const [bulkResults, setBulkResults] = useState<ImportResult[]>([]);
+
+  async function runBulkImport() {
+    let companies: ImportCompany[];
+    try {
+      const parsed: unknown = JSON.parse(bulkInput);
+      if (!Array.isArray(parsed) || !parsed.length || parsed.length > 300) throw new Error("Bitte 1 bis 300 Firmen als JSON-Liste einfügen.");
+      companies = parsed as ImportCompany[];
+    } catch (e) { setError(e instanceof Error ? e.message : "Ungültige JSON-Liste."); return; }
+    setBusy("bulk"); setError(""); setNotice(""); setBulkResults([]);
+    const results: ImportResult[] = [];
+    const newIds = new Set<string>();
+    const enrichedIds = new Set<string>();
+    const checkpointKey = "dg-pv-bulk-import-v1";
+    try {
+      const previous = JSON.parse(localStorage.getItem(checkpointKey) || "null");
+      if (previous?.input === bulkInput) {
+        for (const id of previous.newIds || []) if (typeof id === "string") newIds.add(id);
+        for (const id of previous.enrichedIds || []) if (typeof id === "string") enrichedIds.add(id);
+      }
+    } catch { /* An unavailable checkpoint never authorizes enrichment of unrelated leads. */ }
+    const checkpoint = () => localStorage.setItem(checkpointKey, JSON.stringify({
+      input: bulkInput, newIds: [...newIds], enrichedIds: [...enrichedIds],
+    }));
+    try {
+      for (let offset = 0; offset < companies.length; offset += 10) {
+        setBulkProgress(`Import: ${offset} / ${companies.length}`);
+        const response = await fetch("/api/territories", { method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "bulk_import", companies: companies.slice(offset, offset + 10) }) });
+        const json = await response.json();
+        if (!response.ok) throw new Error(json.error || "Sammelimport fehlgeschlagen. Bereits bestätigte Ergebnisse bleiben erhalten.");
+        results.push(...json.results as ImportResult[]); setBulkResults([...results]);
+        for (const item of json.results as ImportResult[]) if (item.ok && !item.alreadyImported && item.leadId) newIds.add(item.leadId);
+        checkpoint();
+      }
+      const ids = [...newIds].filter(id => !enrichedIds.has(id));
+      for (let offset = 0; offset < ids.length; offset += 3) {
+        setBulkProgress(`Anreicherung: ${offset} / ${ids.length}`);
+        const response = await fetch("/api/crm/enrichment", { method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ leadIds: ids.slice(offset, offset + 3), ai: true }) });
+        const json = await response.json();
+        if (!response.ok) throw new Error(json.error || "Anreicherung unterbrochen; importierte Firmen bleiben im CRM.");
+        for (const item of json.results || []) if (item.ok && typeof item.leadId === "string") enrichedIds.add(item.leadId);
+        checkpoint();
+      }
+      setNotice(`${newIds.size} neu importiert · ${results.filter(item => item.alreadyImported).length} bereits vorhanden · ${results.filter(item => !item.ok).length} Importfehler · ${enrichedIds.size} angereichert.`);
+    } catch (e) { setError(e instanceof Error ? e.message : "Sammelverarbeitung unterbrochen."); }
+    finally { setBulkProgress(""); setBusy(""); await load(applied).catch(() => undefined); }
+  }
 
   const load = useCallback(async (area: { county: string; state: string }) => {
     const params = new URLSearchParams({ county: area.county, state: area.state });
@@ -159,10 +213,25 @@ export default function TerritoryView({ canEdit }: { canEdit: boolean }) {
               onClick={() => void runScan()}>{busy === "scan" ? "Suche läuft …" : "Landkreis recherchieren"}</button>}
             {canEdit && <button className="dg-btn" type="button" disabled={!!busy}
               onClick={() => setAddOpen(value => !value)}>{addOpen ? "Quellenimport schließen" : "+ Firma aus Portalquelle"}</button>}
+            {canEdit && <button className="dg-btn" type="button" disabled={!!busy}
+              onClick={() => setBulkOpen(value => !value)}>Sammelimport</button>}
           </div>
         </div>
         <p className={styles.disclaimer}>Quelle V1: OpenStreetMap (öffentliche Unternehmens-Einträge). Das ist <strong>keine vollständige Landkreis-Abdeckung</strong>. Leadportal-Kunden, Ads und Stellenanzeigen werden nur mit separat dokumentiertem Nachweis bewertet. Ein Scan startet ausschließlich auf Knopfdruck und kann durch öffentliche API-Limits scheitern.</p>
       </section>
+
+      {bulkOpen && canEdit && <section className={`dg-panel ${styles.evidenceEditor}`}>
+        <h2>Geprüfte Firmen importieren und anreichern</h2>
+        <p>Bis zu 300 Datensätze mit Landkreis, Bundesland, Firmenname und Originalquelle. Bestehende Domains werden wiederverwendet. Nur neue CRM-Einträge werden anschließend angereichert. Der Browser muss bis zum Abschluss geöffnet bleiben.</p>
+        <label>Firmenliste (JSON)<textarea value={bulkInput} onChange={e => setBulkInput(e.target.value)}
+          rows={8} maxLength={600000} disabled={!!busy} style={{ width: "100%" }} /></label>
+        <button className="dg-btn dg-btn-primary" type="button" disabled={!!busy || !bulkInput.trim()}
+          onClick={() => void runBulkImport()}>Import und Anreicherung starten</button>
+        {bulkProgress && <p role="status">{bulkProgress}</p>}
+        {bulkResults.length > 0 && <details><summary>{bulkResults.length} bestätigte Importergebnisse</summary>
+          <ul>{bulkResults.map((item, index) => <li key={index}>{item.name}: {item.ok ? (item.alreadyImported ? "bereits vorhanden" : "importiert") : item.error}</li>)}</ul>
+        </details>}
+      </section>}
 
       {addOpen && canEdit && <section className={`dg-panel ${styles.evidenceEditor}`}>
         <div className={styles.resultHead}>
