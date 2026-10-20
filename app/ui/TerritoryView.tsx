@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import styles from "./TerritoryView.module.css";
 
-type EvidenceKind = "portal" | "ads" | "hiring" | "funnel" | "references" | "other";
+type EvidenceKind = "portal" | "portal_listing" | "ads" | "hiring" | "funnel" | "references" | "other";
 type Evidence = { kind: EvidenceKind; url: string; note: string; addedAt: string; verification: "manual" };
 type Candidate = {
   id: string; county: string; state: string; name: string; city: string; website: string;
@@ -20,7 +20,8 @@ const states = [
   "Rheinland-Pfalz", "Saarland", "Sachsen", "Sachsen-Anhalt", "Schleswig-Holstein", "Thüringen",
 ];
 const KINDS: Array<[EvidenceKind, string]> = [
-  ["portal", "Leadportal (Aroundhome / WattFox / andere)"],
+  ["portal", "Leadkauf ausdrücklich bestätigt"],
+  ["portal_listing", "Bei einem Leadportal gelistet (kein Kaufnachweis)"],
   ["ads", "Aktive Google- / Meta-Anzeige"],
   ["hiring", "Vertrieb / offene Stellen"],
   ["funnel", "Website- / Conversion-Schwäche"],
@@ -48,6 +49,12 @@ export default function TerritoryView({ canEdit }: { canEdit: boolean }) {
   const [url, setUrl] = useState("");
   const [note, setNote] = useState("");
   const [search, setSearch] = useState("");
+  const [addOpen, setAddOpen] = useState(false);
+  const [addName, setAddName] = useState("");
+  const [addCity, setAddCity] = useState("");
+  const [addWebsite, setAddWebsite] = useState("");
+  const [addPhone, setAddPhone] = useState("");
+  const [addSource, setAddSource] = useState("");
 
   const load = useCallback(async (area: { county: string; state: string }) => {
     const params = new URLSearchParams({ county: area.county, state: area.state });
@@ -150,10 +157,36 @@ export default function TerritoryView({ canEdit }: { canEdit: boolean }) {
             }}>Gebiet anzeigen</button>
             {canEdit && <button className="dg-btn dg-btn-primary" type="button" disabled={!!busy}
               onClick={() => void runScan()}>{busy === "scan" ? "Suche läuft …" : "Landkreis recherchieren"}</button>}
+            {canEdit && <button className="dg-btn" type="button" disabled={!!busy}
+              onClick={() => setAddOpen(value => !value)}>{addOpen ? "Quellenimport schließen" : "+ Firma aus Portalquelle"}</button>}
           </div>
         </div>
         <p className={styles.disclaimer}>Quelle V1: OpenStreetMap (öffentliche Unternehmens-Einträge). Das ist <strong>keine vollständige Landkreis-Abdeckung</strong>. Leadportal-Kunden, Ads und Stellenanzeigen werden nur mit separat dokumentiertem Nachweis bewertet. Ein Scan startet ausschließlich auf Knopfdruck und kann durch öffentliche API-Limits scheitern.</p>
       </section>
+
+      {addOpen && canEdit && <section className={`dg-panel ${styles.evidenceEditor}`}>
+        <div className={styles.resultHead}>
+          <div><h2>Firma aus Aroundhome, WattFox oder einer anderen Quelle ergänzen</h2>
+          <p>Ohne OSM-Eintrag möglich. Der Originalquellenlink ist Pflicht; die tatsächliche Leadnutzung prüfen wir getrennt.</p></div>
+          <button className="dg-btn" type="button" onClick={() => setAddOpen(false)}>Schließen</button>
+        </div>
+        <form className={styles.evidenceForm} onSubmit={async e => {
+          e.preventDefault();
+          const ok = await act({ action: "add", county: county.trim(), state, name: addName.trim(),
+            city: addCity.trim(), website: addWebsite.trim(), phone: addPhone.trim(),
+            sourceUrl: addSource.trim() }, "Firma mit Originalquelle gespeichert.");
+          if (ok) { setApplied({ county: county.trim(), state }); setAddOpen(false); setAddName(""); setAddCity(""); setAddWebsite(""); setAddPhone(""); setAddSource(""); }
+        }}>
+          <label>Firmenname<input required minLength={3} maxLength={240} value={addName}
+            onChange={e => setAddName(e.target.value)} placeholder="Name des PV-Betriebs" /></label>
+          <label>Stadt<input maxLength={150} value={addCity} onChange={e => setAddCity(e.target.value)} placeholder="Ort" /></label>
+          <label>Website<input type="text" maxLength={600} value={addWebsite} onChange={e => setAddWebsite(e.target.value)} placeholder="https://beispiel.de" /></label>
+          <label>Telefon<input maxLength={120} value={addPhone} onChange={e => setAddPhone(e.target.value)} placeholder="Öffentliche Geschäftsnummer" /></label>
+          <label>Originalquelle (Pflicht)<input type="url" required value={addSource}
+            onChange={e => setAddSource(e.target.value)} placeholder="https://www.aroundhome.de/fachfirmen/firma/..." /></label>
+          <button className="dg-btn dg-btn-primary" type="submit" disabled={!!busy}>Firma speichern</button>
+        </form>
+      </section>}
 
       {error && <p role="alert" className={styles.error}>{error}</p>}
       {notice && <p role="status" className={styles.notice}>{notice}</p>}
