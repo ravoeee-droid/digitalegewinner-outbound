@@ -1,8 +1,8 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { query } from "@/lib/db";
 import { ensureSalesOsSchema, persistRadarLead } from "@/lib/sales-os";
 
-export type EvidenceKind = "portal" | "ads" | "hiring" | "funnel" | "references" | "other";
+export type EvidenceKind = "portal" | "portal_listing" | "ads" | "hiring" | "funnel" | "references" | "other";
 export type TerritoryEvidence = {
   kind: EvidenceKind;
   url: string;
@@ -21,7 +21,7 @@ export type TerritoryScan = {
 };
 
 const EVIDENCE_POINTS: Record<EvidenceKind, number> = {
-  portal: 25, ads: 20, hiring: 15, funnel: 20, references: 10, other: 0,
+  portal: 25, portal_listing: 8, ads: 20, hiring: 15, funnel: 20, references: 10, other: 0,
 };
 const PV_NAME = /solar|photovoltaik|pv[- ]?anlagen|solartechnik|solarmontage/i;
 
@@ -240,4 +240,30 @@ export async function importTerritoryCandidate(id: string, workspace = "default"
   await query(`update dg_territory_candidates set crm_lead_id=$3,updated_at=now() where workspace=$1 and id=$2`,
     [workspace, id, leadId]);
   return { leadId, alreadyImported: Boolean(existing.length) };
+}
+
+/** Add a company with its original public source URL even if OSM has no record. */
+export async function addSourcedCompany(input: {
+  county: string; state: string; name: string; city: string;
+  website: string; phone: string; sourceUrl: string;
+}, workspace = "default") {
+  await ensureTerritorySchema();
+  const website = validWebsite(input.website);
+  const source = new URL(input.sourceUrl);
+  if (!["http:", "https:"].includes(source.protocol)) throw new Error("Quelle muss eine HTTP(S)-URL sein.");
+  const fingerprint = createHash("sha256").update(
+    [input.name.toLocaleLowerCase("de-DE").trim(), input.county.toLocaleLowerCase("de-DE").trim(), website].join("|"),
+  ).digest("hex").slice(0, 32);
+  const tags: Record<string,string> = { provenance: "manual-public-source" };
+  const score = baseScore({ name: input.name, website, phone: input.phone, source_tags: tags });
+  const rows = await query<{ id: string }>(`
+    insert into dg_territory_candidates
+      (id,workspace,source,source_id,county,state,name,city,website,phone,source_url,source_tags,score)
+    values($1,$2,'manual-source',$3,$4,$5,$6,$7,$8,$9,$10,$11::jsonb,$12)
+    on conflict(workspace,source,source_id) do update set
+      source_url=excluded.source_url,updated_at=now()
+    returning id
+  `, [randomUUID(), workspace, fingerprint, input.county, input.state, input.name, input.city,
+    website, input.phone, source.href, JSON.stringify(tags), score]);
+  return { candidateId: rows[0]?.id };
 }
