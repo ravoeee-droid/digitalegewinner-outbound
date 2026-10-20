@@ -1,5 +1,6 @@
 import { query, queryIfTable, readStateFields } from "@/lib/db";
 import { resolveSlots, withSignatureLink } from "@/lib/outreach-copy";
+import { pvPageUrl } from "@/lib/pv-page";
 import { sendMail } from "@/lib/mailer";
 import { loadMailboxCredentials, type StoredMailboxCredential } from "@/lib/mailbox-credentials";
 import { recordOutboundEventByMode } from "@/lib/outbound-event-ledger";
@@ -290,7 +291,7 @@ async function run(request: Request) {
       const configured=(process.env.NEXT_PUBLIC_APP_URL||"").trim().replace(/\/+$/,"");
       const origin=/^https:\/\/[^\s/]+$/i.test(configured)?configured:new URL(request.url).origin;
       const optOut=unsubscribeUrl(origin,row.id,row.lead_id);
-      const mailBody=resolveSlots(withSignatureLink(row.body));
+      const mailBody=resolveSlots(withSignatureLink(row.body)).replaceAll("{{pv_link}}",row.body.includes("{{pv_link}}")?await pvPageUrl():"");
       const html=trackedEmailHtml(mailBody,origin,row.id,row.lead_id,optOut);
       const text=`${mailBody}\n\n--\nKein Interesse an weiteren Nachrichten? Hier abmelden: ${optOut}`;
       const result = await sendMail({ ...credential, to:row.recipient, subject:row.subject, text, html, headers:{ "List-Unsubscribe":`<${optOut}>`, "List-Unsubscribe-Post":"List-Unsubscribe=One-Click" } });
