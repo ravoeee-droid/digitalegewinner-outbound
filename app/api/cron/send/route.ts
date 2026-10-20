@@ -131,11 +131,12 @@ async function run(request: Request) {
 
   let sent=0, failed=0, limited=0, skipped=0, deliverabilityLimited=0, deliverabilityWouldLimit=0;
   const sentThisCycle=new Map<string,number>();
-  for (const row of due) {
+  // Postfächer laufen parallel (jede Mail dauert mehrere Sekunden), Mails desselben Postfachs nacheinander.
+  const handleRow = async (row: OutboxRow) => {
     // Zeitbudget: Rest der Mails sofort wieder freigeben, statt vom Plattform-Timeout mitten im Versand abgebrochen zu werden.
     if (Date.now() - startedAt > 200_000) {
       await query("update er_outbox set status='queued',attempts=greatest(attempts-1,0),scheduled_at=now(),error=null where id=$1 and status='sending'", [row.id]);
-      skipped++; continue;
+      skipped++; return;
     }
     const credential = credMap.get(row.mailbox_id);
     if (!credential) {
@@ -154,7 +155,7 @@ async function run(request: Request) {
           reason:"missing_mailbox_credentials",
         },
       });
-      failed++; continue;
+      failed++; return;
     }
     const configuredMailboxLimit = Math.max(MIN_DAILY_SENDS_PER_MAILBOX, mailboxLimits.get(row.mailbox_id) ?? MIN_DAILY_SENDS_PER_MAILBOX);
     const health = healthMap.get(row.mailbox_id) as {
@@ -178,7 +179,7 @@ async function run(request: Request) {
         );
         limited++;
         deliverabilityLimited++;
-        continue;
+        return;
       }
       const healthLimit=health.health_status==="healthy"
         ?Math.max(MIN_DAILY_SENDS_PER_MAILBOX,Number(health.enforced_daily_limit??configuredMailboxLimit))
@@ -195,13 +196,13 @@ async function run(request: Request) {
     if(cycleCurrent>=cycleLimit){
       await query("update er_outbox set status='queued',attempts=greatest(attempts-1,0),scheduled_at=now()+interval '10 minutes',error=null where id=$1 and status='sending'", [row.id]);
       limited++;
-      continue;
+      return;
     }
     const campaignLimit = row.campaign_id && !row.campaign_id.startsWith("noshow:") ? (row.campaign_id==="pflege-starter-v2" ? Math.max(PFLEGE_CAMPAIGN_DAILY_TARGET,campaignLimits.get(row.campaign_id) ?? PFLEGE_CAMPAIGN_DAILY_TARGET) : (campaignLimits.get(row.campaign_id) ?? 300)) : undefined;
     const campaignCurrent = row.campaign_id ? campaignToday.get(row.campaign_id) ?? 0 : 0;
     if (mailboxCurrent >= mailboxLimit || (campaignLimit !== undefined && campaignCurrent >= campaignLimit)) {
       await query("update er_outbox set status='queued',attempts=greatest(attempts-1,0),scheduled_at=now()+interval '60 minutes',error=null where id=$1 and status='sending'", [row.id]);
-      limited++; continue;
+      limited++; return;
     }
 
     if(runtimeConfig.complianceMode!=="off"){
@@ -236,7 +237,7 @@ async function run(request: Request) {
             [row.id,`Compliance gate: ${compliance.decision.reason}`],
           );
           skipped++;
-          continue;
+          return;
         }
       }catch(error){
         const message=error instanceof Error?error.message:"Compliance evaluation failed";
@@ -262,7 +263,7 @@ async function run(request: Request) {
             [row.id,`Compliance evaluator unavailable: ${message}`],
           );
           skipped++;
-          continue;
+          return;
         }
       }
     }
@@ -376,7 +377,10 @@ async function run(request: Request) {
       failed++;
       if(/auth|login|credential|535|534|550|554|refused|timeout|ECONN/i.test(message))void sendAlertOnce(`send:${row.mailbox_id}`,`⚠️ Versand über ${row.mailbox_id} fehlgeschlagen\n${message.slice(0,300)}`,6);
     }
-  }
+  };
+  const byMailbox = new Map<string, OutboxRow[]>();
+  for (const row of due) byMailbox.set(row.mailbox_id, [...(byMailbox.get(row.mailbox_id) || []), row]);
+  await Promise.all([...byMailbox.values()].map(async (rows) => { for (const row of rows) await handleRow(row); }));
   console.log("[send]",JSON.stringify({claimed:due.length,sent,failed,skipped,limited,seconds:Math.round((Date.now()-startedAt)/1000)}));
   return Response.json({
     ok:true,

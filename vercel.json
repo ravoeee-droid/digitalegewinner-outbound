@@ -23,7 +23,7 @@
     },
     {
       "path": "/api/cron/ba-leads",
-      "schedule": "5 5-15 * * 1-5"
+      "schedule": "5,35 5-15 * * 1-5"
     },
     {
       "path": "/api/cron/pflege-source",
