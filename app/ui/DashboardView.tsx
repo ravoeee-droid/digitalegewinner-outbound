@@ -14,6 +14,7 @@ type Data = {
   recent: { lead_id: string; type: string; company: string | null; at: string }[];
   checks?: Check[];
   source?: { status: string; reason: string; n: number; started: string }[];
+  dbExpiry?: { at: string; claimUrl: string; hoursLeft: number } | null;
 };
 
 const nf = new Intl.NumberFormat("de-DE");
@@ -176,6 +177,9 @@ export default function DashboardView() {
         </div>
       </header>
 
+      {data?.dbExpiry && (
+        <p className="dg-notice" role="alert"><strong>Wichtig: Die Datenbank wird in {data.dbExpiry.hoursLeft} Stunden gelöscht.</strong> Dann sind alle Leads und Daten weg. <a href={data.dbExpiry.claimUrl} target="_blank" rel="noreferrer">Jetzt kostenlos übernehmen</a></p>
+      )}
       {error && <p className="dg-notice" role="alert">{error}</p>}
       {!data && !error && <p className={styles.muted}>Lade Daten …</p>}
 

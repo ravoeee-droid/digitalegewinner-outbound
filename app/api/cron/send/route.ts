@@ -377,6 +377,7 @@ async function run(request: Request) {
       if(/auth|login|credential|535|534|550|554|refused|timeout|ECONN/i.test(message))void sendAlertOnce(`send:${row.mailbox_id}`,`⚠️ Versand über ${row.mailbox_id} fehlgeschlagen\n${message.slice(0,300)}`,6);
     }
   }
+  console.log("[send]",JSON.stringify({claimed:due.length,sent,failed,skipped,limited,seconds:Math.round((Date.now()-startedAt)/1000)}));
   return Response.json({
     ok:true,
     claimed:due.length,
