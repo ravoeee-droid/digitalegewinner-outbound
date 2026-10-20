@@ -10,6 +10,7 @@ import { ingestInboundConversationMessage } from "@/lib/outbound-conversation-in
 import { handleBookingMail } from "@/lib/appointments";
 import { sendAlert, sendAlertOnce } from "@/lib/alerts";
 import { dbExpiry } from "@/lib/db-expiry";
+import { analyzeReply } from "@/lib/reply-insight";
 
 export const runtime="nodejs";export const maxDuration=60;
 type State={leads?:Array<Record<string,unknown>>};
@@ -118,6 +119,19 @@ async function recordReply(messageId:string,from:string,subject:string,mailboxId
  }
  await query("update er_outbox set status='stopped' where workspace='default' and lead_id=$1 and status='queued'",[leadId]);
  if(!optOut.matched){
+  try{
+   const insight=analyzeReply(subject,bodyText||"");
+   await query("update sales_leads set next_action=$2,next_action_at=$3,updated_at=now() where id=$1 and workspace='default'",[leadId,insight.action,insight.due]);
+   await query("insert into er_events(workspace,lead_id,type,meta) values('default',$1,'reply_classified',$2::jsonb)",[leadId,JSON.stringify({messageId,replyClass:insight.replyClass,label:insight.label,action:insight.action,due:insight.due?.toISOString()||null})]);
+   if(insight.suppress){
+    await queryIfTable("insert into er_suppressions(workspace,email,reason) values('default',lower($1),$2) on conflict(workspace,email) do update set reason=excluded.reason",[from,insight.replyClass]);
+    await query("update er_outbox set status='suppressed' where workspace='default' and lower(recipient)=lower($1) and status='queued'",[from]);
+    await query("update sales_leads set do_not_contact=true,updated_at=now() where id=$1 and workspace='default'",[leadId]);
+   }
+   const snippet=String(bodyText||subject||"").replace(/\s+/g," ").trim().slice(0,260);
+   const when=insight.due&&insight.due.getTime()>Date.now()+86400000?`\nWiedervorlage: ${insight.due.toLocaleDateString("de-DE",{timeZone:"Europe/Berlin"})}`:"";
+   await sendAlert(`${insight.suppress?"🚨 ACHTUNG, bitte selbst lesen und NICHT mehr anschreiben (bereits gesperrt)":"💬 Antwort"} von ${from}\n${insight.label}\n„${snippet}"\nNächster Schritt: ${insight.action}${when}`);
+  }catch(insightError){console.error("[reply-insight] failed",insightError instanceof Error?insightError.message:"unknown")}
   await queryIfTable("update pflege_email_outreach set status='replied',updated_at=now() where lower(email)=lower($1) and status in ('approved','sent')",[from]);
   await query("update sales_leads set intent_score=least(100,intent_score+30),stage=case when stage in ('Neu','Kontaktiert') then 'Engaged' else stage end,last_contact_at=now(),updated_at=now() where id=$1 and workspace='default'",[leadId]);
   if(state?.leads){
@@ -146,7 +160,7 @@ async function syncGmail(c:Credential){
   if(await handleBookingMail(msg.id,from,subject,msg.snippet||"",{id:c.id,email:c.email}).catch(()=>false))continue;
   const result=await recordReply(msg.id,from,subject,c.id,msg.snippet||"");
   if(result==="unsubscribe")unsubscribes++;
-  else if(result==="reply"){replies++;await sendAlert(`💬 Antwort von ${from}\n${subject}`)}
+  else if(result==="reply"){replies++}
  }
  return {replies,unsubscribes};
 }
@@ -164,7 +178,7 @@ async function syncMicrosoft(c:Credential){
   if(await handleBookingMail(m.id,from,m.subject||"",m.bodyPreview||"",{id:c.id,email:c.email}).catch(()=>false))continue;
   const result=await recordReply(m.id,from,m.subject||"",c.id,m.bodyPreview||"");
   if(result==="unsubscribe")unsubscribes++;
-  else if(result==="reply"){replies++;await sendAlert(`💬 Antwort von ${from}\n${m.subject||""}`)}
+  else if(result==="reply"){replies++}
  }
  return {replies,unsubscribes};
 }
@@ -251,7 +265,7 @@ async function syncImap(c:Credential){
   if(await handleBookingMail(messageId,from,m.subject,m.bodyText,{id:c.id,email:c.email}).catch(()=>false)){appointments++;continue}
   const result=await recordReply(messageId,from,m.subject,c.id,m.bodyText);
   if(result==="unsubscribe")unsubscribes++;
-  else if(result==="reply"){replies++;await sendAlert(`💬 Antwort von ${from}\n${m.subject}`)}
+  else if(result==="reply"){replies++}
  }
  return {replies,bounces,unsubscribes,appointments};
 }

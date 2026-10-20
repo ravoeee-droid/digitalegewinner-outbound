@@ -110,7 +110,7 @@ function safetyPolicy(result:Classification,trustedOptOut=false):Classification{
   return {...result,requiresHuman:true};
 }
 
-function heuristicClassification(subject:string,body:string):Classification{
+export function heuristicClassification(subject:string,body:string):Classification{
   const text=`${subject}\n${body}`.toLowerCase();
   const has=(pattern:RegExp)=>pattern.test(text);
 
