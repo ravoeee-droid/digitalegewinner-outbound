@@ -17,8 +17,17 @@ type State={leads?:Array<Record<string,unknown>>};
 type Credential=StoredMailboxCredential;
 function auth(request:Request){const s=process.env.CRON_SECRET;return Boolean(s&&(request.headers.get("authorization")||"")===`Bearer ${s}`)}
 function fromHeader(value:string){const m=value.match(/<([^>]+)>/);return (m?.[1]||value).trim().toLowerCase()}
+let claimIndexReady: Promise<unknown> | null = null;
+// Zwei gleichzeitige Cron-Läufe (Vercel und externer Zeitplan) dürfen dieselbe Antwort nicht doppelt verarbeiten.
+async function claimReply(messageId:string){
+ claimIndexReady ||= query("create unique index if not exists er_events_reply_claim_uidx on er_events ((meta->>'claim')) where type='reply_claim'").catch(()=>null);
+ await claimIndexReady;
+ const rows=await query<{id:number}>("insert into er_events(workspace,type,meta) values('default','reply_claim',jsonb_build_object('claim',$1::text)) on conflict ((meta->>'claim')) where type='reply_claim' do nothing returning id",[messageId]).catch(()=>[{id:0}]);
+ return rows.length>0;
+}
 async function recordReply(messageId:string,from:string,subject:string,mailboxId:string,bodyText=""){
  const existing=await query<{id:number}>("select id from er_events where workspace='default' and type='reply' and meta->>'providerMessageId'=$1 limit 1",[messageId]);if(existing.length)return false;
+ if(!(await claimReply(messageId)))return false;
  // Prefer the relational CRM as source of truth. Only touch the legacy JSON mirror
  // when a reply belongs to an older lead that has not been normalized yet.
  const dbLead=await query<{id:string}>(
@@ -269,12 +278,35 @@ async function syncImap(c:Credential){
  }
  return {replies,bounces,unsubscribes,appointments};
 }
+// Nachprüfung der Antworten der letzten 10 Tage mit den aktuellen Regeln: wer keine Mails mehr will, wird gesperrt.
+async function reviewRecentReplies(){
+ try{
+  const rows=await query<{lead_id:string;email:string;subject:string;body:string;company:string}>(`
+   select t.lead_id, lower(ct.email) email, m.subject, m.body_text body, co.name company
+   from outbound_conversation_messages m
+   join outbound_conversation_threads t on t.id=m.thread_id
+   join sales_leads l on l.id=t.lead_id and l.workspace='default'
+   join sales_contacts ct on ct.id=l.contact_id
+   join sales_companies co on co.id=l.company_id
+   where m.direction='inbound' and m.workspace='default' and coalesce(m.received_at,m.created_at)>now()-interval '10 days'
+     and not coalesce(l.do_not_contact,false)`);
+  for(const row of rows){
+   const insight=analyzeReply(row.subject||"",row.body||"");
+   if(!insight.suppress||!row.email)continue;
+   await queryIfTable("insert into er_suppressions(workspace,email,reason) values('default',$1,$2) on conflict(workspace,email) do update set reason=excluded.reason",[row.email,insight.replyClass]);
+   await query("update er_outbox set status='suppressed' where workspace='default' and lower(recipient)=$1 and status='queued'",[row.email]);
+   await query("update sales_leads set do_not_contact=true,next_action=$2,next_action_at=null,updated_at=now() where id=$1 and workspace='default'",[row.lead_id,insight.action]);
+   await sendAlert(`⛔ Nachträglich gesperrt: ${row.company} (${row.email})\n${insight.label}. Es werden keine Mails mehr gesendet.`);
+  }
+ }catch(error){console.error("[reply-review] failed",error instanceof Error?error.message:"unknown")}
+}
 async function run(request:Request){
  if(!auth(request))return Response.json({error:"Unauthorized"},{status:401});
  {const expiry=dbExpiry();if(expiry&&expiry.hoursLeft<=72)await sendAlertOnce("db-expiry",`⚠️ Die Datenbank wird in ${expiry.hoursLeft} Stunden gelöscht. Alle Leads und Daten wären weg. Jetzt kostenlos übernehmen: ${expiry.claimUrl}`,8).catch(()=>false)}
  if((await resolveOutboundRuntimeConfig()).v3Mode==="active"){
   return Response.json({error:"Legacy reply worker is disabled while Outbound OS V3 is active."},{status:409});
  }
+ await reviewRecentReplies();
  let credentials:Credential[]=[];
  try{credentials=await loadMailboxCredentials()}catch{return Response.json({error:"Mailbox Credentials JSON ungültig."},{status:503})}
  let replies=0,bounces=0,unsubscribes=0,appointments=0;

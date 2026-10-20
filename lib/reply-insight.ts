@@ -14,7 +14,7 @@ const LABEL: Record<string, string> = {
   already_filled: "✅ Stelle schon besetzt",
   out_of_office: "🏖 Abwesend",
   legal_complaint: "⚖️ Beschwerde",
-  unsubscribe: "⛔ Abmeldung",
+  unsubscribe: "⛔ Möchte keine Mails mehr",
   unknown: "💬 Antwort (bitte lesen)",
 };
 const ACTION: Record<string, { text: string; days: number | null }> = {
@@ -30,6 +30,7 @@ const ACTION: Record<string, { text: string; days: number | null }> = {
   not_interested: { text: "Abgeschlossen, kein Interesse", days: null },
   already_filled: { text: "Abgeschlossen, Stelle besetzt", days: null },
   legal_complaint: { text: "Beschwerde prüfen, nicht mehr kontaktieren", days: 0 },
+  unsubscribe: { text: "Nie wieder anschreiben (gesperrt)", days: null },
   unknown: { text: "Antwort lesen und entscheiden", days: 0 },
 };
 const MONTHS = ["januar", "februar", "märz", "april", "mai", "juni", "juli", "august", "september", "oktober", "november", "dezember"];
@@ -56,6 +57,9 @@ export function parseFollowUpDate(text: string, now = new Date()): Date | null {
 
 // Drohungen und Beschwerden über unerwünschte Werbung: sofort sperren und persönlich prüfen.
 const COMPLAINT = /\b(anzeige[n]?|anzeigen|polizei|staatsanwalt|verbraucherzentrale|wettbewerbszentrale|abmahn\w*|anwalt|rechtsanwalt|unerlaubte werbung|unerwünschte werbung|unerbetene werbung|spam|belästigung|datenschutzbeauftragt\w*|dsgvo|uwg|löschen sie (meine|alle)|nicht mehr (anschreiben|schreiben|kontaktieren|belästigen)|zeige[n]?\s+(ich\s+)?(sie|euch|dich)\b[^.!?\n]{0,30}\ban\b|melde[n]?\s+(ich\s+)?(sie|euch)\b|rechtliche schritte|\bklage\b)/i;
+// Wunsch, keine Mails mehr zu bekommen (auch höflich formuliert).
+const OPT_OUT = /(aus (ihrem|dem|ihrer) (verteiler|liste|mailingliste)|keine weiteren (angebote|nachrichten|mails|e-mails|werbung|zusendungen)|keine (werbung|angebote|mails|e-mails) (mehr )?(zu|senden|schicken)|bitte (keine|nicht mehr) (\w+ ){0,2}(zusenden|zusenden|senden|schicken|anschreiben|mailen)|nicht mehr (zusenden|senden|schicken|anschreiben|mailen)|austragen|abmelden|abbestellen|streichen sie (uns|mich)|nehmen sie (uns|mich) (bitte )?(aus|von))/i;
+const NO_AGENCY = /(arbeiten wir nicht|arbeite ich nicht|keine zusammenarbeit)[^.]{0,60}(zusammen|personaldienst|vermittl|agentur)/i;
 const LATER = /(noch\s?mal|erneut|wieder|später)\s+(schreiben|melden|anschreiben|kontaktieren|anrufen|nachfragen)|(schreiben|melden|kontaktieren|nachfragen)\s+sie\s+(\w+\s+){0,4}(noch\s?mal|erneut|wieder)/i;
 
 export function analyzeReply(subject: string, body: string, now = new Date()) {
@@ -63,6 +67,8 @@ export function analyzeReply(subject: string, body: string, now = new Date()) {
   const cls = heuristicClassification(subject, body);
   let klass = cls.replyClass as string;
   if (COMPLAINT.test(text)) klass = "legal_complaint";
+  else if (OPT_OUT.test(text)) klass = "unsubscribe";
+  else if (NO_AGENCY.test(text)) klass = "not_interested";
   else if (klass === "unknown" && (LATER.test(text) || parseFollowUpDate(text, now))) klass = "objection_timing";
   const action = ACTION[klass] || ACTION.unknown;
   let due: Date | null = null;

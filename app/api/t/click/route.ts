@@ -19,6 +19,10 @@ export async function GET(request:Request){
     "insert into er_events(workspace,lead_id,type,meta) values('default',$1,'email_click',$2::jsonb)",
     [leadId,JSON.stringify({outboxId,target})],
   ).catch(()=>null);
-  await sendAlertOnce(`click:${leadId}`,`🔗 Link in E-Mail geklickt (Lead ${leadId})\n${target}`,24*30).catch(()=>null);
+  // Sicherheits-Scanner der Empfänger klicken Links in Sekunden nach der Zustellung. Das ist kein Mensch und wird nicht gemeldet.
+  const agent=request.headers.get("user-agent")||"";
+  const [sentRow]=await query<{age:number;recipient:string}>("select extract(epoch from (now()-sent_at))::int age, recipient from er_outbox where id::text=$1",[outboxId]).catch(()=>[]);
+  const botLike=/(bot|crawl|spider|scan|proofpoint|mimecast|barracuda|safelinks|defender|symantec|trend ?micro|python|curl|wget|go-http|headless|preview)/i.test(agent)||(sentRow&&sentRow.age<300);
+  if(!botLike)await sendAlertOnce(`click:${leadId}`,`🔗 Link geklickt: ${sentRow?.recipient||"Lead "+leadId}\n${target}`,24*30).catch(()=>null);
   return new Response(null,{status:302,headers:{location:target,"cache-control":"no-store"}});
 }
