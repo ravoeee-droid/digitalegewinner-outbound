@@ -123,3 +123,24 @@ export async function collectBaLeads(options: { target?: number; budgetMs?: numb
   }
   return { day, target, addedToday: have, addedThisRun: added, tasks, cursor, log: log.slice(-6) };
 }
+
+// Sucht auf der Webseite eines PV-Betriebs (Startseite, Impressum, Kontakt) eine Geschäfts-E-Mail; Bewerbungs-/Personaladressen zählen nicht.
+export async function findPvSiteContact(website: string) {
+  SEG = SEGMENTS.pv;
+  const pick = (t: string, host: string) => {
+    const all: string[] = [];
+    for (const raw of t.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi) || []) { const x = raw.replace(/^(u00[0-9a-f]{2}|%20|x[0-9a-f]{2})/i, ""); const e = mail(x); if (e && !/\.(png|jpe?g|gif|svg|webp|css|js)$/i.test(e) && !all.includes(e)) all.push(e); }
+    return all.find((e) => e.endsWith(`@${host}`) || e.endsWith(`.${host}`)) || all.find((e) => !/(wixpress|sentry|example|domain\.|beispiel|muster)/i.test(e)) || "";
+  };
+  let origin = "", host = "";
+  try { const u = new URL(website); origin = u.origin; host = u.hostname.replace(/^www\./, ""); } catch { return { email: "", phone: "", person: "" }; }
+  let text = "", email = "";
+  for (const path of ["", "/impressum", "/kontakt"]) {
+    const x = await fetchText(origin + path);
+    if (path === "" && !x.text) { const http = origin.replace(/^https:/, "http:"); if (http !== origin) { const y = await fetchText(http); text += `\n${y.text}`; } }
+    text += `\n${x.text}`;
+    email = pick(text, host);
+    if (email) break;
+  }
+  return { email, phone: phone(text), person: person(text) };
+}
