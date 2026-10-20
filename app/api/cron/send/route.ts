@@ -1,4 +1,5 @@
 import { query, queryIfTable, readStateFields } from "@/lib/db";
+import { withSignatureLink } from "@/lib/outreach-copy";
 import { sendMail } from "@/lib/mailer";
 import { loadMailboxCredentials, type StoredMailboxCredential } from "@/lib/mailbox-credentials";
 import { recordOutboundEventByMode } from "@/lib/outbound-event-ledger";
@@ -288,8 +289,9 @@ async function run(request: Request) {
       const configured=(process.env.NEXT_PUBLIC_APP_URL||"").trim().replace(/\/+$/,"");
       const origin=/^https:\/\/[^\s/]+$/i.test(configured)?configured:new URL(request.url).origin;
       const optOut=unsubscribeUrl(origin,row.id,row.lead_id);
-      const html=trackedEmailHtml(row.body,origin,row.id,row.lead_id,optOut);
-      const text=`${row.body}\n\n--\nKein Interesse an weiteren Nachrichten? Hier abmelden: ${optOut}`;
+      const mailBody=withSignatureLink(row.body);
+      const html=trackedEmailHtml(mailBody,origin,row.id,row.lead_id,optOut);
+      const text=`${mailBody}\n\n--\nKein Interesse an weiteren Nachrichten? Hier abmelden: ${optOut}`;
       const result = await sendMail({ ...credential, to:row.recipient, subject:row.subject, text, html, headers:{ "List-Unsubscribe":`<${optOut}>`, "List-Unsubscribe-Post":"List-Unsubscribe=One-Click" } });
       await query("update er_outbox set status='sent',sent_at=now(),provider_message_id=$2,error=null where id=$1 and status='sending'", [row.id,result.id]);
       // Ab hier ist die Mail beim Provider angenommen und in er_outbox als gesendet markiert.

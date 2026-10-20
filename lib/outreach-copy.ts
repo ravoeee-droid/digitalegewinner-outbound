@@ -1,6 +1,14 @@
 // Erstmail von Raphael Hermann (Sie-Form). Es werden nur Angaben aus dem Lead benutzt.
 // Die Anrede "Frau"/"Herr" wird nicht geraten, weil das Geschlecht aus dem Namen nicht sicher ableitbar ist.
-const SIGNATURE = "Freundliche Grüße\nRaphael Hermann\nDigitale Gewinner";
+export const PFLEGE_PAGE = "https://digitalegewinner.de/pflege";
+const SIGNATURE = `Freundliche Grüße\nRaphael Hermann\nDigitale Gewinner\n${PFLEGE_PAGE}`;
+
+// Schon eingeplante Mails (alte Signatur) bekommen den Link beim Versand nachträglich.
+export function withSignatureLink(body: string) {
+  if (body.includes("digitalegewinner.de/pflege")) return body;
+  const trimmed = body.trimEnd();
+  return /Raphael Hermann\s+Digitale Gewinner$/.test(trimmed) ? `${trimmed}\n${PFLEGE_PAGE}` : body;
+}
 
 export type CopyLead = { lead_id: string; company: string; contact: string; city: string; title: string };
 
