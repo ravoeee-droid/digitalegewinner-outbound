@@ -103,9 +103,14 @@ async function buildChecks(queue: { queued: number } | undefined): Promise<Check
   } catch {}
   checks.push({ id: "leads", label: "Leads mit E-Mail-Adresse", status: leads >= 300 ? "ok" : leads > 0 ? "warn" : "fail", detail: leads >= 300 ? `${leads} bereit` : leads > 0 ? `${leads} bereit, 300 pro Tag nötig` : "Keine Leads bereit. Im Menü unter Leads nachfüllen.", href: "/pflege?view=finder" });
 
-  const active = (state.campaigns || []).filter((campaign) => !campaign.status || ["active", "aktiv", "running"].includes(String(campaign.status).toLowerCase()));
-  const limit = Math.max(0, ...active.map((campaign) => Number(campaign.dailyLimit || 0)));
-  checks.push({ id: "kampagne", label: "Kampagne aktiv", status: active.length === 0 ? "fail" : limit >= 300 ? "ok" : "warn", detail: active.length === 0 ? "Keine aktive Kampagne" : limit >= 300 ? `Tageslimit ${limit}` : `Tageslimit ${limit || "?"}, Ziel 300`, href: "/pflege?view=campaigns" });
+  // Die Kampagnen laufen über die Versand-Warteschlange (Pflege + PV, je 150 pro Tag); aktiv = hat Mails wartend oder in den letzten 2 Tagen gesendet.
+  let activeCampaigns = 0;
+  try {
+    const [row] = await query<{ n: number }>("select count(distinct campaign_id)::int n from er_outbox where workspace='default' and campaign_id is not null and (status='queued' or (status='sent' and sent_at>now()-interval '2 days'))");
+    activeCampaigns = row?.n || 0;
+  } catch {}
+  const limit = activeCampaigns * 150;
+  checks.push({ id: "kampagne", label: "Kampagne aktiv", status: activeCampaigns === 0 ? "fail" : limit >= 300 ? "ok" : "warn", detail: activeCampaigns === 0 ? "Keine aktive Kampagne" : `${activeCampaigns} Kampagnen, bis zu ${limit} Mails pro Tag`, href: "/pflege?view=campaigns" });
 
   const queued = queue?.queued ?? 0;
   checks.push({ id: "warteschlange", label: "Mails in der Warteschlange", status: queued > 0 ? "ok" : "warn", detail: queued > 0 ? `${queued} warten auf Versand` : "Leer. Wird nachts oder zum nächsten Termin-Lauf gefüllt.", href: "/outreach" });
