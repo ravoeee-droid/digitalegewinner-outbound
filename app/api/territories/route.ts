@@ -2,7 +2,7 @@ import { cookies } from "next/headers";
 import { z } from "zod";
 import { adminCookieName, sessionRole } from "@/lib/admin-auth";
 import {
-  addTerritoryEvidence, importTerritoryCandidate, listTerritory, scanCounty,
+  addSourcedCompany, addTerritoryEvidence, importTerritoryCandidate, listTerritory, scanCounty,
 } from "@/lib/territory-intelligence";
 
 export const runtime = "nodejs";
@@ -23,9 +23,19 @@ const bodySchema = z.discriminatedUnion("action", [
     state: z.enum(states),
   }),
   z.object({
+    action: z.literal("add"),
+    county: z.string().trim().min(3).max(100),
+    state: z.enum(states),
+    name: z.string().trim().min(3).max(240),
+    city: z.string().trim().max(150).default(""),
+    website: z.string().trim().max(600).default(""),
+    phone: z.string().trim().max(120).default(""),
+    sourceUrl: z.url().max(1200).refine(value => /^https?:\/\//i.test(value), "Nur HTTP(S)-Quellen."),
+  }),
+  z.object({
     action: z.literal("evidence"),
     id: z.string().uuid(),
-    kind: z.enum(["portal", "ads", "hiring", "funnel", "references", "other"]),
+    kind: z.enum(["portal", "portal_listing", "ads", "hiring", "funnel", "references", "other"]),
     url: z.url().max(1200).refine(value => /^https?:\/\//i.test(value), "Nur HTTP(S)-Links erlaubt."),
     note: z.string().trim().min(4).max(800),
   }),
@@ -61,6 +71,7 @@ export async function POST(request: Request) {
   try {
     const body = parsed.data;
     if (body.action === "scan") return Response.json({ ok: true, ...(await scanCounty(body.county, body.state)) });
+    if (body.action === "add") return Response.json({ ok: true, ...(await addSourcedCompany(body)) });
     if (body.action === "evidence") return Response.json({ ok: true, ...(await addTerritoryEvidence(body.id, body.kind, body.url, body.note)) });
     return Response.json({ ok: true, ...(await importTerritoryCandidate(body.id)) });
   } catch (error) { return errorJson(error); }
