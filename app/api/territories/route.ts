@@ -16,7 +16,15 @@ const states = [
   "Schleswig-Holstein", "Thüringen",
 ] as const;
 
+const sourcedCompany = z.object({
+  county: z.string().trim().min(3).max(100), state: z.enum(states),
+  name: z.string().trim().min(3).max(240), city: z.string().trim().max(150).default(""),
+  website: z.string().trim().max(600).default(""), phone: z.string().trim().max(120).default(""),
+  sourceUrl: z.url().max(1200).refine(value => /^https?:\/\//i.test(value), "Nur HTTP(S)-Quellen."),
+});
+
 const bodySchema = z.discriminatedUnion("action", [
+  z.object({ action: z.literal("bulk_import"), companies: z.array(sourcedCompany).min(1).max(10) }),
   z.object({
     action: z.literal("scan"),
     county: z.string().trim().min(3).max(100),
@@ -70,6 +78,20 @@ export async function POST(request: Request) {
   if (!parsed.success) return Response.json({ error: parsed.error.issues[0]?.message || "Ungültige Eingabe." }, { status: 400 });
   try {
     const body = parsed.data;
+    if (body.action === "bulk_import") {
+      const results: Array<{ name: string; ok: boolean; leadId?: string; alreadyImported?: boolean; error?: string }> = [];
+      for (const company of body.companies) {
+        try {
+          const added = await addSourcedCompany(company);
+          if (!added.candidateId) throw new Error("Firma konnte nicht gespeichert werden.");
+          const result = await importTerritoryCandidate(added.candidateId);
+          results.push({ name: company.name, ok: true, ...result });
+        } catch (error) {
+          results.push({ name: company.name, ok: false, error: error instanceof Error ? error.message : "Import fehlgeschlagen." });
+        }
+      }
+      return Response.json({ ok: true, results });
+    }
     if (body.action === "scan") return Response.json({ ok: true, ...(await scanCounty(body.county, body.state)) });
     if (body.action === "add") return Response.json({ ok: true, ...(await addSourcedCompany(body)) });
     if (body.action === "evidence") return Response.json({ ok: true, ...(await addTerritoryEvidence(body.id, body.kind, body.url, body.note)) });
