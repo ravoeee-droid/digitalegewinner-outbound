@@ -22,6 +22,7 @@ const GROUPS: Group[] = [
   { title: "Mehr", more: true, items: [
     { href: "/crm", label: "CRM Pipeline", icon: "dot", sales: true },
     { href: "/pflege?view=finder", label: "Deutschland-Radar", icon: "dot", sales: true },
+    { href: "/landkreise", label: "Landkreis-Scanner", icon: "dot", sales: true },
     { href: "/pflege", label: "Pflege Übersicht", icon: "dot", sales: true },
     { href: "/pflege?view=crm", label: "Research", icon: "dot", sales: true },
     { href: "/pflege?view=followups", label: "Follow-ups", icon: "dot", sales: true },
