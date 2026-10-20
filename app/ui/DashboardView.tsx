@@ -15,6 +15,7 @@ type Data = {
   checks?: Check[];
   source?: { status: string; reason: string; n: number; started: string }[];
   dbExpiry?: { at: string; claimUrl: string; hoursLeft: number } | null;
+  variants?: { campaign_id: string; variant: string; leads: number; replies: number }[];
   campaigns?: { id: string; sent_today: number; sent7: number; queued: number; leads: number; replies: number }[];
 };
 
@@ -226,6 +227,7 @@ export default function DashboardView() {
                 <div key={id} className={`dg-panel ${styles.camp}`}>
                   <div className={styles.campHead}><strong>{name}</strong><span>{sub}</span></div>
                   <div className={styles.campBar} role="progressbar" aria-valuemin={0} aria-valuemax={150} aria-valuenow={Math.min(150, row?.sent_today ?? 0)} aria-label={`${name}: Mails heute`}><i style={{ width: `${Math.min(100, ((row?.sent_today ?? 0) / 150) * 100)}%` }} /></div>
+                  {id === "pv-starter-v1" && (data.variants?.length ?? 0) > 0 && <p className={styles.abLine}>Test Lang gegen Kurz: {data.variants?.map((v) => `${v.variant === "A" ? "Lang" : "Kurz"} ${v.replies} Antworten bei ${v.leads} Angeschriebenen${v.leads ? ` (${Math.round((v.replies / v.leads) * 100)} %)` : ""}`).join(" · ")}</p>}
                   <dl><div><dt>Heute</dt><dd>{row?.sent_today ?? 0} / 150</dd></div><div><dt>7 Tage</dt><dd>{nf.format(row?.sent7 ?? 0)}</dd></div><div><dt>Wartend</dt><dd>{nf.format(row?.queued ?? 0)}</dd></div><div><dt>Antworten</dt><dd>{row?.replies ?? 0}</dd></div></dl>
                 </div>
               );

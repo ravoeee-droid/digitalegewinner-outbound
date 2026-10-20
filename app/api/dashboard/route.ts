@@ -64,6 +64,10 @@ export async function GET(request: Request) {
         count(distinct o.lead_id)::int leads,
         (select count(distinct e.lead_id)::int from er_events e where e.workspace='default' and e.type in ('reply','positive_reply') and e.lead_id in (select lead_id from er_outbox x where x.campaign_id=o.campaign_id))::int replies
       from er_outbox o where o.workspace='default' and o.campaign_id in ('pflege-starter-v2','pv-starter-v1') group by o.campaign_id`).catch(() => []);
+    const variants = await query<{ campaign_id: string; variant: string; leads: number; replies: number }>(`
+      select o.campaign_id, o.variant, count(distinct o.lead_id)::int leads,
+        count(distinct o.lead_id) filter(where exists(select 1 from er_events e where e.workspace='default' and e.lead_id=o.lead_id and e.type in ('reply','positive_reply')))::int replies
+      from er_outbox o where o.workspace='default' and o.campaign_id='pv-starter-v1' and o.status='sent' group by 1,2 order by 2`).catch(() => []);
     const checks = await buildChecks(queue);
     const source = await query<{ status: string; reason: string; n: number; started: string }>(`
       select j.status, coalesce(nullif(j.error,''),'') reason, count(*)::int n, max(r.started_at)::text started
@@ -72,7 +76,7 @@ export async function GET(request: Request) {
       group by 1,2 order by n desc`).catch(() => []);
 
     return Response.json({
-      days, daily, mailboxes, queue, steps, recent, checks, source, campaigns, dbExpiry: dbExpiry(),
+      days, daily, mailboxes, queue, steps, recent, checks, source, campaigns, variants, dbExpiry: dbExpiry(),
       goalPerDay: Number(process.env.APPOINTMENT_GOAL_PER_DAY) || 4,
       dailyTarget: Number(process.env.PFLEGE_CAMPAIGN_DAILY_TARGET) || 300,
     }, { headers: { "cache-control": "no-store" } });

@@ -60,17 +60,33 @@ export function followUp(lead: Pick<CopyLead, "company" | "contact" | "title">, 
 
 // ---------- Kampagne Photovoltaik-Betriebe ----------
 export const PV_PAGE = "https://digitalegewinner.de/handwerk-kunden";
-const PV_SIGNATURE = `Freundliche Grüße\nRaphael Hermann\nDigitale Gewinner\n${PV_PAGE}`;
+export const PV_TRUST_PAGE = "https://digitalegewinner.de/pv-trust";
+// Der Link wird erst beim Versand eingesetzt: /pv-trust, sobald die Seite erreichbar ist, sonst /handwerk-kunden.
+const PV_SIGNATURE = "Freundliche Grüße\nRaphael Hermann\nDigitale Gewinner\n{{pv_link}}";
 
-export function pvFirstTouch(lead: { contact: string }) {
-  const body = [
+// A/B-Test: A = ausführlich, B = kurz. Zuordnung stabil pro Lead.
+export function pvVariantFor(leadId: string): "A" | "B" {
+  let sum = 0;
+  for (let index = 0; index < leadId.length; index += 1) sum += leadId.charCodeAt(index);
+  return sum % 2 === 0 ? "A" : "B";
+}
+
+export function pvFirstTouch(lead: { contact: string; lead_id?: string }) {
+  const variant = pvVariantFor(String(lead.lead_id || lead.contact || ""));
+  const longBody = [
     greeting(lead.contact),
     "kurze Frage: Aktuell ist die Auftragslage Gott sei Dank ziemlich gut im PV-Markt. Ich spreche täglich mit PV-Geschäftsführern, und viele erzählen mir, dass sie ziemlich frustriert sind über die Schwankungen am Markt und darüber, dass Leadportal-Leads an 4 bis 5 andere Betriebe gleichzeitig gehen. Das ruiniert die Margen, und am Ende gewinnt nur noch der Billigste. Viele weichen deshalb auf Subunternehmer aus, bei denen die Verständigung oft schwierig ist, und früher oder später kommt es zu Reklamationen und Anzeigen, was alles nur noch schlimmer macht.",
     "Genau deshalb habe ich ein System entwickelt, das dieses Problem aus der Welt schafft: Sie sind damit nicht mehr abhängig von Leadportal-Leads, nicht von Empfehlungen und nicht von teuren Agenturen. Das System generiert exklusive Leads unter Ihrem eigenen Namen. Langfristig ist das ein deutlicher Vorteil gegenüber anderen Betrieben, weil Tag für Tag Ihre Marke, Ihre Bekanntheit und das Vertrauen wachsen.",
     "Ich würde Ihnen das gerne komplett kostenlos und unverbindlich vorstellen, damit Sie sehen, wie das in der Praxis aussieht. Danach entscheiden Sie, ob es für Ihr Unternehmen wirtschaftlich Sinn macht oder nicht. Würde Ihnen {{termin_1}} Vormittag oder {{termin_2}} Nachmittag eher passen? Das dauert ca. 20 Minuten.",
     PV_SIGNATURE,
   ].join("\n\n");
-  return { variant: "A", subject: "Kurze Frage zur Kundengewinnung", body };
+  const shortBody = [
+    greeting(lead.contact),
+    "kurze Frage: Leadportale verkaufen jede Anfrage an 4 bis 5 Betriebe gleichzeitig, das ruiniert die Margen, und am Ende gewinnt nur der Billigste. Ich habe ein System entwickelt, das exklusive Leads unter Ihrem eigenen Namen bringt: ohne Leadportal, ohne Empfehlungen und ohne teure Agentur.",
+    "Ich zeige Ihnen das gerne kostenlos und unverbindlich in ca. 20 Minuten. Passt Ihnen {{termin_1}} Vormittag oder {{termin_2}} Nachmittag besser?",
+    PV_SIGNATURE,
+  ].join("\n\n");
+  return { variant, subject: "Kurze Frage zur Kundengewinnung", body: variant === "A" ? longBody : shortBody };
 }
 
 export function pvFollowUp(lead: { contact: string }, step: number) {
