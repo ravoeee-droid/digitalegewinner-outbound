@@ -103,6 +103,8 @@ async function run(request: Request) {
   );
   const campaignToday = new Map(campaignTodayRows.map((r) => [r.campaign_id, Number(r.count)]));
 
+  // PV-Mails richten sich an die Geschäftsführung, nicht an Bewerbungs-/Personalpostfächer.
+  await query("update er_outbox set status='suppressed',error='Personal-/Bewerbungsadresse (PV)' where workspace='default' and status='queued' and campaign_id='pv-starter-v1' and recipient ~* '^(bewerbung|bewerbungen|bewerber|karriere|jobs?|hr|personal|recruiting|career|careers|application|applications|stellen|ausbildung)[._-]?[a-z0-9]*@'");
   const due = await query<OutboxRow>(
     `with claim as (
        select o.id
