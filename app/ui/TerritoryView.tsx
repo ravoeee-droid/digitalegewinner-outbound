@@ -222,7 +222,7 @@ export default function TerritoryView({ canEdit }: { canEdit: boolean }) {
             <thead><tr><th>Unternehmen</th><th>Score</th><th>Belege</th><th>Kontakt</th><th>Aktion</th></tr></thead>
             <tbody>{rows.map(row => <tr key={row.id}>
               <td><strong>{row.name}</strong><small>{row.city || row.county}</small>
-                <a href={row.source_url} target="_blank" rel="noopener noreferrer">OSM-Originaleintrag ↗</a></td>
+                <a href={row.source_url} target="_blank" rel="noopener noreferrer">Originalquelle ↗</a></td>
               <td><span className={`${styles.score} ${row.score >= 75 ? styles.highScore : ""}`}>{row.score}/100 · {grade(row.score)}</span></td>
               <td>{(row.evidence || []).length ? <>
                 <strong>{row.evidence.length} Quelle(n)</strong>
