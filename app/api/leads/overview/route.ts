@@ -18,6 +18,8 @@ export async function GET(request: Request) {
   const filter = FILTERS[url.searchParams.get("filter") || ""] ? String(url.searchParams.get("filter")) : "alle";
   const q = String(url.searchParams.get("q") || "").trim().slice(0, 80);
   const page = Math.max(1, Number(url.searchParams.get("page")) || 1);
+  const segment = url.searchParams.get("segment");
+  const segmentSql = segment === "pv" ? " and c.source='ba-pv'" : segment === "pflege" ? " and c.source<>'ba-pv'" : "";
 
   const from = `
     from sales_leads l
@@ -29,7 +31,7 @@ export async function GET(request: Request) {
     left join lateral (
       select status,sent_at from er_outbox x where x.workspace=l.workspace and x.lead_id=l.id order by x.created_at desc limit 1
     ) o on true
-    where l.workspace='default' and l.status='active'`;
+    where l.workspace='default' and l.status='active'${segmentSql}`;
 
   try {
     const [counts] = await query<{ total: number; with_email: number; ready: number; contacted: number }>(`

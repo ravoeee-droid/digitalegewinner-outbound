@@ -56,6 +56,14 @@ export async function GET(request: Request) {
       where e.workspace='default' and e.type in ('appointment','appointment_attended','positive_reply','reply')
       order by e.created_at desc limit 12`).catch(() => []);
 
+    const campaigns = await query<{ id: string; sent_today: number; sent7: number; queued: number; leads: number; replies: number }>(`
+      select o.campaign_id id,
+        count(*) filter(where o.status='sent' and (o.sent_at at time zone 'Europe/Berlin')::date=(now() at time zone 'Europe/Berlin')::date)::int sent_today,
+        count(*) filter(where o.status='sent' and o.sent_at>=now()-interval '7 days')::int sent7,
+        count(*) filter(where o.status='queued')::int queued,
+        count(distinct o.lead_id)::int leads,
+        (select count(distinct e.lead_id)::int from er_events e where e.workspace='default' and e.type in ('reply','positive_reply') and e.lead_id in (select lead_id from er_outbox x where x.campaign_id=o.campaign_id))::int replies
+      from er_outbox o where o.workspace='default' and o.campaign_id in ('pflege-starter-v2','pv-starter-v1') group by o.campaign_id`).catch(() => []);
     const checks = await buildChecks(queue);
     const source = await query<{ status: string; reason: string; n: number; started: string }>(`
       select j.status, coalesce(nullif(j.error,''),'') reason, count(*)::int n, max(r.started_at)::text started
@@ -64,7 +72,7 @@ export async function GET(request: Request) {
       group by 1,2 order by n desc`).catch(() => []);
 
     return Response.json({
-      days, daily, mailboxes, queue, steps, recent, checks, source, dbExpiry: dbExpiry(),
+      days, daily, mailboxes, queue, steps, recent, checks, source, campaigns, dbExpiry: dbExpiry(),
       goalPerDay: Number(process.env.APPOINTMENT_GOAL_PER_DAY) || 4,
       dailyTarget: Number(process.env.PFLEGE_CAMPAIGN_DAILY_TARGET) || 300,
     }, { headers: { "cache-control": "no-store" } });
