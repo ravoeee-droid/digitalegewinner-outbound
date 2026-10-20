@@ -16,6 +16,7 @@ async function run(request:Request){
     // Frische Datenbank: erst Grund-Leads einspielen, damit die Warteschlange gefüllt werden kann.
     await ensureSalesOsSchema().then(()=>seedCallLeadsIfEmpty()).catch(()=>null);
     const result=await ensureAppointmentGoalQueue("default");
+    console.log("[appointment-goal]",JSON.stringify({ok:result.ok,queuedLeads:(result as {queuedLeads?:number}).queuedLeads,queuedMessages:(result as {queuedMessages?:number}).queuedMessages,reason:(result as {reason?:string}).reason}));
     return Response.json(result,{status:result.ok?200:503});
   }catch(error){
     console.error("[appointment-goal] worker failed", error);

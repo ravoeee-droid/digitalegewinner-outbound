@@ -1,5 +1,6 @@
 import { query } from "@/lib/db";
 import { sendAlert } from "@/lib/alerts";
+import { dbExpiry } from "@/lib/db-expiry";
 
 export const runtime="nodejs";
 export const maxDuration=60;
@@ -40,6 +41,8 @@ async function run(request:Request){
       `⚠️ Bounces: ${row.bounces} · Abmeldungen: ${row.unsubscribed} · Fehlgeschlagen: ${row.failed}`,
       `⏳ In der Warteschlange: ${row.queued}`,
     ];
+    const expiry=dbExpiry();
+    if(expiry)lines.push("",`⚠️ Die Datenbank wird in ${expiry.hoursLeft} Stunden gelöscht. Jetzt übernehmen: ${expiry.claimUrl}`);
     if(row.sent===0)lines.push("","❗ Heute wurde keine Mail gesendet. Bitte Postfächer, Kampagne und Cron Jobs prüfen.");
     const sent=await sendAlert(lines.join("\n"));
     return Response.json({ok:true,telegram:sent,...row});

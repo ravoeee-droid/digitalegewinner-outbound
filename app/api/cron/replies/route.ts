@@ -9,6 +9,7 @@ import { createComplianceSuppression, detectExplicitOptOut } from "@/lib/outboun
 import { ingestInboundConversationMessage } from "@/lib/outbound-conversation-intelligence";
 import { handleBookingMail } from "@/lib/appointments";
 import { sendAlert, sendAlertOnce } from "@/lib/alerts";
+import { dbExpiry } from "@/lib/db-expiry";
 
 export const runtime="nodejs";export const maxDuration=60;
 type State={leads?:Array<Record<string,unknown>>};
@@ -256,6 +257,7 @@ async function syncImap(c:Credential){
 }
 async function run(request:Request){
  if(!auth(request))return Response.json({error:"Unauthorized"},{status:401});
+ {const expiry=dbExpiry();if(expiry&&expiry.hoursLeft<=72)await sendAlertOnce("db-expiry",`⚠️ Die Datenbank wird in ${expiry.hoursLeft} Stunden gelöscht. Alle Leads und Daten wären weg. Jetzt kostenlos übernehmen: ${expiry.claimUrl}`,8).catch(()=>false)}
  if((await resolveOutboundRuntimeConfig()).v3Mode==="active"){
   return Response.json({error:"Legacy reply worker is disabled while Outbound OS V3 is active."},{status:409});
  }

@@ -1,4 +1,5 @@
 import { query, readStateFields } from "@/lib/db";
+import { dbExpiry } from "@/lib/db-expiry";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -63,7 +64,7 @@ export async function GET(request: Request) {
       group by 1,2 order by n desc`).catch(() => []);
 
     return Response.json({
-      days, daily, mailboxes, queue, steps, recent, checks, source,
+      days, daily, mailboxes, queue, steps, recent, checks, source, dbExpiry: dbExpiry(),
       goalPerDay: Number(process.env.APPOINTMENT_GOAL_PER_DAY) || 4,
       dailyTarget: Number(process.env.PFLEGE_CAMPAIGN_DAILY_TARGET) || 300,
     }, { headers: { "cache-control": "no-store" } });
