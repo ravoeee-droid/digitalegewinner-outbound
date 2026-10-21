@@ -10,7 +10,18 @@ export function withSignatureLink(body: string) {
   return /Raphael Hermann\s+Digitale Gewinner$/.test(trimmed) ? `${trimmed}\n${PFLEGE_PAGE}` : body;
 }
 
-export type CopyLead = { lead_id: string; company: string; contact: string; city: string; title: string };
+export type CopyLead = { lead_id: string; company: string; contact: string; city: string; title: string; publishedAt?: string };
+
+// Terminlink für die Videocall-Variante (Test B). Ohne gesetzten Link läuft nur die Standard-Mail.
+const BOOKING_URL = (process.env.BOOKING_URL || "").trim();
+
+// Nur belegbare Angabe: wie lange die Anzeige schon veröffentlicht ist (aus dem Veröffentlichungsdatum der Stellenanzeige).
+function openSinceText(publishedAt?: string) {
+  const time = Date.parse(String(publishedAt || ""));
+  if (!Number.isFinite(time)) return "";
+  const days = Math.floor((Date.now() - time) / 86_400_000);
+  return days >= 90 ? "seit über 90 Tagen" : days >= 60 ? "seit über 60 Tagen" : "";
+}
 
 export function cleanJobTitle(raw: string) {
   const first = String(raw || "").split(/\s[-–—|:]\s/)[0];
@@ -38,6 +49,17 @@ function greeting(contact: string) {
 
 export function firstTouch(lead: CopyLead) {
   const title = cleanJobTitle(lead.title);
+  if (BOOKING_URL && pvVariantFor(String(lead.lead_id || lead.contact || "")) === "B") {
+    const since = openSinceText(lead.publishedAt);
+    const body = [
+      greeting(lead.contact),
+      since ? `ich habe gesehen, dass Ihre Stelle als ${title} ${since} offen ist.` : `ich habe gesehen, dass Sie aktuell eine Fachkraft als ${title} suchen.`,
+      "Ich würde mich gerne in einem kurzen Videocall mit Ihnen über Ihre offene Stelle unterhalten und Ihnen zeigen, wie Sie sie in den nächsten sechs Wochen besetzen können.",
+      `Buchen Sie sich hier direkt einen passenden Termin: ${BOOKING_URL}`,
+      SIGNATURE,
+    ].join("\n\n");
+    return { variant: "B", subject: `Ihre offene Stelle: ${title}`.slice(0, 78), body };
+  }
   const body = [
     greeting(lead.contact),
     `ich würde gerne mit Ihnen in den nächsten sechs Wochen Ihre offene Stelle als ${title} mit einer passenden Fachkraft besetzen.`,
