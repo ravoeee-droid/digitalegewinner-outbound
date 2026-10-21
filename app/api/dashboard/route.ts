@@ -67,7 +67,7 @@ export async function GET(request: Request) {
     const variants = await query<{ campaign_id: string; variant: string; leads: number; replies: number }>(`
       select o.campaign_id, o.variant, count(distinct o.lead_id)::int leads,
         count(distinct o.lead_id) filter(where exists(select 1 from er_events e where e.workspace='default' and e.lead_id=o.lead_id and e.type in ('reply','positive_reply')))::int replies
-      from er_outbox o where o.workspace='default' and o.campaign_id='pv-starter-v1' and o.status='sent' group by 1,2 order by 2`).catch(() => []);
+      from er_outbox o where o.workspace='default' and o.campaign_id in ('pflege-starter-v2','pv-starter-v1') and o.status='sent' group by 1,2 order by 1,2`).catch(() => []);
     const checks = await buildChecks(queue);
     const source = await query<{ status: string; reason: string; n: number; started: string }>(`
       select j.status, coalesce(nullif(j.error,''),'') reason, count(*)::int n, max(r.started_at)::text started

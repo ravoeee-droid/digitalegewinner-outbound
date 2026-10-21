@@ -227,7 +227,12 @@ export default function DashboardView() {
                 <div key={id} className={`dg-panel ${styles.camp}`}>
                   <div className={styles.campHead}><strong>{name}</strong><span>{sub}</span></div>
                   <div className={styles.campBar} role="progressbar" aria-valuemin={0} aria-valuemax={150} aria-valuenow={Math.min(150, row?.sent_today ?? 0)} aria-label={`${name}: Mails heute`}><i style={{ width: `${Math.min(100, ((row?.sent_today ?? 0) / 150) * 100)}%` }} /></div>
-                  {id === "pv-starter-v1" && (data.variants?.length ?? 0) > 0 && <p className={styles.abLine}>Test Lang gegen Kurz: {data.variants?.map((v) => `${v.variant === "A" ? "Lang" : "Kurz"} ${v.replies} Antworten bei ${v.leads} Angeschriebenen${v.leads ? ` (${Math.round((v.replies / v.leads) * 100)} %)` : ""}`).join(" · ")}</p>}
+                  {(() => {
+                    const vs = (data.variants ?? []).filter((v) => v.campaign_id === id);
+                    if (vs.length < 2) return null;
+                    const label = (v: string) => (id === "pv-starter-v1" ? (v === "A" ? "Lang" : "Kurz") : v === "A" ? "Standard" : "Videocall-Link");
+                    return <p className={styles.abLine}>Test {id === "pv-starter-v1" ? "Lang gegen Kurz" : "Standard gegen Videocall-Link"}: {vs.map((v) => `${label(v.variant)} ${v.replies} Antworten bei ${v.leads} Angeschriebenen${v.leads ? ` (${Math.round((v.replies / v.leads) * 100)} %)` : ""}`).join(" · ")}</p>;
+                  })()}
                   <dl><div><dt>Heute</dt><dd>{row?.sent_today ?? 0} / 150</dd></div><div><dt>7 Tage</dt><dd>{nf.format(row?.sent7 ?? 0)}</dd></div><div><dt>Wartend</dt><dd>{nf.format(row?.queued ?? 0)}</dd></div><div><dt>Antworten</dt><dd>{row?.replies ?? 0}</dd></div></dl>
                 </div>
               );
