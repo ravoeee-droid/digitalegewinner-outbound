@@ -186,7 +186,7 @@ export async function findPflegeSiteLead(website: string) {
   for (const raw of pages) {
     const text = raw.replace(/<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>|<[^>]+>/g, " ").replace(/\s+/g, " ");
     const role = text.match(JOB_ROLE);
-    if (role && JOB_SIGNAL.test(text.slice(Math.max(0, (role.index || 0) - 200), (role.index || 0) + 300))) const r = role[0].toLowerCase(); return { ...contact, job: /pflegekr|pflegefachkr|pflegefachmann|pflegefachfrau|examinierte|krankenschwester|krankenpfleger|gesundheits-/.test(r) ? "Pflegefachkraft" : /pflegehelfer|pflegeassistent/.test(r) ? "Pflegehelfer" : /altenpfleger/.test(r) ? "Altenpfleger" : "Pflegefachkraft" };
+    if (role && JOB_SIGNAL.test(text.slice(Math.max(0, (role.index || 0) - 200), (role.index || 0) + 300))) { const r = role[0].toLowerCase(); return { ...contact, job: /pflegekr|pflegefachkr|pflegefachmann|pflegefachfrau|examinierte|krankenschwester|krankenpfleger|gesundheits-/.test(r) ? "Pflegefachkraft" : /pflegehelfer|pflegeassistent/.test(r) ? "Pflegehelfer" : /altenpfleger/.test(r) ? "Altenpfleger" : "Pflegefachkraft" }; }
   }
   return { ...contact, job: "" };
 }
