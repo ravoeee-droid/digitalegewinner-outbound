@@ -12,8 +12,8 @@ export function withSignatureLink(body: string) {
 
 export type CopyLead = { lead_id: string; company: string; contact: string; city: string; title: string; publishedAt?: string };
 
-// Terminlink für die Videocall-Variante (Test B). Ohne gesetzten Link läuft nur die Standard-Mail.
-const BOOKING_URL = (process.env.BOOKING_URL || "").trim();
+// Terminlink für die Videocall-Variante (Test B). Ist BOOKING_URL leer, läuft nur die Standard-Mail.
+const BOOKING_URL = (process.env.BOOKING_URL || "https://calendar.app.google/63jjwjMz48c9dAWb7").trim();
 
 // Nur belegbare Angabe: wie lange die Anzeige schon veröffentlicht ist (aus dem Veröffentlichungsdatum der Stellenanzeige).
 function openSinceText(publishedAt?: string) {
