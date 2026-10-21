@@ -164,3 +164,29 @@ export function evaluatePflegePoolRow(row: { n: string; e: string; t: string; d:
 export async function adStillOpen(ref: string) {
   return (await detail(ref)) !== null || (await detail(ref)) !== null;
 }
+
+// Pflege-Betrieb aus einer Maps-Liste: Geschäfts-E-Mail suchen und prüfen, ob die Webseite eine offene Pflegestelle zeigt.
+const JOB_ROLE = /(pflegefachkr[aä]ft\w*|pflegefachmann|pflegefachfrau|pflegekr[aä]ft\w*|altenpfleger\w*|gesundheits- und (?:kranken|alten)pfleger\w*|krankenschwester|krankenpfleger\w*|pflegehelfer\w*|pflegeassistent\w*|pflegedienstleitung|examinierte\w* pflege\w*)/i;
+const JOB_SIGNAL = /(\(\s*[mwdfgx*\/]+(?:\s*[\/,]\s*[mwdfgx*]+)+\s*\)|[mwd]\s*\/\s*[wmd]\s*\/\s*[dxm]|wir suchen|stellenangebot|stellenanzeige|offene stelle|jetzt bewerben|verstärk\w* (?:unser|dein|ihr)|ab sofort|zum nächstmöglichen)/i;
+export async function findPflegeSiteLead(website: string) {
+  SEG = SEGMENTS.pflege;
+  const contact = await findPvSiteContact(website, "pflege");
+  if (!contact.email) return { ...contact, job: "" };
+  let origin = "";
+  try { origin = new URL(website).origin; } catch { return { ...contact, job: "" }; }
+  const home = await fetchText(origin);
+  const links = new Set<string>();
+  for (const m of home.text.matchAll(/href=["']([^"'#]+)["']/gi)) {
+    try { const u = new URL(m[1], origin); if (u.origin === origin && /(karriere|jobs?|stellen|bewerb|arbeiten-bei|offene-stellen)/i.test(u.pathname) && !/\.(pdf|jpg|png)$/i.test(u.pathname)) links.add(u.href); } catch { /* ungültiger Link */ }
+    if (links.size >= 3) break;
+  }
+  if (!links.size) for (const p of ["/karriere", "/jobs", "/stellenangebote"]) links.add(origin + p);
+  const pages = [home.text];
+  for (const href of links) { const page = await fetchText(href); if (page.text) pages.push(page.text); }
+  for (const raw of pages) {
+    const text = raw.replace(/<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>|<[^>]+>/g, " ").replace(/\s+/g, " ");
+    const role = text.match(JOB_ROLE);
+    if (role && JOB_SIGNAL.test(text.slice(Math.max(0, (role.index || 0) - 200), (role.index || 0) + 300))) const r = role[0].toLowerCase(); return { ...contact, job: /pflegekr|pflegefachkr|pflegefachmann|pflegefachfrau|examinierte|krankenschwester|krankenpfleger|gesundheits-/.test(r) ? "Pflegefachkraft" : /pflegehelfer|pflegeassistent/.test(r) ? "Pflegehelfer" : /altenpfleger/.test(r) ? "Altenpfleger" : "Pflegefachkraft" };
+  }
+  return { ...contact, job: "" };
+}

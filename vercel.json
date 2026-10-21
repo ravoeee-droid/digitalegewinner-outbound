@@ -38,6 +38,10 @@
       "schedule": "25,55 5-15 * * 1-5"
     },
     {
+      "path": "/api/cron/pflege-sites",
+      "schedule": "15,45 5-15 * * 1-5"
+    },
+    {
       "path": "/api/cron/pflege-source",
       "schedule": "0 6-15/3 * * 1-5"
     }
