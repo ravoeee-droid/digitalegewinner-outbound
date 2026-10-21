@@ -125,8 +125,8 @@ export async function collectBaLeads(options: { target?: number; budgetMs?: numb
 }
 
 // Sucht auf der Webseite eines PV-Betriebs (Startseite, Impressum, Kontakt) eine Geschäfts-E-Mail; Bewerbungs-/Personaladressen zählen nicht.
-export async function findPvSiteContact(website: string) {
-  SEG = SEGMENTS.pv;
+export async function findPvSiteContact(website: string, segment: BaSegmentKey = "pv") {
+  SEG = SEGMENTS[segment];
   const pick = (t: string, host: string) => {
     const all: string[] = [];
     for (const raw of t.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi) || []) { const x = raw.replace(/^(u00[0-9a-f]{2}|%20|x[0-9a-f]{2})/i, ""); const e = mail(x); if (e && !/\.(png|jpe?g|gif|svg|webp|css|js)$/i.test(e) && !all.includes(e)) all.push(e); }
@@ -143,4 +143,10 @@ export async function findPvSiteContact(website: string) {
     if (email) break;
   }
   return { email, phone: phone(text), person: person(text) };
+}
+
+// Für den Pflege-Bestand: Träger, Zeitarbeit, Ketten und stationäre Einrichtungen werden wie bei der Stellenbörse aussortiert.
+export function isExcludedPflegeName(name: string) {
+  SEG = SEGMENTS.pflege;
+  return excluded(name) || /(senioren(einrichtung|betreuung|wohn|park|stift)|altenpflege|residenz|wohnstift|betreutes wohnen|seniorenhaus)/i.test(name) || !AMB.test(name) && !INTENSIVE.test(name) && INPATIENT.test(name);
 }
