@@ -30,6 +30,10 @@
       "schedule": "20,50 5-15 * * 1-5"
     },
     {
+      "path": "/api/cron/pflege-enrich",
+      "schedule": "10,40 5-15 * * 1-5"
+    },
+    {
       "path": "/api/cron/pflege-source",
       "schedule": "0 6-15/3 * * 1-5"
     }
