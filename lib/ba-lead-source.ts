@@ -150,3 +150,17 @@ export function isExcludedPflegeName(name: string) {
   SEG = SEGMENTS.pflege;
   return excluded(name) || /(senioren(einrichtung|betreuung|wohn|park|stift)|altenpflege|residenz|wohnstift|betreutes wohnen|seniorenhaus)/i.test(name) || !AMB.test(name) && !INTENSIVE.test(name) && INPATIENT.test(name);
 }
+
+// Anzeigen-Pool (Export der Stellenbörse): Passt der Arbeitgeber zur Pflege-Kampagne? Gibt die geprüfte Adresse zurück oder "".
+export function evaluatePflegePoolRow(row: { n: string; e: string; t: string; d: string }) {
+  SEG = SEGMENTS.pflege;
+  if (excluded(row.n, row.t)) return "";
+  if (!/(pflege|sozialstation|\bcare\b|betreuung|krankenpfleg|häusliche|haeusliche|intensiv)/i.test(row.n)) return "";
+  if (!SEG.cat(row.n, `${row.t} ${row.d}`)) return "";
+  return mail(row.e);
+}
+
+// Prüft bei der Stellenbörse, ob die Anzeige noch online ist.
+export async function adStillOpen(ref: string) {
+  return (await detail(ref)) !== null || (await detail(ref)) !== null;
+}
