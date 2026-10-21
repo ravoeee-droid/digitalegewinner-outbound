@@ -61,6 +61,7 @@ function render(template:string, lead:{company:string; contact:string; city:stri
 
 
 type PflegeLeadPayload = {
+  general?:boolean;
   jobReferences?:Array<{title?:string;publishedAt?:string}>;
   signals?:{jobTitles?:string[];websiteAudit?:{finding?:string}};
 };
@@ -75,14 +76,14 @@ function personalizedFirstTouch(lead:{lead_id:string;company:string;contact:stri
   return firstTouch({
     lead_id:lead.lead_id,company:lead.company,contact:lead.contact,city:lead.city,
     title:String(payload.jobReferences?.[0]?.title||payload.signals?.jobTitles?.[0]||""),
-    publishedAt:payload.jobReferences?.[0]?.publishedAt,
+    publishedAt:payload.jobReferences?.[0]?.publishedAt,general:Boolean(payload.general),
   });
 }
 
 function conciseFollowUp(lead:{company:string;contact:string;lead_payload:PflegeLeadPayload|null},stepIndex:number) {
   if(ACTIVE_DEF.key==="pv")return pvFollowUp(lead,stepIndex);
   const payload=lead.lead_payload||{};
-  return followUp({company:lead.company,contact:lead.contact,title:String(payload.jobReferences?.[0]?.title||payload.signals?.jobTitles?.[0]||"")},stepIndex);
+  return followUp({company:lead.company,contact:lead.contact,general:Boolean(payload.general),title:String(payload.jobReferences?.[0]?.title||payload.signals?.jobTitles?.[0]||"")},stepIndex);
 }
 
 export async function getAppointmentGoalSnapshot(workspace="default") {
@@ -285,6 +286,7 @@ async function ensureCampaignQueue(workspace:string,def:CampaignDef) {
         case when ct.source='public-research' and coalesce(ct.metadata->'enrichment'->>'decisionMakerRole','')='' then '' else coalesce(ct.name,'') end contact,
         coalesce(c.city,'') city,
         jsonb_build_object(
+          'general',coalesce(c.metadata->>'general','')='true',
           'jobReferences',jsonb_build_array(jsonb_build_object('title',coalesce(nullif(c.metadata->>'jobTitle',''),'Pflegefachkräfte'),'publishedAt',coalesce(c.metadata->>'jobPublishedAt',''))),
           'signals',jsonb_build_object('jobTitles',jsonb_build_array(coalesce(nullif(c.metadata->>'jobTitle',''),'Pflegefachkräfte')))
         ) lead_payload

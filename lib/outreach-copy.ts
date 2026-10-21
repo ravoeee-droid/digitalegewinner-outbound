@@ -10,7 +10,7 @@ export function withSignatureLink(body: string) {
   return /Raphael Hermann\s+Digitale Gewinner$/.test(trimmed) ? `${trimmed}\n${PFLEGE_PAGE}` : body;
 }
 
-export type CopyLead = { lead_id: string; company: string; contact: string; city: string; title: string; publishedAt?: string };
+export type CopyLead = { lead_id: string; company: string; contact: string; city: string; title: string; publishedAt?: string; general?: boolean };
 
 // Terminlink für die Videocall-Variante (Test B). Ist BOOKING_URL leer, läuft nur die Standard-Mail.
 const BOOKING_URL = (process.env.BOOKING_URL || "https://calendar.app.google/63jjwjMz48c9dAWb7").trim();
@@ -47,8 +47,21 @@ function greeting(contact: string) {
   return name ? `Guten Tag ${name},` : "Guten Tag,";
 }
 
+const GENERAL_SUBJECT = "Mitarbeitergewinnung in der Pflege";
+
 export function firstTouch(lead: CopyLead) {
   const title = cleanJobTitle(lead.title);
+  // Betriebe ohne belegte offene Stelle: kein Bezug auf eine Stelle, sondern auf das Thema Fachkräftegewinnung.
+  if (lead.general) {
+    const body = [
+      greeting(lead.contact),
+      "in der Pflege finden Betriebe kaum noch Fachkräfte über Stellenanzeigen, und jede unbesetzte Stelle belastet das Team.",
+      "Wir haben bereits mehreren Pflegediensten geholfen, ihre Mitarbeiter unabhängig von Stellenportalen und Vermittlern selbst zu gewinnen.",
+      `Ich schaue mir gerne in einem kurzen Videocall Ihre Situation an, und wir sehen gemeinsam, ob das auch bei Ihnen Sinn machen würde. Buchen Sie sich dafür hier einen passenden Termin: ${BOOKING_URL}`,
+      SIGNATURE,
+    ].join("\n\n");
+    return { variant: "C", subject: GENERAL_SUBJECT, body };
+  }
   if (BOOKING_URL && pvVariantFor(String(lead.lead_id || lead.contact || "")) === "B") {
     const since = openSinceText(lead.publishedAt);
     const body = [
@@ -72,8 +85,13 @@ export function firstTouch(lead: CopyLead) {
   return { variant: "A", subject: `Ihre offene Stelle: ${title}`.slice(0, 78), body };
 }
 
-export function followUp(lead: Pick<CopyLead, "company" | "contact" | "title">, step: number) {
+export function followUp(lead: Pick<CopyLead, "company" | "contact" | "title"> & { general?: boolean }, step: number) {
   const title = cleanJobTitle(lead.title);
+  if (lead.general) {
+    const generalSubject = `Re: ${GENERAL_SUBJECT}`;
+    if (step === 1) return { subject: generalSubject, body: [greeting(lead.contact), `kurz zu meiner Nachricht: Hätten Sie diese Woche Zeit für einen kurzen Videocall zur Mitarbeitergewinnung? Hier können Sie sich direkt einen Termin buchen: ${BOOKING_URL}`, SIGNATURE].join("\n\n") };
+    return { subject: generalSubject, body: [greeting(lead.contact), "das ist meine letzte Nachricht dazu. Spielt das Thema bei Ihnen gerade keine Rolle, geben Sie mir bitte kurz Bescheid, dann melde ich mich nicht mehr bei Ihnen.", SIGNATURE].join("\n\n") };
+  }
   const subject = `Re: Ihre offene Stelle: ${title}`.slice(0, 78);
   if (step === 1) {
     return { subject, body: [greeting(lead.contact), `kurz zu meiner Nachricht: Haben Sie nächste Woche 20 Minuten, um Ihre Situation rund um die Stelle ${title} gemeinsam anzuschauen? Danach erhalten Sie eine Strategie, die zu Ihrer Einrichtung passt.`, SIGNATURE].join("\n\n") };

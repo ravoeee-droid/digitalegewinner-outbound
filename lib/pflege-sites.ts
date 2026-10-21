@@ -33,6 +33,8 @@ export async function pflegeSitesStats() {
 
 export async function processPflegeSites({ limit = 40, budgetMs = 200_000 }: { limit?: number; budgetMs?: number } = {}) {
   await ensurePool();
+  // Betriebe ohne Stelle werden seit der allgemeinen Mail ebenfalls übernommen.
+  await query("update pflege_sites set status='pending' where status='no_job' and checked_at<timestamptz '2026-10-21 20:00+00'");
   await query("update pflege_sites set status='pending' where status='checking' and checked_at<now()-interval '15 minutes'");
   const startedAt = Date.now();
   let checked = 0, added = 0;
@@ -47,16 +49,16 @@ export async function processPflegeSites({ limit = 40, budgetMs = 200_000 }: { l
         if (isExcludedPflegeName(r.name)) { await query("update pflege_sites set status='skipped' where host=$1", [r.host]); return; }
         const found = await findPflegeSiteLead(r.website);
         if (!found.email) { await query("update pflege_sites set status='no_email' where host=$1", [r.host]); return; }
-        if (!found.job) { await query("update pflege_sites set status='no_job',email=$2 where host=$1", [r.host, found.email]); return; }
+        const general = !found.job;
         const dup = await query("select 1 from sales_contacts where workspace='default' and lower(email)=lower($1) limit 1", [found.email]);
         if (dup.length) { await query("update pflege_sites set status='duplicate',email=$2 where host=$1", [r.host, found.email]); return; }
         const sourceId = `pflege-site:${r.host}`;
         await persistRadarLead({ id: sourceId, company: r.name, contact: found.person || "", email: found.email, phone: found.phone || r.phone || "", website: r.website, city: r.city, industry: "Pflege", source: "ba-jobboerse" }, { email: found.email, phone: found.phone || r.phone || "" } as never, undefined, "default");
         await query(
           "update sales_companies set source='ba-jobboerse', metadata=coalesce(metadata,'{}'::jsonb)||$2::jsonb, updated_at=now() where workspace='default' and source_id=$1",
-          [sourceId, JSON.stringify({ source: "ba-jobboerse", via: "pflege-sites", jobTitle: found.job, state: r.state, category: "ambulatory_care" })],
+          [sourceId, JSON.stringify({ source: "ba-jobboerse", via: "pflege-sites", jobTitle: found.job, general: general ? "true" : "", state: r.state, category: "ambulatory_care" })],
         );
-        await query("update pflege_sites set status='lead',email=$2,job=$3 where host=$1", [r.host, found.email, found.job]);
+        await query("update pflege_sites set status=$4,email=$2,job=$3 where host=$1", [r.host, found.email, found.job, general ? "lead_general" : "lead"]);
         added++;
       } catch {
         await query("update pflege_sites set status='pending' where host=$1", [r.host]).catch(() => null);
