@@ -8,7 +8,7 @@ import { persistRadarLead } from "@/lib/sales-os";
 
 const BA_BASE="https://rest.arbeitsagentur.de/jobboerse/jobsuche-service";
 const BA_KEY="jobboerse-jobsuche";
-const TERMS=["Pflegedienst Pflegefachkraft","ambulante Pflege Pflegefachkraft","Sozialstation Pflegefachkraft","Intensivpflege Pflegefachkraft","häusliche Krankenpflege","ambulanter Pflegedienst","Pflegedienstleitung ambulant","Pflegefachkraft ambulant","mobiler Pflegedienst","außerklinische Intensivpflege","Pflege zuhause Pflegefachkraft","ambulante Krankenpflege"];
+const TERMS=["Pflegedienst Pflegefachkraft","ambulante Pflege Pflegefachkraft","Sozialstation Pflegefachkraft","Intensivpflege Pflegefachkraft","häusliche Krankenpflege","ambulanter Pflegedienst","Pflegedienstleitung ambulant","Pflegefachkraft ambulant","mobiler Pflegedienst","außerklinische Intensivpflege","Pflege zuhause Pflegefachkraft","ambulante Krankenpflege","Pflegeheim Pflegefachkraft","Seniorenzentrum Pflegefachkraft","Altenheim Pflegefachkraft","Seniorenresidenz Pflegefachkraft"];
 const DAYS=[30,60,100];
 const STAFF=/(randstad|adecco|manpower|tempton|persona service|personaservice|pluss|akut|avanti|piening|unique personal|in care|incare|all\.medi|medwing|pacura|felten|iperdimed|zeitarbeit|arbeitnehmerüberlass|arbeitnehmeruberlass|personaldienst|personalvermittlung|staffing|leiharbeit|recruiting agentur|personalmanagement|personalservice|arbeitsvermittlung|personal und |personal & |klinikpersonal|personalberatung|managementberatung|unternehmensberatung|personalleasing|personalagentur|pflegevermittlung|vermittlung)/i;
 const BIG=/(universitätsklin|universitaetsklin|universitätsmedizin|klinikum|\bklinik\b|krankenhaus|charit[eé]|helios|asklepios|sana klin|korian|alloheim|caritas|diakonie|deutsches rotes kreuz|\bdrk\b|\bbrk\b|arbeiterwohlfahrt|\bawo\b|johanniter|malteser|lebenshilfe|deutsche fachpflege|renafan|advita|aiutanda|compassio|dorea|emeis|pro seniore|kursana|azurit|münchenstift|munchenstift|landkreis|stadtverwaltung|bundeswehr|holding|konzern|bundesweit|zentrale geschäftsführung|zentrale geschaeftsfuehrung)/i;
@@ -23,14 +23,14 @@ function hash(v:string){let h=2166136261;for(let i=0;i<v.length;i++){h^=v.charCo
 function strings(v:unknown,out:string[]=[]):string[]{if(typeof v==="string")out.push(v);else if(Array.isArray(v))for(const x of v)strings(x,out);else if(v&&typeof v==="object")for(const x of Object.values(v as Record<string,unknown>))strings(x,out);return out;}
 function first(o:Record<string,unknown>,ks:string[]){for(const k of ks){const v=o?.[k];if(typeof v==="string"&&v.trim())return v.trim();}return"";}
 function ms(v:unknown){const x=Date.parse(String(v||""));return Number.isFinite(x)?x:0;}
-function excluded(name:string,text=""){const v=`${name} ${text}`;return !name||STAFF.test(v)||BIG.test(v)||INPATIENT.test(name)||(SEG.key==="pv"&&UTILITY.test(name));}
-function catPflege(name:string,text:string){const v=`${name} ${text}`;if(INTENSIVE.test(v))return"intensive_care";if(AMB.test(v)&&!INPATIENT.test(v))return"ambulatory_care";return"";}
+function excluded(name:string,text=""){const v=`${name} ${text}`;return !name||STAFF.test(v)||BIG.test(v)||(SEG.key==="pv"&&UTILITY.test(name));}
+function catPflege(name:string,text:string){const v=`${name} ${text}`;if(INTENSIVE.test(v))return"intensive_care";if(AMB.test(v)&&!INPATIENT.test(name))return"ambulatory_care";if(INPATIENT.test(name))return"inpatient_care";return"";}
 const PV_MATCH=/(photovoltaik|\bsolar|\bpv[- ]?(anlage|montage|monteur|installa|techn|projekt|service)?\b|stromspeicher|wärmepumpe)/i;
 const UTILITY=/(stadtwerke|\brwe\b|e\.on|\beon\b|enbw|vattenfall|siemens|bosch|enercon|vestas|senvion|sma solar|solarwatt|meyer burger|1komma5|enpal|zolar|thüga|innogy|\btüv\b|dekra|handwerkskammer|bundesagentur|jobcenter|hochschule|universität|fraunhofer|verband|energieversorg|netzbetreiber|netze\b|konzern)/i;
 function catPv(name:string,text:string){return PV_MATCH.test(`${name} ${text}`)?"pv_installer":"";}
 export type BaSegmentKey="pflege"|"pv";
 const SEGMENTS={
-  pflege:{key:"pflege" as BaSegmentKey,source:"ba-jobboerse",industry:"Pflege",terms:TERMS,match:(seed:string)=>AMB.test(seed)||INTENSIVE.test(seed),cat:catPflege},
+  pflege:{key:"pflege" as BaSegmentKey,source:"ba-jobboerse",industry:"Pflege",terms:TERMS,match:(seed:string)=>AMB.test(seed)||INTENSIVE.test(seed)||INPATIENT.test(seed),cat:catPflege},
   pv:{key:"pv" as BaSegmentKey,source:"ba-pv",industry:"Photovoltaik",terms:["Photovoltaik Monteur","Solarteur","Photovoltaik Elektriker","Elektroniker Photovoltaik","Photovoltaikanlagen Installation","Solaranlagen Monteur","PV Projektleiter","Bauleiter Photovoltaik","Solartechnik Elektriker","Stromspeicher Installateur","Photovoltaik Dachmontage","PV Servicetechniker","Solar Montage","Elektriker Photovoltaik Wallbox","Energietechnik Photovoltaik"],match:(seed:string)=>PV_MATCH.test(seed),cat:catPv},
 };
 let SEG: { key: BaSegmentKey; source: string; industry: string; terms: string[]; match: (seed: string) => boolean; cat: (name: string, text: string) => string } = SEGMENTS.pflege;
@@ -148,14 +148,14 @@ export async function findPvSiteContact(website: string, segment: BaSegmentKey =
 // Für den Pflege-Bestand: Träger, Zeitarbeit, Ketten und stationäre Einrichtungen werden wie bei der Stellenbörse aussortiert.
 export function isExcludedPflegeName(name: string) {
   SEG = SEGMENTS.pflege;
-  return excluded(name) || /(senioren(einrichtung|betreuung|wohn|park|stift)|altenpflege|residenz|wohnstift|betreutes wohnen|seniorenhaus)/i.test(name) || !AMB.test(name) && !INTENSIVE.test(name) && INPATIENT.test(name);
+  return excluded(name);
 }
 
 // Anzeigen-Pool (Export der Stellenbörse): Passt der Arbeitgeber zur Pflege-Kampagne? Gibt die geprüfte Adresse zurück oder "".
 export function evaluatePflegePoolRow(row: { n: string; e: string; t: string; d: string }) {
   SEG = SEGMENTS.pflege;
   if (excluded(row.n, row.t)) return "";
-  if (!/(pflege|sozialstation|\bcare\b|betreuung|krankenpfleg|häusliche|haeusliche|intensiv)/i.test(row.n)) return "";
+  if (!/(pflege|sozialstation|\bcare\b|betreuung|krankenpfleg|häusliche|haeusliche|intensiv|senioren|alten|residenz|stift|heim|wohn)/i.test(row.n)) return "";
   if (!SEG.cat(row.n, `${row.t} ${row.d}`)) return "";
   return mail(row.e);
 }
