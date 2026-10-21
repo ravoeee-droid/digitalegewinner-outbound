@@ -54,8 +54,9 @@ export function firstTouch(lead: CopyLead) {
     const body = [
       greeting(lead.contact),
       since ? `ich habe gesehen, dass Ihre Stelle als ${title} ${since} offen ist.` : `ich habe gesehen, dass Sie aktuell eine Fachkraft als ${title} suchen.`,
-      "Ich würde mich gerne in einem kurzen Videocall mit Ihnen über Ihre offene Stelle unterhalten und Ihnen zeigen, wie Sie sie in den nächsten sechs Wochen besetzen können.",
-      `Buchen Sie sich hier direkt einen passenden Termin: ${BOOKING_URL}`,
+      "Das ist gerade in der Pflege ein bekanntes Problem: Auf Anzeigen melden sich kaum noch passende Fachkräfte, und jede Woche ohne Besetzung belastet Ihr Team.",
+      "Genau diese Situation haben wir bereits mehrfach bei anderen Pflegediensten gelöst.",
+      `Ich schaue mir gerne in einem kurzen Videocall Ihre Situation an, und wir sehen gemeinsam, ob das auch bei Ihnen Sinn machen würde. Buchen Sie sich dafür hier einen passenden Termin: ${BOOKING_URL}`,
       SIGNATURE,
     ].join("\n\n");
     return { variant: "B", subject: `Ihre offene Stelle: ${title}`.slice(0, 78), body };
