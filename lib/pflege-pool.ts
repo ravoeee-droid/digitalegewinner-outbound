@@ -34,6 +34,8 @@ export async function pflegePoolStats() {
 export async function processPflegePool({ limit = 40, budgetMs = 200_000 }: { limit?: number; budgetMs?: number } = {}) {
   await ensurePool();
   await query("update pflege_pool set status='pending' where status='checking' and checked_at<now()-interval '15 minutes'");
+  // Seit der Erweiterung auf Pflegeheime/Seniorenzentren werden früher aussortierte Betriebe noch einmal geprüft.
+  await query("update pflege_pool set status='pending' where status='skipped' and checked_at<timestamptz '2026-10-21 19:00+00'");
   const byEmail = new Map((pool as PoolRow[]).map((row) => [row.e, row]));
   const startedAt = Date.now();
   let checked = 0, added = 0;
