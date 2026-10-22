@@ -69,7 +69,7 @@ export async function GET(request: Request) {
 
     return Response.json({
       counts, filter, q, page, pageSize: PAGE_SIZE, total, pages: Math.max(1, Math.ceil(total / PAGE_SIZE)),
-      rows: rows.map((row) => ({ ...row, contact: cleanPersonName(row.contact), video_token: row.shot ? videoToken(String(row.id)) : "" })),
+      rows: rows.map((row) => ({ ...row, contact: cleanPersonName(row.contact), video_token: videoToken(String(row.id)) })),
     }, { headers: { "cache-control": "no-store" } });
   } catch (error) {
     return Response.json({ error: error instanceof Error ? error.message : "Leads konnten nicht geladen werden." }, { status: 503 });
