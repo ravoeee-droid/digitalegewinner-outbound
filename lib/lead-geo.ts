@@ -22,7 +22,7 @@ async function lookup(text: string) {
   return state || county ? { state, county } : null;
 }
 
-export async function enrichGeoOnce({ limit = 25, budgetMs = 60_000 }: { limit?: number; budgetMs?: number } = {}) {
+export async function enrichGeoOnce({ limit = 25, budgetMs = 45_000 }: { limit?: number; budgetMs?: number } = {}) {
   const startedAt = Date.now();
   let checked = 0, mapped = 0;
   const rows = await query<{ id: string; city: string; address: string; plz: string; state: string }>(
