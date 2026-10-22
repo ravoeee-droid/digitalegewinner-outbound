@@ -8,6 +8,7 @@ const PRIVATE_HOST = /^(localhost|.*\.local|.*\.internal|127\.|10\.|192\.168\.|1
 export async function ensureScreenshotTable() {
   await query(`create table if not exists lead_screenshots (
     lead_id text primary key, url text, status text not null default 'ok', data bytea, error text, created_at timestamptz not null default now())`);
+  await query("alter table lead_screenshots add column if not exists attempts int not null default 0");
 }
 
 export function safeWebsite(raw: string) {
@@ -84,7 +85,7 @@ export async function screenshotCandidates(limit: number) {
     where l.workspace='default' and l.status='active' and l.stage in ('Neu','Research','Bereit')
       and coalesce(l.do_not_contact,false)=false and coalesce(ct.email,'')<>''
       and lower(coalesce(c.source,''))=any(array['ba-jobboerse','ba-pv'])
-      and s.lead_id is null
+      and (s.lead_id is null or (s.status='failed' and s.attempts<4 and s.created_at<now()-interval '20 minutes'))
       and not exists(select 1 from er_outbox o where o.workspace='default' and o.lead_id=l.id::text and o.status not in ('failed','suppressed'))
     order by l.priority_score desc, l.updated_at desc
     limit $1`, [limit]);
