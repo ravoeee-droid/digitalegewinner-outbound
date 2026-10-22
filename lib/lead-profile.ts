@@ -37,7 +37,7 @@ export async function profileSite(website: string) {
   return { employees: employees || null, open_jobs: titles.size || null, locations: sites.size || null, traeger: traeger || null };
 }
 
-export async function enrichProfilesOnce({ limit = 12, budgetMs = 30_000 }: { limit?: number; budgetMs?: number } = {}) {
+export async function enrichProfilesOnce({ limit = 12, budgetMs = 25_000 }: { limit?: number; budgetMs?: number } = {}) {
   const startedAt = Date.now();
   let checked = 0, found = 0;
   const rows = await query<{ id: string; website: string; email: string }>(
