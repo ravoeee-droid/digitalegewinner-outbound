@@ -13,6 +13,8 @@ const FILTERS: Record<string, string> = {
   bereit: "coalesce(ct.email,'')<>'' and not l.do_not_contact and l.stage in ('Neu','Research','Bereit') and o.status is null",
   angeschrieben: "o.status in ('sent','stopped')",
   ohne_email: "coalesce(ct.email,'')=''",
+  // Leads, für die der Website-Screenshot (persönliche Videoseite) schon fertig ist.
+  screenshot: "exists(select 1 from lead_screenshots ls where ls.lead_id=l.id::text and ls.status='ok')",
   // Interessiert: hat die persönliche Videoseite geöffnet, das Video gestartet oder den Kalender angeklickt (Bots zählen nicht).
   video: "exists(select 1 from er_events ve where ve.workspace=l.workspace and ve.lead_id=l.id::text and ve.type in ('video_view','video_play','video_calendar_focus','video_booking_click') and coalesce(ve.meta->>'bot','false')='false')",
 };
