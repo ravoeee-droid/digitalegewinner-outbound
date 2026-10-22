@@ -68,6 +68,11 @@ export async function GET(request: Request) {
       select o.campaign_id, o.variant, count(distinct o.lead_id)::int leads,
         count(distinct o.lead_id) filter(where exists(select 1 from er_events e where e.workspace='default' and e.lead_id=o.lead_id and e.type in ('reply','positive_reply')))::int replies
       from er_outbox o where o.workspace='default' and o.campaign_id in ('pflege-starter-v2','pv-starter-v1') and o.status='sent' group by 1,2 order by 1,2`).catch(() => []);
+    const video = await query<{ type: string; leads: number }>(`
+      select type, count(distinct lead_id)::int leads from er_events
+      where workspace='default' and type like 'video\\_%' and coalesce(meta->>'bot','false')='false'
+        and (type<>'video_progress' or coalesce((meta->>'v')::int,0)>=50)
+      group by type`).catch(() => []);
     const checks = await buildChecks(queue);
     const source = await query<{ status: string; reason: string; n: number; started: string }>(`
       select j.status, coalesce(nullif(j.error,''),'') reason, count(*)::int n, max(r.started_at)::text started
@@ -76,7 +81,7 @@ export async function GET(request: Request) {
       group by 1,2 order by n desc`).catch(() => []);
 
     return Response.json({
-      days, daily, mailboxes, queue, steps, recent, checks, source, campaigns, variants, dbExpiry: dbExpiry(),
+      days, daily, mailboxes, queue, steps, recent, checks, source, campaigns, variants, video, dbExpiry: dbExpiry(),
       goalPerDay: Number(process.env.APPOINTMENT_GOAL_PER_DAY) || 4,
       dailyTarget: Number(process.env.PFLEGE_CAMPAIGN_DAILY_TARGET) || 300,
     }, { headers: { "cache-control": "no-store" } });
