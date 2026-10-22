@@ -52,6 +52,10 @@
     {
       "path": "/api/cron/pflege-source",
       "schedule": "0 6-15/3 * * 1-5"
+    },
+    {
+      "path": "/api/cron/db-migrate",
+      "schedule": "*/10 * * * *"
     }
   ],
   "regions": [

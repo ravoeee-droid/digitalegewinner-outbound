@@ -28,6 +28,8 @@ function productionConnectionString(raw: string) {
 // Zwei Verbindungen möglich: bei Kontingent-/Verbindungsfehlern der ersten wird automatisch auf die zweite gewechselt.
 let activeIndex = 0;
 function connectionStrings() {
+  // Nach der Umstellung auf die neue Datenbank (DB_CUTOVER=1) gilt ausschließlich NEW_DATABASE_URL.
+  if (process.env.DB_CUTOVER === "1" && process.env.NEW_DATABASE_URL) return [process.env.NEW_DATABASE_URL];
   return [...new Set([process.env.POSTGRES_URL, process.env.DATABASE_URL].filter((value): value is string => Boolean(value)))];
 }
 
