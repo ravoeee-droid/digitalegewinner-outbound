@@ -20,12 +20,15 @@ function status(row: Row) {
 }
 
 function videoCell(row: Row) {
-  if (!row.video_token) return <span className={styles.muted}>noch kein Screenshot</span>;
+  if (!row.video_token) return <span className={styles.muted}>-</span>;
+  const analyse = <small><a href={`/api/t/analyse/${encodeURIComponent(row.video_token)}`} target="_blank" rel="noopener noreferrer">Analyse (PDF) für den Termin</a></small>;
+  if (!row.shot) return <><span className={styles.muted}>noch kein Screenshot</span>{analyse}</>;
   const steps = [row.views ? "geöffnet" : "", row.plays ? "Play" : "", row.progress ? `${row.progress} % gesehen` : "", row.watch ? `${row.watch} s` : "", row.calendar ? "Kalender" : ""].filter(Boolean);
   return (
     <>
       <a href={`/v/${encodeURIComponent(row.video_token)}`} target="_blank" rel="noopener noreferrer">Seite ansehen</a>
       <small>{steps.length ? steps.join(" · ") : "noch nicht geöffnet"}</small>
+      {analyse}
     </>
   );
 }
