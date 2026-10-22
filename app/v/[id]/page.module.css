@@ -19,6 +19,7 @@
 .calendar h2 { margin: 0 0 12px; font-size: 17px; }
 .calendar iframe { width: 100%; height: 640px; border: 0; border-radius: 10px; background: #fff; }
 
+.staticShot { width: 100%; aspect-ratio: 16 / 9; border-radius: 14px; background: #1d1814 center top / cover no-repeat; box-shadow: 0 12px 40px rgba(28, 24, 21, 0.22); }
 .player { position: relative; width: 100%; aspect-ratio: 16 / 9; background: #14110f; border-radius: 14px; overflow: hidden; box-shadow: 0 12px 40px rgba(28, 24, 21, 0.22); }
 .screen { position: absolute; inset: 0; background-size: cover; background-position: top center; background-color: #1d1814; }
 .cam { position: absolute; left: 3.2%; bottom: 13%; width: 19%; aspect-ratio: 1; border-radius: 50%; overflow: hidden; border: 4px solid #fff; background: #000; box-shadow: 0 8px 28px rgba(0, 0, 0, 0.5); }

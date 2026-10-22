@@ -12,6 +12,9 @@ export function withSignatureLink(body: string) {
 
 // Videomail (Variante V): enthält {{video_link}} (persönliche Videoseite, wird beim Versand eingesetzt). Nur aktiv mit VIDEO_MAIL=on.
 export const VIDEO_MAIL_ENABLED = process.env.VIDEO_MAIL === "on";
+// YouTube-ID des Talking-Head-Videos je Zielgruppe. Ist keins hinterlegt, bekommt diese Zielgruppe keine Videomail.
+export const VIDEO_IDS: Record<"pflege" | "pv", string> = { pflege: process.env.VIDEO_ID_PFLEGE || "iYU1SEsBusI", pv: process.env.VIDEO_ID_PV || "" };
+
 export function videoVariantFor(leadId: string) {
   let sum = 7;
   for (let index = 0; index < leadId.length; index += 1) sum += leadId.charCodeAt(index) * (index % 3 + 1);
