@@ -144,23 +144,25 @@ export function firstTouch(lead: CopyLead) {
   return { variant: "A", subject: `Ihre offene Stelle: ${title}`.slice(0, 78), body };
 }
 
+const BREAKUP_TAIL = "Ein kurzes „später“ oder „kein Bedarf“ genügt, dann melde ich mich entsprechend.";
+
 export function followUp(lead: Pick<CopyLead, "company" | "contact" | "title"> & { general?: boolean; video?: boolean }, step: number) {
   const title = cleanJobTitle(lead.title);
   if (lead.video) {
-    const videoSubject = "Re: Kurzes Video zur Mitarbeitergewinnung";
-    if (step === 1) return { subject: videoSubject, body: [greeting(lead.contact), "kurz zu meiner Nachricht: Hier nochmal das kurze Video, falls es untergegangen ist: {{video_link}}", "Dort können Sie sich auch direkt einen Termin buchen.", SIGNATURE].join("\n\n") };
-    return { subject: videoSubject, body: [greeting(lead.contact), "das ist meine letzte Nachricht dazu. Spielt das Thema bei Ihnen gerade keine Rolle, geben Sie mir bitte kurz Bescheid, dann melde ich mich nicht mehr bei Ihnen.", SIGNATURE].join("\n\n") };
+    const videoSubject = "Nachfrage: Kurzes Video zur Mitarbeitergewinnung";
+    if (step === 1) return { subject: videoSubject, body: [greeting(lead.contact), "falls meine erste Nachricht untergegangen ist: Hier ist das kurze Video, das ich für Sie aufgenommen habe: {{video_link}}", "Dort können Sie sich auch direkt einen Termin buchen.", SIGNATURE].join("\n\n") };
+    return { subject: videoSubject, body: [greeting(lead.contact), `ich habe bisher nichts von Ihnen gehört und möchte Sie nicht weiter stören. ${BREAKUP_TAIL}`, SIGNATURE].join("\n\n") };
   }
   if (lead.general) {
-    const generalSubject = `Re: ${GENERAL_SUBJECT}`;
-    if (step === 1) return { subject: generalSubject, body: [greeting(lead.contact), `kurz zu meiner Nachricht: Hätten Sie diese Woche Zeit für einen kurzen Videocall zur Mitarbeitergewinnung? Hier können Sie sich direkt einen Termin buchen: ${BOOKING_URL}`, SIGNATURE].join("\n\n") };
-    return { subject: generalSubject, body: [greeting(lead.contact), "das ist meine letzte Nachricht dazu. Spielt das Thema bei Ihnen gerade keine Rolle, geben Sie mir bitte kurz Bescheid, dann melde ich mich nicht mehr bei Ihnen.", SIGNATURE].join("\n\n") };
+    const generalSubject = `Nachfrage: ${GENERAL_SUBJECT}`;
+    if (step === 1) return { subject: generalSubject, body: [greeting(lead.contact), "falls meine erste Nachricht untergegangen ist: Wir haben Pflegediensten geholfen, Mitarbeiter unabhängig von Stellenportalen und Vermittlern selbst zu gewinnen.", `Wenn Sie möchten, zeige ich Ihnen in 15 Minuten im Videocall, was davon für Sie passt. Hier können Sie sich direkt einen Termin buchen: ${BOOKING_URL}`, SIGNATURE].join("\n\n") };
+    return { subject: generalSubject, body: [greeting(lead.contact), `ich habe bisher nichts von Ihnen gehört und möchte Sie nicht weiter stören. ${BREAKUP_TAIL}`, SIGNATURE].join("\n\n") };
   }
-  const subject = `Re: Ihre offene Stelle: ${title}`.slice(0, 78);
+  const subject = `Nachfrage: ${title}`.slice(0, 78);
   if (step === 1) {
-    return { subject, body: [greeting(lead.contact), `kurz zu meiner Nachricht: Haben Sie nächste Woche 20 Minuten, um Ihre Situation rund um die Stelle ${title} gemeinsam anzuschauen? Danach erhalten Sie eine Strategie, die zu Ihrer Einrichtung passt.`, SIGNATURE].join("\n\n") };
+    return { subject, body: [greeting(lead.contact), `ich hake noch einmal kurz nach, falls meine erste Nachricht untergegangen ist. Eine offene Stelle als ${title} kostet jede Woche Kraft im Team.`, "Bei einem Pflegebetrieb sind durch unsere Arbeit 11 neue Mitarbeiter in 4 Monaten dazugekommen (Einzelergebnis, keine Garantie).", "Wenn Sie möchten, zeige ich Ihnen in 15 Minuten, welcher Weg für Sie passt. Antworten Sie einfach mit „ja“, dann sende ich Ihnen zwei Terminvorschläge.", SIGNATURE].join("\n\n") };
   }
-  return { subject, body: [greeting(lead.contact), "das ist meine letzte Nachricht dazu. Ist die Stelle bereits besetzt, geben Sie mir bitte kurz Bescheid, dann melde ich mich nicht mehr bei Ihnen.", SIGNATURE].join("\n\n") };
+  return { subject, body: [greeting(lead.contact), `ich habe bisher nichts von Ihnen gehört und möchte Sie nicht weiter stören. Ist die Stelle als ${title} inzwischen besetzt? ${BREAKUP_TAIL}`, SIGNATURE].join("\n\n") };
 }
 
 // ---------- Kampagne Photovoltaik-Betriebe ----------
@@ -231,14 +233,14 @@ export function pvFirstTouch(lead: { contact: string; lead_id?: string; video?: 
 }
 
 export function pvFollowUp(lead: { contact: string; video?: boolean }, step: number) {
-  const subject = lead.video ? "Re: Kurzes Video zur Kundengewinnung" : "Re: Kurze Frage zur Kundengewinnung";
+  const subject = lead.video ? "Nachfrage: Kurzes Video zur Kundengewinnung" : "Nachfrage: Anfragen ohne Leadportal";
   if (lead.video) {
-    if (step === 1) return { subject, body: [greeting(lead.contact), "kurz zu meiner Nachricht: Hier nochmal das kurze Video, falls es untergegangen ist: {{video_link}}", "Dort können Sie sich auch direkt einen Termin buchen.", PV_SIGNATURE].join("\n\n") };
+    if (step === 1) return { subject, body: [greeting(lead.contact), "falls meine erste Nachricht untergegangen ist: Hier ist das kurze Video, das ich für Sie aufgenommen habe: {{video_link}}", "Dort können Sie sich auch direkt einen Termin buchen.", PV_SIGNATURE].join("\n\n") };
   }
   if (step === 1) {
-    return { subject, body: [greeting(lead.contact), "kurz zu meiner Nachricht: Hätten Sie in den nächsten Tagen 20 Minuten, damit ich Ihnen zeigen kann, wie Sie ohne Leadportale an exklusive Anfragen unter Ihrem eigenen Namen kommen? Die Vorstellung ist kostenlos und unverbindlich.", PV_SIGNATURE].join("\n\n") };
+    return { subject, body: [greeting(lead.contact), "ich hake noch einmal kurz nach, falls meine erste Nachricht untergegangen ist. Bei Leadportalen teilen sich vier bis fünf Betriebe dieselbe Anfrage, und am Ende gewinnt der Billigste.", "Ich zeige Ihnen in 15 Minuten, wie Sie an Anfragen kommen, die nur an Sie gehen. Antworten Sie einfach mit „ja“, dann sende ich Ihnen zwei Terminvorschläge.", PV_SIGNATURE].join("\n\n") };
   }
-  return { subject, body: [greeting(lead.contact), "das ist meine letzte Nachricht dazu. Ist das Thema bei Ihnen gerade kein Thema, geben Sie mir bitte kurz Bescheid, dann melde ich mich nicht mehr bei Ihnen.", PV_SIGNATURE].join("\n\n") };
+  return { subject, body: [greeting(lead.contact), `ich habe bisher nichts von Ihnen gehört und möchte Sie nicht weiter stören. ${BREAKUP_TAIL}`, PV_SIGNATURE].join("\n\n") };
 }
 
 // Terminvorschläge werden erst beim Versand eingesetzt, damit „morgen“ und „übermorgen“ immer Werktage sind.
