@@ -48,7 +48,7 @@ export async function capture(browser: Browser, website: string) {
     await page.addStyleTag({ content: HIDE_BANNERS }).catch(() => null);
     await page.waitForTimeout(2_500);
     const png = await page.screenshot({ type: "png", clip: { x: 0, y: 0, width: 1440, height: 900 } });
-    const jpg = await sharp(png).jpeg({ quality: 72, mozjpeg: true }).toBuffer();
+    const jpg = await sharp(png).resize(1280).jpeg({ quality: 62, mozjpeg: true }).toBuffer();
     // Fast leere oder einfarbige Seiten (Fehlerseiten, Ladebildschirme) sind kein brauchbarer Screenshot.
     const { channels } = await sharp(png).resize(64, 40).stats();
     const spread = Math.max(...channels.map((channel) => channel.stdev));
@@ -88,4 +88,14 @@ export async function screenshotCandidates(limit: number) {
       and not exists(select 1 from er_outbox o where o.workspace='default' and o.lead_id=l.id::text and o.status not in ('failed','suppressed'))
     order by l.priority_score desc, l.updated_at desc
     limit $1`, [limit]);
+}
+
+// Platzsparen: Screenshots von Leads, die die Seite nie geöffnet haben, werden nach 21 Tagen gelöscht (der Datensatz bleibt, die Seite zeigt dann ohne Bild).
+export async function purgeOldScreenshots() {
+  const rows = await query<{ lead_id: string }>(
+    `delete from lead_screenshots s where s.created_at<now()-interval '21 days'
+       and not exists(select 1 from er_events e where e.workspace='default' and e.lead_id=s.lead_id and e.type like 'video\\_%')
+     returning s.lead_id`,
+  ).catch(() => []);
+  return rows.length;
 }
