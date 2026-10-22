@@ -3,6 +3,8 @@
 import { query } from "@/lib/db";
 
 const DEFAULTS: Array<[string, string]> = [
+  ["drk", "Fallstudie 01 (DRK)"],
+  ["rotes kreuz", "Fallstudie 01 (DRK)"],
   ["pflegeresidenz rose", "Fallstudie 02"],
   ["maternus", "Fallstudie 03"],
   ["radloff", "Fallstudie 04 (Häusliche Krankenpflege Raik Radloff)"],
