@@ -19,8 +19,9 @@ const FILTERS: Record<string, string> = {
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
-  const filter = FILTERS[url.searchParams.get("filter") || ""] ? String(url.searchParams.get("filter")) : "alle";
   const q = String(url.searchParams.get("q") || "").trim().slice(0, 80);
+  // Wer sucht, will den Lead finden, egal in welchem Status: Die Suche läuft über alle Leads.
+  const filter = q ? "alle" : FILTERS[url.searchParams.get("filter") || ""] ? String(url.searchParams.get("filter")) : "alle";
   const page = Math.max(1, Number(url.searchParams.get("page")) || 1);
   const segment = url.searchParams.get("segment");
   const segmentSql = segment === "pv" ? " and c.source='ba-pv'" : segment === "pflege" ? " and c.source<>'ba-pv'" : "";
@@ -48,7 +49,7 @@ export async function GET(request: Request) {
     await ensureScreenshotTable();
     const params: unknown[] = [];
     let search = "";
-    if (q) { params.push(`%${q}%`); search = ` and (c.name ilike $1 or c.city ilike $1 or ct.email ilike $1 or ct.name ilike $1)`; }
+    if (q) { params.push(`%${q}%`); search = ` and (c.name ilike $1 or c.city ilike $1 or ct.email ilike $1 or ct.name ilike $1 or c.website ilike $1 or c.domain ilike $1)`; }
     const [{ n: total } = { n: 0 }] = await query<{ n: number }>(`select count(*)::int n ${from} and ${FILTERS[filter]}${search}`, params);
 
     const rows = await query<{ id: string; company: string; city: string; website: string; contact: string; email: string; phone: string; stage: string; score: number; mail_status: string | null; last_sent: string | null; do_not_contact: boolean; shot: boolean | null; views: number; plays: number; progress: number; watch: number; dwell: number; calendar: number; site_pages: number; site_dwell: number }>(`
