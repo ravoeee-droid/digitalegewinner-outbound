@@ -1,7 +1,7 @@
 {
   "contractVersion": "1.0.0",
   "instance": "DG-MAIN",
-  "updatedAt": "2026-10-20",
+  "updatedAt": "2026-10-22",
   "policy": "same-task-adapt-both-directions",
   "status": "parity-realignment-in-progress",
   "sharedSurfaces": {
@@ -23,7 +23,8 @@
     "outboundOsV3": "dg-foundation-feature-branch-peer-parity-blocked",
     "appointmentGoalAutopilot": "dg-implemented-peer-parity-blocked",
     "dailyCockpitHeute": "dg-implemented-peer-parity-blocked",
-    "crmKanbanWorkspace": "dg-implemented-peer-parity-blocked"
+    "crmKanbanWorkspace": "dg-implemented-peer-parity-blocked",
+    "territorySourceImport": "DG supports explicit Pflege sector and public email, preserves legacy PV default; peer parity blocked"
   },
   "blockers": [
     {
@@ -68,6 +69,12 @@
       "surface": "mailboxStatusWorkflow",
       "peer": "CLIENT-WALKENHORST",
       "detail": "Peer corresponding source app/api/mail/config/route.ts was requested read-only from main and returned HTTP404. No equivalent mailbox configuration seam could be inspected; peer source/runtime remain unchanged. DG recovery is fixed for its ten explicit Netcup accounts; shared-core parity is not claimed."
+    },
+    {
+      "id": "territory-pflege-import-2026-10-22",
+      "surface": "territorySourceImport",
+      "peer": "CLIENT-WALKENHORST",
+      "detail": "Read-only requests for peer main app/api/territories/route.ts and lib/territory-intelligence.ts returned HTTP404. No equivalent import seam could be inspected. Peer source and all peer runtime/data are unchanged. Shared-core parity is not claimed."
     }
   ],
   "rules": [
