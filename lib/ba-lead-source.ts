@@ -127,22 +127,28 @@ export async function collectBaLeads(options: { target?: number; budgetMs?: numb
 // Sucht auf der Webseite eines PV-Betriebs (Startseite, Impressum, Kontakt) eine Geschäfts-E-Mail; Bewerbungs-/Personaladressen zählen nicht.
 export async function findPvSiteContact(website: string, segment: BaSegmentKey = "pv") {
   SEG = SEGMENTS[segment];
-  const pick = (t: string, host: string) => {
+  const emailsIn = (t: string) => {
     const all: string[] = [];
-    for (const raw of t.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi) || []) { const x = raw.replace(/^(u00[0-9a-f]{2}|%20|x[0-9a-f]{2})/i, ""); const e = mail(x); if (e && !/\.(png|jpe?g|gif|svg|webp|css|js)$/i.test(e) && !all.includes(e)) all.push(e); }
-    return all.find((e) => e.endsWith(`@${host}`) || e.endsWith(`.${host}`)) || all.find((e) => !/(wixpress|sentry|example|domain\.|beispiel|muster)/i.test(e)) || "";
+    for (const raw of t.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi) || []) { const x = raw.replace(/^(u00[0-9a-f]{2}|%20|x[0-9a-f]{2})/i, ""); const e = mail(x); if (e && !/\.(png|jpe?g|gif|svg|webp|css|js)$/i.test(e) && !/(wixpress|sentry|example|domain\.|beispiel|muster)/i.test(e) && !all.includes(e)) all.push(e); }
+    return all;
   };
+  const fold = (v: string) => v.toLowerCase().replace(/ä/g, "ae").replace(/ö/g, "oe").replace(/ü/g, "ue").replace(/ß/g, "ss").normalize("NFKD").replace(/[^a-z]/g, "");
   let origin = "", host = "";
   try { const u = new URL(website); origin = u.origin; host = u.hostname.replace(/^www\./, ""); } catch { return { email: "", phone: "", person: "" }; }
-  let text = "", email = "";
+  let text = "";
+  // Impressum und Kontakt werden immer gelesen: Dort stehen Geschäftsführung und oft deren eigene Adresse.
   for (const path of ["", "/impressum", "/kontakt"]) {
     const x = await fetchText(origin + path);
     if (path === "" && !x.text) { const http = origin.replace(/^https:/, "http:"); if (http !== origin) { const y = await fetchText(http); text += `\n${y.text}`; } }
     text += `\n${x.text}`;
-    email = pick(text, host);
-    if (email) break;
   }
-  return { email, phone: phone(text), person: person(text) };
+  const all = emailsIn(text);
+  const owner = person(text);
+  const surname = fold(owner.split(/\s+/).slice(-1)[0] || "");
+  // Bevorzugt: Adresse der namentlich genannten Geschäftsführung, dann Adressen der eigenen Domain, dann alle übrigen.
+  const personal = surname.length >= 4 ? all.find((e) => fold(e.split("@")[0]).includes(surname) && (e.endsWith(`@${host}`) || e.endsWith(`.${host}`))) : "";
+  const email = personal || all.find((e) => e.endsWith(`@${host}`) || e.endsWith(`.${host}`)) || all[0] || "";
+  return { email, phone: phone(text), person: owner, personal: Boolean(personal) };
 }
 
 // Für den Pflege-Bestand: Träger, Zeitarbeit, Ketten und stationäre Einrichtungen werden wie bei der Stellenbörse aussortiert.
