@@ -70,7 +70,7 @@ export async function GET(request: Request) {
       from er_outbox o where o.workspace='default' and o.campaign_id in ('pflege-starter-v2','pv-starter-v1') and o.status='sent' group by 1,2 order by 1,2`).catch(() => []);
     const video = await query<{ type: string; leads: number }>(`
       select type, count(distinct lead_id)::int leads from er_events
-      where workspace='default' and type like 'video\\_%' and coalesce(meta->>'bot','false')='false'
+      where workspace='default' and (type like 'video\\_%' or type='site_view') and coalesce(meta->>'bot','false')='false'
         and (type<>'video_progress' or coalesce((meta->>'v')::int,0)>=50)
       group by type`).catch(() => []);
     const checks = await buildChecks(queue);

@@ -1,5 +1,5 @@
 import { query } from "@/lib/db";
-import { decodeTarget, verifyClick } from "@/lib/email-tracking";
+import { decodeTarget, verifyClick, videoToken } from "@/lib/email-tracking";
 import { sendAlertOnce } from "@/lib/alerts";
 
 export const runtime="nodejs";
@@ -24,5 +24,8 @@ export async function GET(request:Request){
   const [sentRow]=await query<{age:number;recipient:string}>("select extract(epoch from (now()-sent_at))::int age, recipient from er_outbox where id::text=$1",[outboxId]).catch(()=>[]);
   const botLike=/(bot|crawl|spider|scan|proofpoint|mimecast|barracuda|safelinks|defender|symantec|trend ?micro|python|curl|wget|go-http|headless|preview)/i.test(agent)||(sentRow&&sentRow.age<300);
   if(!botLike)await sendAlertOnce(`click:${leadId}`,`🔗 Link geklickt: ${sentRow?.recipient||"Lead "+leadId}\n${target}`,24*30).catch(()=>null);
-  return new Response(null,{status:302,headers:{location:target,"cache-control":"no-store"}});
+  // Links auf die eigene Website bekommen die Lead-Kennung mit, damit der Besuch dort dem Lead zugeordnet werden kann (ohne Cookies).
+  let location=target;
+  try{const u=new URL(target);if(/(^|\.)digitalegewinner\.de$/i.test(u.hostname)&&!u.searchParams.has("lt")){u.searchParams.set("lt",videoToken(leadId));location=u.toString();}}catch{/* Ziel bleibt unverändert */}
+  return new Response(null,{status:302,headers:{location,"cache-control":"no-store"}});
 }
