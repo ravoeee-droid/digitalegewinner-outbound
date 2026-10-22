@@ -1,0 +1,26 @@
+.backdrop { position: fixed; inset: 0; z-index: 200; background: rgba(0, 0, 0, 0.55); display: flex; justify-content: flex-end; }
+.panel { width: min(560px, 100vw); height: 100%; overflow-y: auto; background: #14110f; color: #f4efe9; border-left: 1px solid rgba(255, 255, 255, 0.14); padding: 20px; display: grid; align-content: start; gap: 12px; }
+.panel header { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; }
+.panel a { color: #4ade80; }
+.panel h2 { margin: 0; font-size: 22px; line-height: 1.25; }
+.panel h3 { margin: 10px 0 0; font-size: 16px; }
+.panel header p { margin: 4px 0 0; opacity: 0.7; }
+.panel header button { background: none; border: 0; color: inherit; font-size: 30px; line-height: 1; cursor: pointer; min-width: 44px; min-height: 44px; }
+.facts { margin: 0; display: grid; gap: 8px; }
+.facts div { display: grid; grid-template-columns: 130px 1fr; gap: 10px; font-size: 14.5px; }
+.facts dt { opacity: 0.65; }
+.facts dd { margin: 0; overflow-wrap: anywhere; }
+.links { display: flex; gap: 16px; flex-wrap: wrap; margin: 0; font-size: 14px; }
+.muted { opacity: 0.7; }
+.error { color: #ff8a80; }
+.timeline { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.timeline li { border-left: 3px solid rgba(255, 255, 255, 0.2); padding: 2px 0 2px 12px; display: grid; gap: 2px; }
+.timeline li.mail { border-left-color: #ffa44d; }
+.timeline li.reply { border-left-color: #4ade80; }
+.timeline time { font-size: 12px; opacity: 0.6; }
+.timeline p, .timeline summary { margin: 0; font-size: 14.5px; line-height: 1.4; }
+.timeline summary { cursor: pointer; }
+.timeline strong { font-weight: 700; }
+.timeline span { display: block; opacity: 0.7; font-size: 13px; overflow-wrap: anywhere; }
+.timeline pre { margin: 8px 0 0; white-space: pre-wrap; word-break: break-word; font: inherit; font-size: 13.5px; line-height: 1.5; background: rgba(255, 255, 255, 0.06); padding: 10px 12px; border-radius: 10px; }
+@media (max-width: 640px) { .facts div { grid-template-columns: 1fr; gap: 0; } }
