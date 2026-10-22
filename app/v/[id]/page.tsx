@@ -20,6 +20,22 @@ const CALENDAR_URL = `https://calendar.google.com/appointments/schedules/${SCHED
 // Vorerst nur die Beispielseite; später kommen Firma, Screenshot und Video pro Lead aus der Datenbank.
 const DEMO = { company: "Ihr Betrieb", screenshot: "/v-demo.jpg", youtubeId: "iYU1SEsBusI" };
 
+// Was der Besucher aus dem Termin mitnimmt, auch ohne Zusammenarbeit (Versprechen, die im Gespräch eingelöst werden müssen).
+const TAKEAWAYS = {
+  pflege: [
+    "Eine ehrliche Einschätzung, warum bei Ihnen aktuell zu wenige passende Bewerber ankommen.",
+    "Einen Überblick über die Wege zu Fachkräften (Vermittlung, Ausland, Stellenportale, eigene Kampagnen) und welcher bei Ihnen wirtschaftlich Sinn macht.",
+    "Den Check, ob für Sie eine Förderung infrage kommt (je nach Bundesland und Betrieb).",
+    "Zwei bis drei Sofortmaßnahmen, die Sie selbst umsetzen können.",
+  ],
+  pv: [
+    "Eine ehrliche Einschätzung, was Leadportale Sie aktuell an Marge und Aufträgen kosten.",
+    "Einen Überblick über die Wege zu Kunden (Empfehlungen, Portale, Agenturen, eigene exklusive Anfragen) und welcher bei Ihnen wirtschaftlich Sinn macht.",
+    "Den Check, ob für Sie eine Förderung infrage kommt (je nach Bundesland und Betrieb).",
+    "Zwei bis drei Sofortmaßnahmen, die Sie selbst umsetzen können.",
+  ],
+};
+
 // Fallstudien wie auf digitalegewinner.de/pflege (Zahlen und Quellenangabe von dort übernommen).
 const CASES = [
   { name: "Pflegeeinrichtung", big: "3 Einstellungen", line: "2.000 € Werbebudget · 43 Bewerbungen · Ø 46 € pro Bewerbung" },
@@ -32,14 +48,16 @@ export default async function VideoPage({ params }: { params: Promise<{ id: stri
   const { id } = await params;
   const token = decodeURIComponent(id);
   let data = DEMO;
+  let segment: "pflege" | "pv" = "pflege";
   if (token !== "demo") {
     const leadId = verifyVideoToken(token);
     if (!leadId) notFound();
-    const [row] = await query<{ company: string }>(
-      "select c.name company from sales_leads l join sales_companies c on c.id=l.company_id and c.workspace=l.workspace where l.id::text=$1 limit 1",
+    const [row] = await query<{ company: string; source: string }>(
+      "select c.name company, coalesce(c.source,'') source from sales_leads l join sales_companies c on c.id=l.company_id and c.workspace=l.workspace where l.id::text=$1 limit 1",
       [leadId],
     ).catch(() => []);
     if (!row) notFound();
+    segment = row.source === "ba-pv" ? "pv" : "pflege";
     data = { ...DEMO, company: row.company, screenshot: (await hasScreenshot(leadId)) ? `/api/t/shot/${encodeURIComponent(token)}` : "" };
   }
   return (
@@ -59,7 +77,12 @@ export default async function VideoPage({ params }: { params: Promise<{ id: stri
       <div className={styles.grid}>
         <section className={styles.videoCol} aria-label="Video">
           <VideoPlayer youtubeId={data.youtubeId} screenshot={data.screenshot} company={data.company} />
-          <p className={styles.note}>Gefällt Ihnen, was Sie sehen? Wählen Sie rechts direkt einen passenden Termin für ein kurzes, unverbindliches Gespräch.</p>
+          <div className={styles.takeaway}>
+            <h2>15 Minuten, die sich für Sie lohnen, auch ohne Zusammenarbeit</h2>
+            <p>Das nehmen Sie aus dem Gespräch mit:</p>
+            <ul>{TAKEAWAYS[segment].map((item) => <li key={item}>{item}</li>)}</ul>
+            <p className={styles.takeNote}>Kostenlos und unverbindlich. Wählen Sie rechts direkt einen Termin.</p>
+          </div>
         </section>
         <section id="termin" className={styles.calendar} aria-label="Termin buchen">
           <h2>Termin direkt buchen</h2>
