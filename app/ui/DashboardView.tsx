@@ -15,6 +15,7 @@ type Data = {
   checks?: Check[];
   source?: { status: string; reason: string; n: number; started: string }[];
   dbExpiry?: { at: string; claimUrl: string; hoursLeft: number } | null;
+  video?: { type: string; leads: number }[];
   variants?: { campaign_id: string; variant: string; leads: number; replies: number }[];
   campaigns?: { id: string; sent_today: number; sent7: number; queued: number; leads: number; replies: number }[];
 };
@@ -238,6 +239,15 @@ export default function DashboardView() {
               );
             })}
           </section>
+
+          {(data.video?.length ?? 0) > 0 && (() => {
+            const count = (type: string) => data.video?.find((item) => item.type === type)?.leads ?? 0;
+            return (
+              <p className={styles.abLine}>
+                Video-Seite: Geöffnet {count("video_view")} · Abgespielt {count("video_play")} · mind. 50 % gesehen {count("video_progress")} · Kalender angeklickt {count("video_calendar_focus") + count("video_booking_click")}
+              </p>
+            );
+          })()}
 
           <section className={styles.kpis} aria-label={`Kennzahlen ${days} Tage`}>
             {[

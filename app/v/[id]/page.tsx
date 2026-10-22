@@ -1,5 +1,9 @@
 import type { Metadata } from "next";
+import { notFound } from "next/navigation";
 import VideoPlayer from "./VideoBubble";
+import PageTracker from "./PageTracker";
+import { query } from "@/lib/db";
+import { verifyVideoToken } from "@/lib/email-tracking";
 import styles from "./page.module.css";
 
 export const metadata: Metadata = {
@@ -22,10 +26,22 @@ const CASES = [
 ];
 
 export default async function VideoPage({ params }: { params: Promise<{ id: string }> }) {
-  await params;
-  const data = DEMO;
+  const { id } = await params;
+  const token = decodeURIComponent(id);
+  let data = DEMO;
+  if (token !== "demo") {
+    const leadId = verifyVideoToken(token);
+    if (!leadId) notFound();
+    const [row] = await query<{ company: string }>(
+      "select c.name company from sales_leads l join sales_companies c on c.id=l.company_id and c.workspace=l.workspace where l.id::text=$1 limit 1",
+      [leadId],
+    ).catch(() => []);
+    if (!row) notFound();
+    data = { ...DEMO, company: row.company };
+  }
   return (
     <main className={styles.page}>
+      <PageTracker token={token} />
       <header className={styles.head}>
         <div className={styles.author}>
           <span className={styles.avatar} aria-hidden="true">RH</span>

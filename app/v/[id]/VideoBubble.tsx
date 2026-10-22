@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import styles from "./page.module.css";
+import { track } from "./track";
 
 type YTPlayer = { playVideo(): void; pauseVideo(): void; seekTo(seconds: number, allowSeekAhead: boolean): void; getCurrentTime(): number; getDuration(): number; destroy(): void };
 type YTApi = { Player: new (el: HTMLElement, options: Record<string, unknown>) => YTPlayer };
@@ -31,6 +32,9 @@ export default function VideoPlayer({ youtubeId, screenshot, company }: { youtub
   const [started, setStarted] = useState(false);
   const [time, setTime] = useState(0);
   const [duration, setDuration] = useState(0);
+  const watched = useRef(0);
+  const sentPlay = useRef(false);
+  const milestones = useRef(new Set<number>());
 
   useEffect(() => {
     let cancelled = false;
@@ -44,7 +48,11 @@ export default function VideoPlayer({ youtubeId, screenshot, company }: { youtub
           onReady: () => { setReady(true); setDuration(player.current?.getDuration() || 0); },
           onStateChange: (event: { data: number }) => {
             setPlaying(event.data === 1);
-            if (event.data === 1) { setStarted(true); setDuration(player.current?.getDuration() || 0); }
+            if (event.data === 1) {
+              setStarted(true); setDuration(player.current?.getDuration() || 0);
+              if (!sentPlay.current) { sentPlay.current = true; track("play"); }
+            }
+            if (event.data === 2 || event.data === 0) track("watch", Math.round(watched.current));
             if (event.data === 0) { setStarted(false); setTime(0); }
           },
         },
@@ -54,8 +62,22 @@ export default function VideoPlayer({ youtubeId, screenshot, company }: { youtub
   }, [youtubeId]);
 
   useEffect(() => {
+    const flush = () => { if (watched.current > 0) track("watch", Math.round(watched.current)); };
+    window.addEventListener("pagehide", flush);
+    return () => window.removeEventListener("pagehide", flush);
+  }, []);
+
+  useEffect(() => {
     if (!playing) return;
-    const timer = window.setInterval(() => setTime(player.current?.getCurrentTime() || 0), 250);
+    const timer = window.setInterval(() => {
+      const now = player.current?.getCurrentTime() || 0;
+      setTime(now);
+      watched.current += 0.25;
+      const total = player.current?.getDuration() || 0;
+      if (total > 0) for (const step of [25, 50, 75, 100]) {
+        if (now / total >= (step === 100 ? 0.97 : step / 100) && !milestones.current.has(step)) { milestones.current.add(step); track("progress", step); }
+      }
+    }, 250);
     return () => window.clearInterval(timer);
   }, [playing]);
 

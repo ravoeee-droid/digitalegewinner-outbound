@@ -57,3 +57,13 @@ export function trackedEmailHtml(text:string,origin:string,outboxId:string,leadI
   const pixel=openTrackingUrl(origin,outboxId,leadId);
   return `<div style="font-family:Arial,sans-serif;font-size:14px;line-height:1.55;color:#111">${html}<img src="${escapeHtml(pixel)}" width="1" height="1" alt="" style="display:block;width:1px;height:1px;border:0;opacity:.01" /></div>`;
 }
+
+// Persönlicher Link zur Videoseite: Lead-ID plus kurze Signatur, damit niemand fremde Lead-IDs raten kann.
+export function videoToken(leadId:string){return `${leadId}.${signature(`video|${leadId}`).slice(0,16)}`;}
+export function verifyVideoToken(token:string){
+  const index=token.lastIndexOf(".");
+  if(index<1)return "";
+  const leadId=token.slice(0,index);
+  return safeEqual(videoToken(leadId),token)?leadId:"";
+}
+export function videoPageUrl(origin:string,leadId:string){return `${base(origin)}/v/${encodeURIComponent(videoToken(leadId))}`;}
