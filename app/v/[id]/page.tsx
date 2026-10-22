@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import VideoBubble from "./VideoBubble";
+import VideoPlayer from "./VideoBubble";
 import styles from "./page.module.css";
 
 export const metadata: Metadata = {
@@ -7,7 +7,8 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-const BOOKING_URL = "https://calendar.app.google/63jjwjMz48c9dAWb7";
+const SCHEDULE_ID = "AcZssZ2_bTTYywdIxhuhqlmFqNuKS0li41T2CphSGixgYtdPNeN_60JmG5nXyzjD8im24mG8hK0BZB8Q";
+const CALENDAR_URL = `https://calendar.google.com/appointments/schedules/${SCHEDULE_ID}?gv=true&hl=de`;
 
 // Vorerst nur die Beispielseite; später kommen Firma, Screenshot und Video pro Lead aus der Datenbank.
 const DEMO = { company: "Ihr Betrieb", screenshot: "/v-demo.jpg", youtubeId: "iYU1SEsBusI" };
@@ -16,16 +17,27 @@ export default async function VideoPage({ params }: { params: Promise<{ id: stri
   await params;
   const data = DEMO;
   return (
-    <main className={styles.stage} style={{ backgroundImage: `url(${data.screenshot})` }}>
-      <header className={styles.top}>
-        <span className={styles.chip}>Für {data.company}</span>
+    <main className={styles.page}>
+      <header className={styles.head}>
+        <div className={styles.author}>
+          <span className={styles.avatar} aria-hidden="true">RH</span>
+          <div>
+            <h1>Eine kurze Nachricht für {data.company}</h1>
+            <p>Raphael Hermann · Digitale Gewinner</p>
+          </div>
+        </div>
+        <a href="#termin" className={styles.headButton}>Termin buchen</a>
       </header>
-      <aside className={styles.cta}>
-        <strong>Kurzes Gespräch zu Ihrer Website?</strong>
-        <span>20 Minuten per Videocall, kostenlos und unverbindlich.</span>
-        <a href={BOOKING_URL} className={styles.button}>Termin buchen</a>
-      </aside>
-      <VideoBubble youtubeId={data.youtubeId} />
+      <div className={styles.grid}>
+        <section className={styles.videoCol} aria-label="Video">
+          <VideoPlayer youtubeId={data.youtubeId} screenshot={data.screenshot} company={data.company} />
+          <p className={styles.note}>Gefällt Ihnen, was Sie sehen? Wählen Sie rechts direkt einen passenden Termin für ein kurzes, unverbindliches Gespräch.</p>
+        </section>
+        <section id="termin" className={styles.calendar} aria-label="Termin buchen">
+          <h2>Termin direkt buchen</h2>
+          <iframe src={CALENDAR_URL} title="Terminbuchung bei Raphael Hermann" loading="lazy" />
+        </section>
+      </div>
     </main>
   );
 }
