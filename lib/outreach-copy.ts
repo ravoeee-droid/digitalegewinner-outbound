@@ -56,6 +56,9 @@ function greeting(contact: string) {
 }
 
 const GENERAL_SUBJECT = "Mitarbeitergewinnung in der Pflege";
+// Landet die Mail im Vorzimmer, soll sie dort weitergeleitet statt gelöscht werden.
+const FORWARD_PFLEGE = "Falls Sie dafür nicht zuständig sind: Bitte leiten Sie diese Nachricht kurz an die Geschäftsführung oder Pflegedienstleitung weiter. Vielen Dank.";
+const FORWARD_PV = "Falls Sie dafür nicht zuständig sind: Bitte leiten Sie diese Nachricht kurz an die Geschäftsführung weiter. Vielen Dank.";
 
 export function firstTouch(lead: CopyLead) {
   const title = cleanJobTitle(lead.title);
@@ -64,6 +67,7 @@ export function firstTouch(lead: CopyLead) {
       greeting(lead.contact),
       "ich habe ein kurzes Video zur Mitarbeitergewinnung in der Pflege aufgenommen (ca. 90 Sekunden): {{video_link}}",
       "Wenn es für Sie interessant klingt, können Sie sich dort direkt einen Termin buchen.",
+      FORWARD_PFLEGE,
       SIGNATURE,
     ].join("\n\n");
     return { variant: "V", subject: "Kurzes Video zur Mitarbeitergewinnung", body };
@@ -75,6 +79,7 @@ export function firstTouch(lead: CopyLead) {
       "in der Pflege finden Betriebe kaum noch Fachkräfte über Stellenanzeigen, und jede unbesetzte Stelle belastet das Team.",
       "Wir haben bereits mehreren Pflegediensten geholfen, ihre Mitarbeiter unabhängig von Stellenportalen und Vermittlern selbst zu gewinnen.",
       `Ich schaue mir gerne in einem kurzen Videocall Ihre Situation an, und wir sehen gemeinsam, ob das auch bei Ihnen Sinn machen würde. Buchen Sie sich dafür hier einen passenden Termin: ${BOOKING_URL}`,
+      FORWARD_PFLEGE,
       SIGNATURE,
     ].join("\n\n");
     return { variant: "C", subject: GENERAL_SUBJECT, body };
@@ -87,6 +92,7 @@ export function firstTouch(lead: CopyLead) {
       "Das ist gerade in der Pflege ein bekanntes Problem: Auf Anzeigen melden sich kaum noch passende Fachkräfte, und jede Woche ohne Besetzung belastet Ihr Team.",
       "Genau diese Situation haben wir bereits mehrfach bei anderen Pflegediensten gelöst.",
       `Ich schaue mir gerne in einem kurzen Videocall Ihre Situation an, und wir sehen gemeinsam, ob das auch bei Ihnen Sinn machen würde. Buchen Sie sich dafür hier einen passenden Termin: ${BOOKING_URL}`,
+      FORWARD_PFLEGE,
       SIGNATURE,
     ].join("\n\n");
     return { variant: "B", subject: `Ihre offene Stelle: ${title}`.slice(0, 78), body };
@@ -97,6 +103,7 @@ export function firstTouch(lead: CopyLead) {
     "Dafür würde ich mir zuerst Ihre konkrete Situation anschauen: Wen suchen Sie, was haben Sie bisher versucht und wo hakt es gerade?",
     "Auf dieser Grundlage arbeite ich eine Strategie aus, die zu Ihrer Einrichtung passt. Diese können Sie anschließend gemeinsam mit mir oder auch eigenständig umsetzen.",
     "Haben Sie nächste Woche 20 Minuten, um uns Ihre Situation gemeinsam anzuschauen?",
+    FORWARD_PFLEGE,
     SIGNATURE,
   ].join("\n\n");
   return { variant: "A", subject: `Ihre offene Stelle: ${title}`.slice(0, 78), body };
@@ -140,6 +147,7 @@ export function pvFirstTouch(lead: { contact: string; lead_id?: string; video?: 
       greeting(lead.contact),
       "ich habe ein kurzes Video aufgenommen, wie PV-Betriebe ohne Leadportale an exklusive Anfragen unter ihrem eigenen Namen kommen (ca. 90 Sekunden): {{video_link}}",
       "Wenn es für Sie interessant klingt, können Sie sich dort direkt einen Termin buchen.",
+      FORWARD_PV,
       PV_SIGNATURE,
     ].join("\n\n");
     return { variant: "V", subject: "Kurzes Video zur Kundengewinnung", body };
@@ -150,12 +158,14 @@ export function pvFirstTouch(lead: { contact: string; lead_id?: string; video?: 
     "kurze Frage: Aktuell ist die Auftragslage Gott sei Dank ziemlich gut im PV-Markt. Ich spreche täglich mit PV-Geschäftsführern, und viele erzählen mir, dass sie ziemlich frustriert sind über die Schwankungen am Markt und darüber, dass Leadportal-Leads an 4 bis 5 andere Betriebe gleichzeitig gehen. Das ruiniert die Margen, und am Ende gewinnt nur noch der Billigste. Viele weichen deshalb auf Subunternehmer aus, bei denen die Verständigung oft schwierig ist, und früher oder später kommt es zu Reklamationen und Anzeigen, was alles nur noch schlimmer macht.",
     "Genau deshalb habe ich ein System entwickelt, das dieses Problem aus der Welt schafft: Sie sind damit nicht mehr abhängig von Leadportal-Leads, nicht von Empfehlungen und nicht von teuren Agenturen. Das System generiert exklusive Leads unter Ihrem eigenen Namen. Langfristig ist das ein deutlicher Vorteil gegenüber anderen Betrieben, weil Tag für Tag Ihre Marke, Ihre Bekanntheit und das Vertrauen wachsen.",
     "Ich würde Ihnen das gerne komplett kostenlos und unverbindlich vorstellen, damit Sie sehen, wie das in der Praxis aussieht. Danach entscheiden Sie, ob es für Ihr Unternehmen wirtschaftlich Sinn macht oder nicht. Würde Ihnen {{termin_1}} Vormittag oder {{termin_2}} Nachmittag eher passen? Das dauert ca. 20 Minuten.",
+    FORWARD_PV,
     PV_SIGNATURE,
   ].join("\n\n");
   const shortBody = [
     greeting(lead.contact),
     "kurze Frage: Leadportale verkaufen jede Anfrage an 4 bis 5 Betriebe gleichzeitig, das ruiniert die Margen, und am Ende gewinnt nur der Billigste. Ich habe ein System entwickelt, das exklusive Leads unter Ihrem eigenen Namen bringt: ohne Leadportal, ohne Empfehlungen und ohne teure Agentur.",
     "Ich zeige Ihnen das gerne kostenlos und unverbindlich in ca. 20 Minuten. Passt Ihnen {{termin_1}} Vormittag oder {{termin_2}} Nachmittag besser?",
+    FORWARD_PV,
     PV_SIGNATURE,
   ].join("\n\n");
   return { variant, subject: "Kurze Frage zur Kundengewinnung", body: variant === "A" ? longBody : shortBody };
