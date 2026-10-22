@@ -14,6 +14,7 @@ async function run(request: Request) {
   if (!authorized(request)) return Response.json({ error: "Unauthorized" }, { status: 401 });
   const startedAt = Date.now();
   let ok = 0, failed = 0;
+  const errors: string[] = [];
   try {
     await ensureScreenshotTable();
     const purged = await purgeOldScreenshots();
@@ -31,12 +32,15 @@ async function run(request: Request) {
             await query("insert into lead_screenshots(lead_id,url,status,data) values($1,$2,'ok',$3) on conflict (lead_id) do update set url=excluded.url,status='ok',data=excluded.data,error=null", [lead.lead_id, website, jpg]);
             ok++;
           } catch (error) {
-            await query("insert into lead_screenshots(lead_id,url,status,error) values($1,$2,'failed',$3) on conflict (lead_id) do nothing", [lead.lead_id, website, String(error instanceof Error ? error.message : error).slice(0, 200)]).catch(() => null);
+            const message = String(error instanceof Error ? error.message : error).slice(0, 300);
+            if (errors.length < 3) errors.push(`${website}: ${message}`);
+            await query("insert into lead_screenshots(lead_id,url,status,error,attempts) values($1,$2,'failed',$3,1) on conflict (lead_id) do update set status='failed', error=excluded.error, created_at=now(), attempts=lead_screenshots.attempts+1 where lead_screenshots.status='failed'", [lead.lead_id, website, message]).catch(() => null);
             failed++;
           }
         }
       } finally { await browser.close().catch(() => null); }
     }
+    if (errors.length) console.error("[screenshots-fehler]", JSON.stringify(errors));
     console.log("[screenshots]", JSON.stringify({ candidates: leads.length, ok, failed, purged, seconds: Math.round((Date.now() - startedAt) / 1000) }));
     return Response.json({ ok: true, candidates: leads.length, created: ok, failed });
   } catch (error) {
