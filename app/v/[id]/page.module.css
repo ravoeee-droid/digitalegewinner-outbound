@@ -76,7 +76,8 @@
   .calendar { position: static; }
 }
 @media (max-width: 640px) {
-  .waFab span, .chatFab span { display: inline; }
+  .chatFab span { display: none; }
+  .chatFab { padding: 0 14px; }
   .chatPanel { right: 8px; left: 8px; width: auto; bottom: 132px; }
   .proof ul { grid-template-columns: minmax(0, 1fr); }
   .page { padding: 14px 14px 32px; }

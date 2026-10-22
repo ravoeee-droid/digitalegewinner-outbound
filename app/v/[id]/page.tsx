@@ -23,15 +23,13 @@ const DEMO = { company: "Ihr Betrieb", screenshot: "/v-demo.jpg", youtubeId: "iY
 // Was der Besucher aus dem Termin mitnimmt, auch ohne Zusammenarbeit (Versprechen, die im Gespräch eingelöst werden müssen).
 const TAKEAWAYS = {
   pflege: [
-    "Eine ehrliche Einschätzung, warum bei Ihnen aktuell zu wenige passende Bewerber ankommen.",
-    "Einen Überblick über die Wege zu Fachkräften (Vermittlung, Ausland, Stellenportale, eigene Kampagnen) und welcher bei Ihnen wirtschaftlich Sinn macht.",
-    "Den Check, ob für Sie eine Förderung infrage kommt (je nach Bundesland und Betrieb).",
+    "Eine ehrliche Einschätzung, warum bei Ihnen zu wenige passende Bewerber ankommen.",
+    "Welcher Weg zu Fachkräften wirtschaftlich passt (Vermittlung, Ausland, Portale, eigene Kampagnen) und ob eine Förderung infrage kommt.",
     "Zwei bis drei Sofortmaßnahmen, die Sie selbst umsetzen können.",
   ],
   pv: [
     "Eine ehrliche Einschätzung, was Leadportale Sie aktuell an Marge und Aufträgen kosten.",
-    "Einen Überblick über die Wege zu Kunden (Empfehlungen, Portale, Agenturen, eigene exklusive Anfragen) und welcher bei Ihnen wirtschaftlich Sinn macht.",
-    "Den Check, ob für Sie eine Förderung infrage kommt (je nach Bundesland und Betrieb).",
+    "Welcher Weg zu Kunden wirtschaftlich passt (Empfehlungen, Portale, Agenturen, eigene exklusive Anfragen) und ob eine Förderung infrage kommt.",
     "Zwei bis drei Sofortmaßnahmen, die Sie selbst umsetzen können.",
   ],
 };
@@ -78,8 +76,7 @@ export default async function VideoPage({ params }: { params: Promise<{ id: stri
         <section className={styles.videoCol} aria-label="Video">
           <VideoPlayer youtubeId={data.youtubeId} screenshot={data.screenshot} company={data.company} />
           <div className={styles.takeaway}>
-            <h2>15 Minuten, die sich für Sie lohnen, auch ohne Zusammenarbeit</h2>
-            <p>Das nehmen Sie aus dem Gespräch mit:</p>
+            <h2>15 Minuten, die sich auch ohne Zusammenarbeit lohnen</h2>
             <ul>{TAKEAWAYS[segment].map((item) => <li key={item}>{item}</li>)}</ul>
             <p className={styles.takeNote}>Kostenlos und unverbindlich. Wählen Sie rechts direkt einen Termin.</p>
           </div>
