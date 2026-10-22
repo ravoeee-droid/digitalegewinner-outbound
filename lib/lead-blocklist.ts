@@ -3,6 +3,9 @@
 import { query } from "@/lib/db";
 
 const DEFAULTS: Array<[string, string]> = [
+  ["libi elektronik", "PV-Fallstudie Libi Elektronik"],
+  ["libielektronik", "PV-Fallstudie Libi Elektronik"],
+  ["solavol", "PV-Fallstudie Solavol"],
   ["drk", "Fallstudie 01 (DRK)"],
   ["rotes kreuz", "Fallstudie 01 (DRK)"],
   ["pflegeresidenz rose", "Fallstudie 02"],
