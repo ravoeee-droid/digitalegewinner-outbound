@@ -16,6 +16,10 @@ export async function GET(request: Request) {
     )`;
   const [{ n }] = await query<{ n: number }>(`select count(distinct lead_id)::int n from er_outbox where ${where}`);
   if (!run) return NextResponse.json({ leads: n, hinweis: "Mit ?run=1 ausführen" });
+  if (n === 0) {
+    const stand = await query("select campaign_id, status, variant, count(*)::int n from er_outbox where workspace='default' and scheduled_at>now()-interval '3 days' group by 1,2,3 order by 1,2,3").catch(() => []);
+    return NextResponse.json({ leads: 0, zurueckgesetzt: 0, stand });
+  }
   const rows = await query<{ id: string }>(
     `update er_outbox set status='suppressed',error='Neu gerendert (Textvariante E)' where ${where} returning id`,
   );
