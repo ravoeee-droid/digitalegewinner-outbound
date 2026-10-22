@@ -45,13 +45,15 @@ async function ddl(table: string) {
 
 export async function GET(request: Request) {
   const step = new URL(request.url).searchParams.get("step") || "";
-  const list = await tables();
-  if (!step) {
-    const counts = await Promise.all(list.map(async (t) => ({ tabelle: t, zeilen: Number((await query<{ n: string }>(`select count(*)::text n from ${quote(t)}`))[0]?.n || 0) })));
-    return NextResponse.json({ hinweis: "?step=schema, danach ?step=data wiederholen", tabellen: counts });
-  }
-  const target = targetPool();
+  let target: Pool | undefined;
   try {
+    const list = await tables();
+    if (!step) {
+      const counts: { tabelle: string; zeilen: number }[] = [];
+      for (const t of list) counts.push({ tabelle: t, zeilen: Number((await query<{ n: string }>(`select count(*)::text n from ${quote(t)}`))[0]?.n || 0) });
+      return NextResponse.json({ hinweis: "?step=schema, danach ?step=data wiederholen", tabellen: counts });
+    }
+    target = targetPool();
     if (step === "schema") {
       await target.query("drop schema public cascade; create schema public;");
       const failed: string[] = [];
@@ -98,6 +100,6 @@ export async function GET(request: Request) {
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "Fehler" }, { status: 500 });
   } finally {
-    await target.end().catch(() => undefined);
+    await target?.end().catch(() => undefined);
   }
 }
