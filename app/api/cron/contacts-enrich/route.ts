@@ -1,6 +1,7 @@
 import { contactEnrichProgress, enrichContactsOnce } from "@/lib/contact-enrich";
 import { enrichGeoOnce } from "@/lib/lead-geo";
 import { enrichProfilesOnce } from "@/lib/lead-profile";
+import { enrichJobSearchOnce } from "@/lib/lead-jobsearch";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -17,9 +18,10 @@ async function run(request: Request) {
     const result = await enrichContactsOnce();
     const geo = await enrichGeoOnce().catch(() => ({ geoChecked: 0, geoMapped: 0 }));
     const profile = await enrichProfilesOnce().catch(() => ({ profileChecked: 0, profileFound: 0 }));
+    const jobs = await enrichJobSearchOnce().catch(() => ({ jobsearchChecked: 0, jobsearchActive: 0 }));
     const progress = await contactEnrichProgress();
-    console.log("[contacts-enrich]", JSON.stringify({ ...result, ...geo, ...profile, ...progress }));
-    return Response.json({ ok: true, ...result, ...geo, ...profile, ...progress });
+    console.log("[contacts-enrich]", JSON.stringify({ ...result, ...geo, ...profile, ...jobs, ...progress }));
+    return Response.json({ ok: true, ...result, ...geo, ...profile, ...jobs, ...progress });
   } catch (error) {
     console.error("[contacts-enrich-error]", error);
     return Response.json({ ok: false, error: error instanceof Error ? error.message : "Ansprechpartner-Suche fehlgeschlagen." }, { status: 500 });
