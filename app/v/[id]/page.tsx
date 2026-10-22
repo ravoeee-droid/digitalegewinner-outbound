@@ -77,12 +77,14 @@ export default async function VideoPage({ params }: { params: Promise<{ id: stri
           <VideoPlayer youtubeId={data.youtubeId} screenshot={data.screenshot} company={data.company} />
           <div className={styles.takeaway}>
             <h2>15 Minuten, die sich auch ohne Zusammenarbeit lohnen</h2>
+            <p className={styles.bonus}><strong>Bonus nach Ihrer Buchung:</strong> Sie erhalten vorab Ihre persönliche Wettbewerbsanalyse als PDF: welche Betriebe in Ihrem Umkreis wie aufgestellt sind, was sie gut machen und wo Ihre größten Chancen liegen.</p>
             <ul>{TAKEAWAYS[segment].map((item) => <li key={item}>{item}</li>)}</ul>
             <p className={styles.takeNote}>Kostenlos und unverbindlich. Wählen Sie rechts direkt einen Termin.</p>
           </div>
         </section>
         <section id="termin" className={styles.calendar} aria-label="Termin buchen">
           <h2>Termin direkt buchen</h2>
+          <p className={styles.calBonus}>Inklusive: Ihre persönliche Wettbewerbsanalyse (PDF)</p>
           <iframe src={CALENDAR_URL} title="Terminbuchung bei Raphael Hermann" loading="lazy" />
         </section>
       </div>

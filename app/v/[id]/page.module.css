@@ -11,6 +11,8 @@
 .takeaway h2 { margin: 0 0 6px; font-size: 19px; line-height: 1.3; }
 .takeaway p { margin: 0 0 8px; color: #5a5149; font-size: 15px; }
 .takeaway ul { margin: 0 0 10px; padding-left: 20px; display: grid; gap: 6px; font-size: 15px; line-height: 1.45; }
+.takeaway .bonus { background: #fff4e5; border: 1px solid #ffd9a8; border-radius: 10px; padding: 10px 12px; color: #1c1815; line-height: 1.45; }
+.calBonus { margin: -4px 0 10px; font-size: 13.5px; font-weight: 700; color: #b45a08; }
 .takeaway .takeNote { margin: 0; font-weight: 700; color: #1c1815; }
 .note { margin: 14px 4px 0; color: #5a5149; font-size: 15px; line-height: 1.5; }
 .calendar { background: #fff; border: 1px solid #e4ded7; border-radius: 16px; padding: 16px; position: sticky; top: 16px; }

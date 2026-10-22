@@ -1,6 +1,5 @@
 import { query } from "@/lib/db";
 import { sendAlert } from "@/lib/alerts";
-import { analysisUrl, ensureAnalysisPdf } from "@/lib/analysis-store";
 
 // Terminbuchungen (Google Kalender, Calendly, Cal.com …) erkennen, die als E-Mail in einem verbundenen Postfach landen.
 const CALENDAR_SENDERS = /(calendar-notification@google\.com|calendar@google\.com|no-?reply@calendly\.com|notifications@cal\.com|noreply@cal\.com|@calendly\.com|@cal\.com)/i;
@@ -53,11 +52,8 @@ export async function recordBooking(messageId: string, subject: string, mailboxI
     [lead.id, "Termin gebucht (automatisch erkannt)", JSON.stringify({ source: "calendar-mail", subject, messageId })],
   );
   await sendAlert(`📅 Neuer Termin: ${lead.company}\n${lead.email}\n${subject}`);
-  // Für den Termin wird automatisch die Wettbewerbsanalyse (PDF) vorbereitet; Link kommt per Telegram.
-  try {
-    const pdf = await Promise.race([ensureAnalysisPdf(lead.id), new Promise<null>((resolve) => setTimeout(() => resolve(null), 100_000))]);
-    await sendAlert(pdf ? `📄 Wettbewerbsanalyse für den Termin ist fertig: ${lead.company}\n${analysisUrl(lead.id)}` : `📄 Für ${lead.company} konnte keine Wettbewerbsanalyse erstellt werden (keine Website bekannt oder Zeitüberschreitung). Im Menü Leads über "Analyse" erneut versuchen.`);
-  } catch { /* Termin ist gespeichert, die Analyse kann später im CRM erzeugt werden */ }
+  // Die Landingpage verspricht eine persönliche Wettbewerbsanalyse: Erinnerung per Telegram, damit sie vor dem Termin fertig ist.
+  await sendAlert(`📄 Bitte Wettbewerbsanalyse für ${lead.company} vorbereiten und vor dem Termin schicken.`);
   return true;
 }
 
