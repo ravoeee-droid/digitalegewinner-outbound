@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import styles from "./LeadsView.module.css";
 
-type Row = { id: string; company: string; city: string; website: string; contact: string; email: string; phone: string; stage: string; score: number; mail_status: string | null; last_sent: string | null; do_not_contact: boolean };
+type Row = { id: string; company: string; city: string; website: string; contact: string; email: string; phone: string; stage: string; score: number; mail_status: string | null; last_sent: string | null; do_not_contact: boolean; shot?: boolean | null; video_token?: string; views?: number; plays?: number; progress?: number; watch?: number; dwell?: number; calendar?: number };
 type Data = { counts: { total: number; with_email: number; ready: number; contacted: number }; filter: string; page: number; pages: number; total: number; rows: Row[] };
 
 const FILTERS: Array<[string, string]> = [["alle", "Alle"], ["bereit", "Bereit zum Anschreiben"], ["email", "Mit E-Mail"], ["angeschrieben", "Angeschrieben"], ["ohne_email", "Ohne E-Mail"]];
@@ -17,6 +17,17 @@ function status(row: Row) {
   if (row.mail_status === "queued" || row.mail_status === "sending") return { label: "In Warteschlange", tone: "warn" };
   if (!row.email) return { label: "E-Mail fehlt", tone: "bad" };
   return { label: "Bereit", tone: "ok" };
+}
+
+function videoCell(row: Row) {
+  if (!row.video_token) return <span className={styles.muted}>noch kein Screenshot</span>;
+  const steps = [row.views ? "geöffnet" : "", row.plays ? "Play" : "", row.progress ? `${row.progress} % gesehen` : "", row.watch ? `${row.watch} s` : "", row.calendar ? "Kalender" : ""].filter(Boolean);
+  return (
+    <>
+      <a href={`/v/${encodeURIComponent(row.video_token)}`} target="_blank" rel="noopener noreferrer">Seite ansehen</a>
+      <small>{steps.length ? steps.join(" · ") : "noch nicht geöffnet"}</small>
+    </>
+  );
 }
 
 export default function LeadsView() {
@@ -105,7 +116,7 @@ export default function LeadsView() {
         {data && data.rows.length > 0 && (
           <div className={styles.tableWrap}>
             <table className={styles.table}>
-              <thead><tr><th scope="col">Firma</th><th scope="col">Ansprechpartner</th><th scope="col">E-Mail</th><th scope="col">Telefon</th><th scope="col">Status</th></tr></thead>
+              <thead><tr><th scope="col">Firma</th><th scope="col">Ansprechpartner</th><th scope="col">E-Mail</th><th scope="col">Telefon</th><th scope="col">Video-Seite</th><th scope="col">Status</th></tr></thead>
               <tbody>
                 {data.rows.map((row) => {
                   const state = status(row);
@@ -115,6 +126,7 @@ export default function LeadsView() {
                       <td data-label="Ansprechpartner">{row.contact || <span className={styles.muted}>nicht bekannt</span>}</td>
                       <td data-label="E-Mail">{row.email ? <a href={`mailto:${row.email}`}>{row.email}</a> : <span className={styles.muted}>fehlt</span>}</td>
                       <td data-label="Telefon">{row.phone ? <a href={`tel:${row.phone.replace(/\s+/g, "")}`}>{row.phone}</a> : <span className={styles.muted}>–</span>}</td>
+                      <td data-label="Video-Seite">{videoCell(row)}</td>
                       <td data-label="Status"><span className={`${styles.badge} ${styles[state.tone]}`}>{state.label}</span></td>
                     </tr>
                   );
