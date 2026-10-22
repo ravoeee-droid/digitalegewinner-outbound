@@ -29,7 +29,17 @@
 .track { flex: 1; height: 6px; border-radius: 3px; background: rgba(255, 255, 255, 0.3); cursor: pointer; }
 .fill { height: 100%; border-radius: 3px; background: #ffa44d; }
 
+.proof { max-width: 1320px; margin: 36px auto 0; }
+.proof h2 { margin: 0 0 8px; font-size: 20px; }
+.proof p { margin: 0 0 16px; max-width: 760px; color: #5a5149; font-size: 14px; line-height: 1.5; }
+.proof ul { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.proof li { display: grid; gap: 8px; }
+.proof a { display: block; border: 1px solid #e4ded7; border-radius: 12px; overflow: hidden; background: #fff; }
+.proof img { display: block; width: 100%; height: auto; }
+.proof span { font-size: 14px; color: #3d3630; font-weight: 600; }
+
 @media (max-width: 960px) {
+  .proof ul { grid-template-columns: minmax(0, 1fr); }
   .grid { grid-template-columns: minmax(0, 1fr); }
   .calendar { position: static; }
 }
