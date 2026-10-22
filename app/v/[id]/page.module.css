@@ -1,0 +1,26 @@
+.stage { position: fixed; inset: 0; background-size: cover; background-position: top center; background-color: #14110f; overflow: hidden; font-family: Inter, system-ui, sans-serif; }
+.top { position: absolute; top: 84px; left: 0; right: 0; display: flex; justify-content: center; }
+.chip { background: rgba(20, 17, 15, 0.86); color: #fff; border: 1px solid rgba(255, 255, 255, 0.18); border-radius: 999px; padding: 9px 16px; font-size: 14px; font-weight: 600; backdrop-filter: blur(8px); }
+.cta { position: absolute; left: 16px; bottom: 16px; max-width: 340px; display: grid; gap: 8px; background: rgba(20, 17, 15, 0.9); color: #fff; border: 1px solid rgba(255, 255, 255, 0.16); border-radius: 18px; padding: 18px; backdrop-filter: blur(10px); }
+.cta strong { font-size: 17px; line-height: 1.3; }
+.cta span { font-size: 14px; color: rgba(255, 255, 255, 0.78); line-height: 1.4; }
+.button { display: inline-flex; justify-content: center; align-items: center; min-height: 48px; margin-top: 4px; border-radius: 999px; background: linear-gradient(135deg, #ffa44d, #e8791a); color: #1b1108; font-weight: 700; font-size: 16px; text-decoration: none; }
+.button:focus-visible, .play:focus-visible, .close:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
+.bubble { position: absolute; right: 20px; bottom: 20px; width: 168px; height: 168px; border-radius: 50%; overflow: visible; transition: width 0.3s ease, height 0.3s ease, border-radius 0.3s ease; }
+.bubbleOpen { width: min(420px, calc(100vw - 40px)); height: min(236px, calc((100vw - 40px) * 0.5625)); border-radius: 16px; }
+.play { position: relative; width: 100%; height: 100%; padding: 0; border: 3px solid #fff; border-radius: 50%; overflow: hidden; cursor: pointer; background: #000; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5); }
+.thumb { width: 100%; height: 100%; object-fit: cover; object-position: center 30%; transform: scale(1.5); }
+.ring { position: absolute; inset: -3px; border-radius: 50%; border: 3px solid #ffa44d; animation: pulse 2s ease-out infinite; pointer-events: none; }
+.icon { position: absolute; inset: 0; display: grid; place-items: center; color: #fff; font-size: 34px; text-shadow: 0 2px 8px rgba(0, 0, 0, 0.6); background: rgba(0, 0, 0, 0.18); }
+.label { position: absolute; left: 0; right: 0; bottom: 8px; text-align: center; color: #fff; font-size: 12px; font-weight: 700; text-shadow: 0 1px 6px rgba(0, 0, 0, 0.8); }
+.frame { width: 100%; height: 100%; border: 3px solid #fff; border-radius: 16px; box-shadow: 0 14px 40px rgba(0, 0, 0, 0.55); background: #000; }
+.close { position: absolute; top: -14px; right: -10px; width: 36px; height: 36px; border-radius: 50%; border: 0; background: #fff; color: #111; font-size: 22px; line-height: 1; cursor: pointer; }
+@keyframes pulse { 0% { transform: scale(1); opacity: 0.9; } 100% { transform: scale(1.18); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .ring { animation: none; } .bubble { transition: none; } }
+@media (max-width: 640px) {
+  .stage { background-position: top left; }
+  .cta { left: 12px; right: 12px; bottom: 12px; max-width: none; }
+  .bubble { right: 14px; bottom: 176px; width: 120px; height: 120px; }
+  .bubbleOpen { right: 14px; width: calc(100vw - 28px); height: calc((100vw - 28px) * 0.5625); bottom: 176px; }
+  .icon { font-size: 26px; }
+}
