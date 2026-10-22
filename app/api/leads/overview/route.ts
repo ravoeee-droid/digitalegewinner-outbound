@@ -34,7 +34,7 @@ export async function GET(request: Request) {
       order by (coalesce(k.email,'')<>'') desc, k.is_primary desc, k.created_at limit 1
     ) ct on true
     left join lateral (
-      select status,sent_at from er_outbox x where x.workspace=l.workspace and x.lead_id=l.id order by x.created_at desc limit 1
+      select status,sent_at from er_outbox x where x.workspace=l.workspace and x.lead_id=l.id order by (x.status in ('sent','stopped')) desc, x.created_at desc limit 1
     ) o on true
     where l.workspace='default' and l.status='active'${segmentSql}`;
 
