@@ -15,6 +15,13 @@ export const VIDEO_MAIL_ENABLED = process.env.VIDEO_MAIL === "on";
 // YouTube-ID des Talking-Head-Videos je Zielgruppe. Ist keins hinterlegt, bekommt diese Zielgruppe keine Videomail.
 export const VIDEO_IDS: Record<"pflege" | "pv", string> = { pflege: process.env.VIDEO_ID_PFLEGE || "iYU1SEsBusI", pv: process.env.VIDEO_ID_PV || "" };
 
+// Aufteilung der Leads auf drei Textvarianten (A = bisheriger Text, B = Videocall-Link bzw. kurz, D = neuer Text).
+export function textBucketFor(leadId: string): "A" | "B" | "D" {
+  let sum = 3;
+  for (let index = 0; index < leadId.length; index += 1) sum += leadId.charCodeAt(index) * (index % 5 + 1);
+  return ["A", "B", "D"][sum % 3] as "A" | "B" | "D";
+}
+
 export function videoVariantFor(leadId: string) {
   let sum = 7;
   for (let index = 0; index < leadId.length; index += 1) sum += leadId.charCodeAt(index) * (index % 3 + 1);
@@ -87,7 +94,21 @@ export function firstTouch(lead: CopyLead) {
     ].join("\n\n");
     return { variant: "C", subject: GENERAL_SUBJECT, body };
   }
-  if (BOOKING_URL && pvVariantFor(String(lead.lead_id || lead.contact || "")) === "B") {
+  const bucket = textBucketFor(String(lead.lead_id || lead.contact || ""));
+  if (bucket === "D") {
+    const since = openSinceText(lead.publishedAt);
+    const body = [
+      greeting(lead.contact),
+      since ? `Ihre Stelle als ${title} ist ${since} online.` : `Sie suchen aktuell eine Fachkraft als ${title}.`,
+      "Bei vielen Pflegediensten melden sich auf Anzeigen kaum noch passende Fachkräfte, und das Team trägt die Lücke.",
+      "Wir haben Pflegebetrieben geholfen, das zu lösen. In einem Fall waren es 11 neue Mitarbeiter in 4 Monaten (Einzelergebnis, keine Garantie).",
+      "Soll ich Ihnen in 15 Minuten zeigen, welcher Weg für Sie wirtschaftlich passt? Antworten Sie einfach mit „ja“, dann sende ich Ihnen zwei Terminvorschläge.",
+      FORWARD_PFLEGE,
+      SIGNATURE,
+    ].join("\n\n");
+    return { variant: "D", subject: `Ihre offene Stelle: ${title}`.slice(0, 78), body };
+  }
+  if (BOOKING_URL && bucket === "B") {
     const since = openSinceText(lead.publishedAt);
     const body = [
       greeting(lead.contact),
@@ -144,7 +165,7 @@ export function pvVariantFor(leadId: string): "A" | "B" {
   return sum % 2 === 0 ? "A" : "B";
 }
 
-export function pvFirstTouch(lead: { contact: string; lead_id?: string; video?: boolean }) {
+export function pvFirstTouch(lead: { contact: string; lead_id?: string; video?: boolean; company?: string }) {
   if (lead.video) {
     const body = [
       greeting(lead.contact),
@@ -155,7 +176,20 @@ export function pvFirstTouch(lead: { contact: string; lead_id?: string; video?: 
     ].join("\n\n");
     return { variant: "V", subject: "Kurzes Video zur Kundengewinnung", body };
   }
-  const variant = pvVariantFor(String(lead.lead_id || lead.contact || ""));
+  const bucket = textBucketFor(String(lead.lead_id || lead.contact || ""));
+  if (bucket === "D") {
+    const name = String(lead.company || "").replace(/\s+/g, " ").trim().slice(0, 38);
+    const body = [
+      greeting(lead.contact),
+      "Leadportale verkaufen jede Anfrage an vier bis fünf Betriebe gleichzeitig. Am Ende gewinnt der Billigste, und die Marge leidet.",
+      "Wir bauen für PV-Betriebe einen Weg zu Anfragen, die nur an Sie gehen, unter Ihrem eigenen Namen.",
+      "Soll ich Ihnen das in 15 Minuten zeigen? Antworten Sie einfach mit „ja“, dann sende ich Ihnen zwei Terminvorschläge.",
+      FORWARD_PV,
+      PV_SIGNATURE,
+    ].join("\n\n");
+    return { variant: "D", subject: name ? `${name}: Anfragen ohne Leadportal?` : "Anfragen ohne Leadportal?", body };
+  }
+  const variant: "A" | "B" = bucket === "A" ? "A" : "B";
   const longBody = [
     greeting(lead.contact),
     "kurze Frage: Aktuell ist die Auftragslage Gott sei Dank ziemlich gut im PV-Markt. Ich spreche täglich mit PV-Geschäftsführern, und viele erzählen mir, dass sie ziemlich frustriert sind über die Schwankungen am Markt und darüber, dass Leadportal-Leads an 4 bis 5 andere Betriebe gleichzeitig gehen. Das ruiniert die Margen, und am Ende gewinnt nur noch der Billigste. Viele weichen deshalb auf Subunternehmer aus, bei denen die Verständigung oft schwierig ist, und früher oder später kommt es zu Reklamationen und Anzeigen, was alles nur noch schlimmer macht.",

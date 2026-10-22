@@ -73,7 +73,7 @@ function cleanFinding(value:string) {
 }
 
 function personalizedFirstTouch(lead:{lead_id:string;company:string;contact:string;city:string;lead_payload:PflegeLeadPayload|null;video?:boolean}) {
-  if(ACTIVE_DEF.key==="pv")return pvFirstTouch({contact:lead.contact,lead_id:lead.lead_id,video:lead.video});
+  if(ACTIVE_DEF.key==="pv")return pvFirstTouch({contact:lead.contact,lead_id:lead.lead_id,video:lead.video,company:lead.company});
   const payload=lead.lead_payload||{};
   return firstTouch({
     lead_id:lead.lead_id,company:lead.company,contact:lead.contact,city:lead.city,
