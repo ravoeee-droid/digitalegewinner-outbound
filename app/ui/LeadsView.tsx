@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import styles from "./LeadsView.module.css";
 
-type Row = { id: string; company: string; city: string; website: string; contact: string; email: string; phone: string; stage: string; score: number; mail_status: string | null; last_sent: string | null; do_not_contact: boolean; shot?: boolean | null; video_token?: string; views?: number; plays?: number; progress?: number; watch?: number; dwell?: number; calendar?: number };
+type Row = { id: string; company: string; city: string; website: string; contact: string; email: string; phone: string; stage: string; score: number; mail_status: string | null; last_sent: string | null; do_not_contact: boolean; shot?: boolean | null; video_token?: string; views?: number; plays?: number; progress?: number; watch?: number; dwell?: number; calendar?: number; site_pages?: number; site_dwell?: number };
 type Data = { counts: { total: number; with_email: number; ready: number; contacted: number }; filter: string; page: number; pages: number; total: number; rows: Row[] };
 
 const FILTERS: Array<[string, string]> = [["alle", "Alle"], ["bereit", "Bereit zum Anschreiben"], ["email", "Mit E-Mail"], ["angeschrieben", "Angeschrieben"], ["ohne_email", "Ohne E-Mail"], ["video", "Video angesehen (anrufen)"]];
@@ -23,7 +23,7 @@ function videoCell(row: Row) {
   if (!row.video_token) return <span className={styles.muted}>-</span>;
   const analyse = <small><a href={`/api/t/analyse/${encodeURIComponent(row.video_token)}`} target="_blank" rel="noopener noreferrer">Analyse (PDF) für den Termin</a></small>;
   if (!row.shot) return <><span className={styles.muted}>noch kein Screenshot</span>{analyse}</>;
-  const steps = [row.views ? "geöffnet" : "", row.plays ? "Play" : "", row.progress ? `${row.progress} % gesehen` : "", row.watch ? `${row.watch} s` : "", row.calendar ? "Kalender" : ""].filter(Boolean);
+  const steps = [row.views ? "geöffnet" : "", row.plays ? "Play" : "", row.progress ? `${row.progress} % gesehen` : "", row.watch ? `${row.watch} s` : "", row.calendar ? "Kalender" : "", row.site_pages ? `Website ${row.site_pages} Seite${row.site_pages > 1 ? "n" : ""}${row.site_dwell ? ` · ${row.site_dwell} s` : ""}` : ""].filter(Boolean);
   return (
     <>
       <a href={`/v/${encodeURIComponent(row.video_token)}`} target="_blank" rel="noopener noreferrer">Seite ansehen</a>

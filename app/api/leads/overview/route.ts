@@ -51,17 +51,18 @@ export async function GET(request: Request) {
     if (q) { params.push(`%${q}%`); search = ` and (c.name ilike $1 or c.city ilike $1 or ct.email ilike $1 or ct.name ilike $1)`; }
     const [{ n: total } = { n: 0 }] = await query<{ n: number }>(`select count(*)::int n ${from} and ${FILTERS[filter]}${search}`, params);
 
-    const rows = await query<{ id: string; company: string; city: string; website: string; contact: string; email: string; phone: string; stage: string; score: number; mail_status: string | null; last_sent: string | null; do_not_contact: boolean; shot: boolean | null; views: number; plays: number; progress: number; watch: number; dwell: number; calendar: number }>(`
+    const rows = await query<{ id: string; company: string; city: string; website: string; contact: string; email: string; phone: string; stage: string; score: number; mail_status: string | null; last_sent: string | null; do_not_contact: boolean; shot: boolean | null; views: number; plays: number; progress: number; watch: number; dwell: number; calendar: number; site_pages: number; site_dwell: number }>(`
       select l.id, c.name company, c.city, coalesce(nullif(c.website,''),c.domain) website, coalesce(ct.name,'') contact, coalesce(ct.email,'') email, c.phone,
         l.stage, coalesce(l.priority_score,0)::int score, o.status mail_status, o.sent_at::text last_sent, l.do_not_contact,
         (s.status='ok') shot, coalesce(ev.views,0)::int views, coalesce(ev.plays,0)::int plays, coalesce(ev.progress,0)::int progress,
-        coalesce(ev.watch,0)::int watch, coalesce(ev.dwell,0)::int dwell, coalesce(ev.calendar,0)::int calendar
+        coalesce(ev.watch,0)::int watch, coalesce(ev.dwell,0)::int dwell, coalesce(ev.calendar,0)::int calendar, coalesce(ev.site_pages,0)::int site_pages, coalesce(ev.site_dwell,0)::int site_dwell
       ${from.replace("where l.workspace", `left join lead_screenshots s on s.lead_id=l.id::text
     left join lateral (
       select count(*) filter(where type='video_view') views, count(*) filter(where type='video_play') plays,
         max(case when type='video_progress' then (meta->>'v')::int end) progress, max(case when type='video_watch' then (meta->>'v')::int end) watch,
-        max(case when type='video_dwell' then (meta->>'v')::int end) dwell, count(*) filter(where type in ('video_booking_click','video_calendar_focus')) calendar
-      from er_events e where e.workspace=l.workspace and e.lead_id=l.id::text and e.type like 'video\\_%' and coalesce(e.meta->>'bot','false')='false'
+        max(case when type='video_dwell' then (meta->>'v')::int end) dwell, count(*) filter(where type in ('video_booking_click','video_calendar_focus')) calendar,
+        count(distinct meta->>'p') filter(where type='site_view') site_pages, max(case when type='site_dwell' then (meta->>'v')::int end) site_dwell
+      from er_events e where e.workspace=l.workspace and e.lead_id=l.id::text and (e.type like 'video\\_%' or e.type like 'site\\_%') and coalesce(e.meta->>'bot','false')='false'
     ) ev on true
     where l.workspace`)} and ${FILTERS[filter]}${search}
       order by ${filter === "video" ? "(select max(ve.created_at) from er_events ve where ve.workspace=l.workspace and ve.lead_id=l.id::text and ve.type like 'video\\_%') desc nulls last," : ""} l.priority_score desc nulls last, c.name
