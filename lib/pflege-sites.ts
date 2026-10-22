@@ -56,7 +56,7 @@ export async function processPflegeSites({ limit = 40, budgetMs = 200_000 }: { l
         await persistRadarLead({ id: sourceId, company: r.name, contact: found.person || "", email: found.email, phone: found.phone || r.phone || "", website: r.website, city: r.city, industry: "Pflege", source: "ba-jobboerse" }, { email: found.email, phone: found.phone || r.phone || "" } as never, undefined, "default");
         await query(
           "update sales_companies set source='ba-jobboerse', metadata=coalesce(metadata,'{}'::jsonb)||$2::jsonb, updated_at=now() where workspace='default' and source_id=$1",
-          [sourceId, JSON.stringify({ source: "ba-jobboerse", via: "pflege-sites", jobTitle: found.job, general: general ? "true" : "", state: r.state, category: "ambulatory_care" })],
+          [sourceId, JSON.stringify({ source: "ba-jobboerse", via: "pflege-sites", contact_enriched_at: new Date().toISOString(), jobTitle: found.job, general: general ? "true" : "", state: r.state, category: "ambulatory_care" })],
         );
         await query("update pflege_sites set status=$4,email=$2,job=$3 where host=$1", [r.host, found.email, found.job, general ? "lead_general" : "lead"]);
         added++;
