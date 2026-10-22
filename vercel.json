@@ -42,6 +42,10 @@
       "schedule": "15,45 5-15 * * 1-5"
     },
     {
+      "path": "/api/cron/screenshots",
+      "schedule": "0,30 5-15 * * 1-5"
+    },
+    {
       "path": "/api/cron/pflege-source",
       "schedule": "0 6-15/3 * * 1-5"
     }

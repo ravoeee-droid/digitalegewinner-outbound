@@ -4,7 +4,8 @@ import { recordOutboundEventByMode } from "@/lib/outbound-event-ledger";
 import { resolveOutboundRuntimeConfig } from "@/lib/outbound-runtime-config";
 import { ensureLegacyCampaignVersionForAttribution } from "@/lib/outbound-revenue-attribution";
 import { loadMailboxCredentials } from "@/lib/mailbox-credentials";
-import { firstTouch, followUp, pvFirstTouch, pvFollowUp } from "@/lib/outreach-copy";
+import { VIDEO_MAIL_ENABLED, firstTouch, followUp, pvFirstTouch, pvFollowUp, videoVariantFor } from "@/lib/outreach-copy";
+import { screenshotReadySet } from "@/lib/lead-screenshot";
 
 export const APPOINTMENT_GOAL_PER_DAY = 4;
 export const LEAD_BUFFER_TARGET = 300;
@@ -70,20 +71,20 @@ function cleanFinding(value:string) {
   return value.replace(/[–—]/g,",").replace(/\s+/g," ").replace(/[.!?]+$/,"").trim();
 }
 
-function personalizedFirstTouch(lead:{lead_id:string;company:string;contact:string;city:string;lead_payload:PflegeLeadPayload|null}) {
-  if(ACTIVE_DEF.key==="pv")return pvFirstTouch(lead);
+function personalizedFirstTouch(lead:{lead_id:string;company:string;contact:string;city:string;lead_payload:PflegeLeadPayload|null;video?:boolean}) {
+  if(ACTIVE_DEF.key==="pv")return pvFirstTouch({contact:lead.contact,lead_id:lead.lead_id,video:lead.video});
   const payload=lead.lead_payload||{};
   return firstTouch({
     lead_id:lead.lead_id,company:lead.company,contact:lead.contact,city:lead.city,
     title:String(payload.jobReferences?.[0]?.title||payload.signals?.jobTitles?.[0]||""),
-    publishedAt:payload.jobReferences?.[0]?.publishedAt,general:Boolean(payload.general),
+    publishedAt:payload.jobReferences?.[0]?.publishedAt,general:Boolean(payload.general),video:lead.video,
   });
 }
 
-function conciseFollowUp(lead:{company:string;contact:string;lead_payload:PflegeLeadPayload|null},stepIndex:number) {
-  if(ACTIVE_DEF.key==="pv")return pvFollowUp(lead,stepIndex);
+function conciseFollowUp(lead:{company:string;contact:string;lead_payload:PflegeLeadPayload|null;video?:boolean},stepIndex:number) {
+  if(ACTIVE_DEF.key==="pv")return pvFollowUp({contact:lead.contact,video:lead.video},stepIndex);
   const payload=lead.lead_payload||{};
-  return followUp({company:lead.company,contact:lead.contact,general:Boolean(payload.general),title:String(payload.jobReferences?.[0]?.title||payload.signals?.jobTitles?.[0]||"")},stepIndex);
+  return followUp({company:lead.company,contact:lead.contact,general:Boolean(payload.general),video:lead.video,title:String(payload.jobReferences?.[0]?.title||payload.signals?.jobTitles?.[0]||"")},stepIndex);
 }
 
 export async function getAppointmentGoalSnapshot(workspace="default") {
@@ -306,6 +307,7 @@ async function ensureCampaignQueue(workspace:string,def:CampaignDef) {
     `, [workspace,campaign.id,def.sources]);
   }
 
+  const screenshotsReady=VIDEO_MAIL_ENABLED?await screenshotReadySet(candidates.map((candidate)=>String(candidate.lead_id))):new Set<string>();
   let queuedLeads=0, queuedMessages=0, complianceBlocked=0;
   let mailboxIndex=0;
   const senderName = "Raphael Hermann";
@@ -343,11 +345,13 @@ async function ensureCampaignQueue(workspace:string,def:CampaignDef) {
 
     const spreadMinutes=enrollmentCapacity<=1?0:Math.floor((queuedLeads*90)/Math.max(1,enrollmentCapacity-1));
     const firstTouchAt=Date.now()+spreadMinutes*60_000;
-    const firstTouch=personalizedFirstTouch(lead);
+    // Videomail nur, wenn der Website-Screenshot für die persönliche Videoseite bereits fertig ist.
+    const video=VIDEO_MAIL_ENABLED&&screenshotsReady.has(String(lead.lead_id))&&videoVariantFor(String(lead.lead_id));
+    const firstTouch=personalizedFirstTouch({...lead,video});
     for (let stepIndex=0;stepIndex<campaign.steps.length;stepIndex++) {
       const step=campaign.steps[stepIndex];
       const scheduled = new Date(firstTouchAt+Math.max(0,step.waitDays)*86400000);
-      const copy=stepIndex===0?firstTouch:conciseFollowUp(lead,stepIndex);
+      const copy=stepIndex===0?firstTouch:conciseFollowUp({...lead,video},stepIndex);
       await query(`
         insert into er_outbox(
           id,workspace,campaign_id,lead_id,mailbox_id,recipient,subject,body,variant,scheduled_at,campaign_version_id
