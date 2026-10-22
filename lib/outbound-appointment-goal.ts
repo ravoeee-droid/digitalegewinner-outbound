@@ -4,7 +4,7 @@ import { recordOutboundEventByMode } from "@/lib/outbound-event-ledger";
 import { resolveOutboundRuntimeConfig } from "@/lib/outbound-runtime-config";
 import { ensureLegacyCampaignVersionForAttribution } from "@/lib/outbound-revenue-attribution";
 import { loadMailboxCredentials } from "@/lib/mailbox-credentials";
-import { VIDEO_MAIL_ENABLED, firstTouch, followUp, pvFirstTouch, pvFollowUp, videoVariantFor } from "@/lib/outreach-copy";
+import { VIDEO_IDS, VIDEO_MAIL_ENABLED, firstTouch, followUp, pvFirstTouch, pvFollowUp, videoVariantFor } from "@/lib/outreach-copy";
 import { screenshotReadySet } from "@/lib/lead-screenshot";
 import { applyBlocklist } from "@/lib/lead-blocklist";
 
@@ -347,7 +347,7 @@ async function ensureCampaignQueue(workspace:string,def:CampaignDef) {
     const spreadMinutes=enrollmentCapacity<=1?0:Math.floor((queuedLeads*90)/Math.max(1,enrollmentCapacity-1));
     const firstTouchAt=Date.now()+spreadMinutes*60_000;
     // Videomail nur, wenn der Website-Screenshot für die persönliche Videoseite bereits fertig ist.
-    const video=VIDEO_MAIL_ENABLED&&screenshotsReady.has(String(lead.lead_id))&&videoVariantFor(String(lead.lead_id));
+    const video=VIDEO_MAIL_ENABLED&&Boolean(VIDEO_IDS[ACTIVE_DEF.key])&&screenshotsReady.has(String(lead.lead_id))&&videoVariantFor(String(lead.lead_id));
     const firstTouch=personalizedFirstTouch({...lead,video});
     for (let stepIndex=0;stepIndex<campaign.steps.length;stepIndex++) {
       const step=campaign.steps[stepIndex];

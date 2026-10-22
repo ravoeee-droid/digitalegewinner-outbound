@@ -4,6 +4,7 @@ import VideoPlayer from "./VideoBubble";
 import PageTracker from "./PageTracker";
 import ChatWidget from "./ChatWidget";
 import { WHATSAPP_NUMBER } from "@/lib/video-chat";
+import { VIDEO_IDS } from "@/lib/outreach-copy";
 import { query } from "@/lib/db";
 import { verifyVideoToken } from "@/lib/email-tracking";
 import { hasScreenshot } from "@/lib/lead-screenshot";
@@ -74,7 +75,9 @@ export default async function VideoPage({ params }: { params: Promise<{ id: stri
       </header>
       <div className={styles.grid}>
         <section className={styles.videoCol} aria-label="Video">
-          <VideoPlayer youtubeId={data.youtubeId} screenshot={data.screenshot} company={data.company} />
+          {VIDEO_IDS[segment] || token === "demo" ? <VideoPlayer youtubeId={segment === "pv" && token !== "demo" ? VIDEO_IDS.pv : data.youtubeId} screenshot={data.screenshot} company={data.company} /> : (
+            <div className={styles.staticShot} style={data.screenshot ? { backgroundImage: `url(${data.screenshot})` } : undefined} role="img" aria-label={`Website von ${data.company}`} />
+          )}
           <div className={styles.takeaway}>
             <h2>15 Minuten, die sich auch ohne Zusammenarbeit lohnen</h2>
             <p className={styles.bonus}><strong>Bonus nach Ihrer Buchung:</strong> Sie erhalten vorab Ihre persönliche Wettbewerbsanalyse als PDF: welche Betriebe in Ihrem Umkreis wie aufgestellt sind, was sie gut machen und wo Ihre größten Chancen liegen.</p>
@@ -88,6 +91,7 @@ export default async function VideoPage({ params }: { params: Promise<{ id: stri
           <iframe src={CALENDAR_URL} title="Terminbuchung bei Raphael Hermann" loading="lazy" />
         </section>
       </div>
+      {segment === "pflege" && (
       <section className={styles.proof} aria-label="Fallstudien aus der Pflege">
         <h2>Echte Pflegebetriebe. Echte Ergebnisse.</h2>
         <ul>
@@ -105,6 +109,7 @@ export default async function VideoPage({ params }: { params: Promise<{ id: stri
         </blockquote>
         <p className={styles.source}>Einzelergebnisse, keine Garantie.</p>
       </section>
+      )}
       <footer className={styles.legal}>
         <span>Digitale Gewinner · Raphael Hermann</span>
         <a href="https://digitalegewinner.de/impressum.html" target="_blank" rel="noopener noreferrer">Impressum</a>
