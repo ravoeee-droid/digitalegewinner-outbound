@@ -81,12 +81,12 @@ export default async function VideoPage({ params }: { params: Promise<{ id: stri
           „Für uns als Pflegebetrieb ist es ein neues Gefühl, auch mal wieder selektieren zu dürfen! Das hatten wir die letzten 7 Jahre nicht mehr.“
           <cite>Raik Radloff, Häusliche Krankenpflege</cite>
         </blockquote>
-        <p className={styles.source}>Kampagnen, die Raphael Hermann bei Fachkraftmarketing verantwortet hat; Veröffentlichung mit schriftlicher Freigabe. Einzelergebnisse und keine Garantie. Bewerbungen und Einstellungen hängen auch von Region, Angebot und Ihrer Reaktionsgeschwindigkeit ab. Das Werbebudget ist nicht Teil unseres Honorars. <a href="https://digitalegewinner.de/pflege#fallstudien">Alle Fallstudien ansehen</a></p>
+        <p className={styles.source}>Einzelergebnisse, keine Garantie.</p>
       </section>
       <footer className={styles.legal}>
         <span>Digitale Gewinner · Raphael Hermann</span>
-        <a href="https://digitalegewinner.de/impressum.html">Impressum</a>
-        <a href="https://digitalegewinner.de/datenschutz.html">Datenschutz</a>
+        <a href="https://digitalegewinner.de/impressum.html" target="_blank" rel="noopener noreferrer">Impressum</a>
+        <a href="https://digitalegewinner.de/datenschutz.html" target="_blank" rel="noopener noreferrer">Datenschutz</a>
         <span>Wir messen, ob und wie lange diese Seite und das Video angesehen werden (ohne Cookies). Details in der Datenschutzerklärung.</span>
       </footer>
     </main>
