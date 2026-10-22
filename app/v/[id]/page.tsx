@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import VideoPlayer from "./VideoBubble";
 import PageTracker from "./PageTracker";
+import ChatWidget from "./ChatWidget";
+import { WHATSAPP_NUMBER } from "@/lib/video-chat";
 import { query } from "@/lib/db";
 import { verifyVideoToken } from "@/lib/email-tracking";
 import { hasScreenshot } from "@/lib/lead-screenshot";
@@ -43,6 +45,7 @@ export default async function VideoPage({ params }: { params: Promise<{ id: stri
   return (
     <main className={styles.page}>
       <PageTracker token={token} />
+      <ChatWidget token={token} company={data.company} whatsapp={WHATSAPP_NUMBER} />
       <header className={styles.head}>
         <div className={styles.author}>
           <span className={styles.avatar} aria-hidden="true">RH</span>
