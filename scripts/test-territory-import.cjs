@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-require-imports -- CommonJS fixture tests transpiled CommonJS modules in a VM. */
 const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict'),crypto=require('node:crypto');
 const req=require('node:module').createRequire(__dirname+'/../package.json'),ts=req('typescript'),zod=req('zod');let row,captured=[],existing=false;
 const query=async(sql,p=[])=>{if(sql.includes('insert into dg_territory_candidates')){row={id:p[0],source:'manual-source',source_id:p[2],county:p[3],state:p[4],name:p[5],city:p[6],website:p[7],phone:p[8],source_url:p[9],source_tags:JSON.parse(p[10]),score:p[11],evidence:[],crm_lead_id:null};return[{id:row.id}];}if(sql.includes('from dg_territory_candidates'))return[row];if(sql.includes('join sales_companies'))return existing?[{id:'existing-lead'}]:[];return[]};
