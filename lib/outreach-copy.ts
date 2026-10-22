@@ -15,11 +15,11 @@ export const VIDEO_MAIL_ENABLED = process.env.VIDEO_MAIL === "on";
 // YouTube-ID des Talking-Head-Videos je Zielgruppe. Ist keins hinterlegt, bekommt diese Zielgruppe keine Videomail.
 export const VIDEO_IDS: Record<"pflege" | "pv", string> = { pflege: process.env.VIDEO_ID_PFLEGE || "iYU1SEsBusI", pv: process.env.VIDEO_ID_PV || "" };
 
-// Aufteilung der Leads auf drei Textvarianten (A = bisheriger Text, B = Videocall-Link bzw. kurz, D = neuer Text).
-export function textBucketFor(leadId: string): "A" | "B" | "D" {
+// Aufteilung der Leads auf vier Textvarianten (A = bisheriger Text, B = Videocall-Link bzw. kurz, D = neuer Text, E = emotionaler Einstieg).
+export function textBucketFor(leadId: string): "A" | "B" | "D" | "E" {
   let sum = 3;
   for (let index = 0; index < leadId.length; index += 1) sum += leadId.charCodeAt(index) * (index % 5 + 1);
-  return ["A", "B", "D"][sum % 3] as "A" | "B" | "D";
+  return ["A", "B", "D", "E"][sum % 4] as "A" | "B" | "D" | "E";
 }
 
 export function videoVariantFor(leadId: string) {
@@ -108,6 +108,17 @@ export function firstTouch(lead: CopyLead) {
     ].join("\n\n");
     return { variant: "D", subject: `Ihre offene Stelle: ${title}`.slice(0, 78), body };
   }
+  if (bucket === "E") {
+    const body = [
+      greeting(lead.contact),
+      `Wenn die Stelle als ${title} offen bleibt, springt am Ende immer dasselbe Team ein: am Wochenende, im Frei, zum dritten Mal in Folge. Das kennen Sie wahrscheinlich besser als ich.`,
+      "Wir haben Pflegebetrieben geholfen, genau das zu beenden. In einem Fall waren es 11 neue Mitarbeiter in 4 Monaten (Einzelergebnis, keine Garantie).",
+      "Darf ich Ihnen in 15 Minuten zeigen, welcher Weg für Sie passt? Antworten Sie einfach mit „ja“, dann sende ich Ihnen zwei Terminvorschläge.",
+      FORWARD_PFLEGE,
+      SIGNATURE,
+    ].join("\n\n");
+    return { variant: "E", subject: `Ihr Team und die offene Stelle: ${title}`.slice(0, 78), body };
+  }
   if (BOOKING_URL && bucket === "B") {
     const since = openSinceText(lead.publishedAt);
     const body = [
@@ -188,6 +199,17 @@ export function pvFirstTouch(lead: { contact: string; lead_id?: string; video?: 
       PV_SIGNATURE,
     ].join("\n\n");
     return { variant: "D", subject: name ? `${name}: Anfragen ohne Leadportal?` : "Anfragen ohne Leadportal?", body };
+  }
+  if (bucket === "E") {
+    const body = [
+      greeting(lead.contact),
+      "Leadportale verkaufen dieselbe Anfrage an vier bis fünf Betriebe. Sie zahlen für den Lead und dann nochmal im Preiskampf, und am Ende bleibt kaum Marge für die Arbeit Ihres Teams.",
+      "Wir bauen für PV-Betriebe einen Weg zu Anfragen, die nur an Sie gehen, unter Ihrem eigenen Namen.",
+      "Darf ich Ihnen das in 15 Minuten zeigen? Antworten Sie einfach mit „ja“, dann sende ich Ihnen zwei Terminvorschläge.",
+      FORWARD_PV,
+      PV_SIGNATURE,
+    ].join("\n\n");
+    return { variant: "E", subject: "Zahlen Sie auch doppelt für Leads?", body };
   }
   const variant: "A" | "B" = bucket === "A" ? "A" : "B";
   const longBody = [
