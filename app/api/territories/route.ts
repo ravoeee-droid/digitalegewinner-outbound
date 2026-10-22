@@ -21,7 +21,7 @@ const sourcedCompany = z.object({
   name: z.string().trim().min(3).max(240), city: z.string().trim().max(150).default(""),
   website: z.string().trim().max(600).default(""), phone: z.string().trim().max(120).default(""),
   sourceUrl: z.url().max(1200).refine(value => /^https?:\/\//i.test(value), "Nur HTTP(S)-Quellen."),
-  industry: z.enum(["Photovoltaik / Elektro", "Ambulante Pflege", "Intensivpflege"]).default("Photovoltaik / Elektro"),
+  industry: z.enum(["Photovoltaik / Elektro", "Ambulante Pflege", "Intensivpflege", "Stationäre Pflege"]).default("Photovoltaik / Elektro"),
   email: z.union([z.email().max(320), z.literal("")]).default(""),
 });
 
@@ -41,7 +41,7 @@ const bodySchema = z.discriminatedUnion("action", [
     website: z.string().trim().max(600).default(""),
     phone: z.string().trim().max(120).default(""),
     sourceUrl: z.url().max(1200).refine(value => /^https?:\/\//i.test(value), "Nur HTTP(S)-Quellen."),
-    industry: z.enum(["Photovoltaik / Elektro", "Ambulante Pflege", "Intensivpflege"]).default("Photovoltaik / Elektro"),
+    industry: z.enum(["Photovoltaik / Elektro", "Ambulante Pflege", "Intensivpflege", "Stationäre Pflege"]).default("Photovoltaik / Elektro"),
     email: z.union([z.email().max(320), z.literal("")]).default(""),
   }),
   z.object({
