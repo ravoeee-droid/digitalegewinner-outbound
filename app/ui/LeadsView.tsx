@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import styles from "./LeadsView.module.css";
+import LeadDrawer from "./LeadDrawer";
 
 type Row = { id: string; company: string; city: string; website: string; contact: string; email: string; phone: string; stage: string; score: number; mail_status: string | null; last_sent: string | null; do_not_contact: boolean; shot?: boolean | null; video_token?: string; views?: number; plays?: number; progress?: number; watch?: number; dwell?: number; calendar?: number; site_pages?: number; site_dwell?: number };
 type Data = { counts: { total: number; with_email: number; ready: number; contacted: number }; filter: string; page: number; pages: number; total: number; rows: Row[] };
@@ -71,6 +72,7 @@ export default function LeadsView() {
   const [page, setPage] = useState(1);
   const [data, setData] = useState<Data | null>(null);
   const [error, setError] = useState("");
+  const [openId, setOpenId] = useState("");
 
   const load = useCallback(async () => {
     try {
@@ -155,7 +157,7 @@ export default function LeadsView() {
                   const state = status(row);
                   return (
                     <tr key={row.id}>
-                      <td data-label="Firma"><strong>{row.company}</strong><small>{row.city || "Ort unbekannt"}</small></td>
+                      <td data-label="Firma"><button type="button" className={styles.companyLink} onClick={() => setOpenId(row.id)}><strong>{row.company}</strong></button><small>{row.city || "Ort unbekannt"}</small></td>
                       <td data-label="Ansprechpartner">{row.contact || <span className={styles.muted}>nicht bekannt</span>}</td>
                       <td data-label="E-Mail">{row.email ? <a href={`mailto:${row.email}`}>{row.email}</a> : <span className={styles.muted}>fehlt</span>}</td>
                       <td data-label="Telefon">{row.phone ? <a href={`tel:${row.phone.replace(/\s+/g, "")}`}>{row.phone}</a> : <span className={styles.muted}>–</span>}</td>
@@ -169,6 +171,7 @@ export default function LeadsView() {
           </div>
         )}
         <Blocklist onChange={load} />
+        {openId && <LeadDrawer id={openId} onClose={() => setOpenId("")} />}
         {data && data.pages > 1 && (
           <nav className={styles.pager} aria-label="Seiten">
             <button type="button" className="dg-btn" disabled={page <= 1} onClick={() => setPage(page - 1)}>Zurück</button>
