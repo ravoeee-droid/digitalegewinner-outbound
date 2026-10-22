@@ -42,3 +42,13 @@
   .table td:first-child strong,.table td:first-child small{text-align:left}
   .pager{flex-wrap:wrap;justify-content:center}
 }
+
+.blocklist { margin-top: 18px; border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 12px; padding: 12px 16px; }
+.blocklist summary { cursor: pointer; font-weight: 700; }
+.blocklist p { margin: 10px 0; opacity: 0.8; font-size: 14px; }
+.blocklist form { display: flex; gap: 10px; flex-wrap: wrap; }
+.blocklist input { flex: 1 1 240px; min-height: 44px; padding: 0 12px; border-radius: 10px; border: 1px solid rgba(255, 255, 255, 0.2); background: transparent; color: inherit; }
+.blocklist ul { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 6px; }
+.blocklist li { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; font-size: 14px; }
+.blocklist li span { opacity: 0.7; flex: 1 1 auto; }
+.blocklist li button { background: none; border: 0; color: inherit; text-decoration: underline; cursor: pointer; min-height: 32px; }

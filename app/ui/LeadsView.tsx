@@ -30,6 +30,36 @@ function videoCell(row: Row) {
   );
 }
 
+function Blocklist({ onChange }: { onChange: () => void }) {
+  const [rows, setRows] = useState<Array<{ id: string; pattern: string; note: string }>>([]);
+  const [text, setText] = useState("");
+  const [message, setMessage] = useState("");
+  const load = useCallback(async () => {
+    try { const json = await (await fetch("/api/leads/blocklist", { cache: "no-store" })).json(); setRows(json.rows || []); } catch { /* Anzeige bleibt leer */ }
+  }, []);
+  useEffect(() => { const timer = setTimeout(load, 0); return () => clearTimeout(timer); }, [load]);
+  async function add(event: React.FormEvent) {
+    event.preventDefault();
+    const response = await fetch("/api/leads/blocklist", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ pattern: text }) });
+    const json = await response.json();
+    setMessage(response.ok ? `Gesperrt. ${json.blocked || 0} Lead(s) aus der Liste genommen.` : json.error || "Speichern fehlgeschlagen");
+    if (response.ok) { setText(""); load(); onChange(); }
+  }
+  async function remove(id: string) { await fetch(`/api/leads/blocklist?id=${id}`, { method: "DELETE" }); load(); }
+  return (
+    <details className={styles.blocklist}>
+      <summary>Sperrliste: Kunden, die keine Mail bekommen ({rows.length})</summary>
+      <p>Wer hier steht, wird nie angeschrieben, auch nicht von neuen Lead-Quellen. Ein Eintrag sperrt jeden Lead, dessen Firmenname, Website oder E-Mail den Text enthält.</p>
+      <form onSubmit={add}>
+        <input value={text} onChange={(event) => setText(event.target.value)} placeholder="Firmenname, Website oder E-Mail-Teil" aria-label="Neuer Eintrag für die Sperrliste" />
+        <button type="submit" className="dg-btn">Sperren</button>
+      </form>
+      {message && <p role="status">{message}</p>}
+      <ul>{rows.map((row) => <li key={row.id}><strong>{row.pattern}</strong><span>{row.note}</span><button type="button" onClick={() => remove(row.id)} aria-label={`${row.pattern} entsperren`}>Entsperren</button></li>)}</ul>
+    </details>
+  );
+}
+
 export default function LeadsView() {
   const [filter, setFilter] = useState("bereit");
   const [segment, setSegment] = useState("");
@@ -135,6 +165,7 @@ export default function LeadsView() {
             </table>
           </div>
         )}
+        <Blocklist onChange={load} />
         {data && data.pages > 1 && (
           <nav className={styles.pager} aria-label="Seiten">
             <button type="button" className="dg-btn" disabled={page <= 1} onClick={() => setPage(page - 1)}>Zurück</button>

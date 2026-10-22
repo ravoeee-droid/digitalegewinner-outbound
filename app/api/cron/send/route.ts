@@ -9,6 +9,7 @@ import { evaluateEmailSendCompliance } from "@/lib/outbound-compliance-runtime";
 import { getMailboxHealthMap } from "@/lib/outbound-deliverability";
 import { recordOutboundConversationMessage } from "@/lib/outbound-conversation-intelligence";
 import { recordExperimentExposureForSend } from "@/lib/outbound-experiment-engine";
+import { applyBlocklist } from "@/lib/lead-blocklist";
 import { trackedEmailHtml, unsubscribeUrl, videoPageUrl } from "@/lib/email-tracking";
 import { sendAlertOnce } from "@/lib/alerts";
 
@@ -92,6 +93,7 @@ async function run(request: Request) {
     ? new Map()
     : await getMailboxHealthMap("default").catch(()=>new Map());
 
+  await applyBlocklist().catch(() => null);
   await query("update er_outbox set status='queued',scheduled_at=now()+interval '5 minutes',error='Stale send claim recovered' where workspace='default' and status='sending' and scheduled_at<now()-interval '15 minutes'");
 
   const sentTodayRows = await query<{mailbox_id:string;count:string}>(

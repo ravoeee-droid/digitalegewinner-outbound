@@ -6,6 +6,7 @@ import { ensureLegacyCampaignVersionForAttribution } from "@/lib/outbound-revenu
 import { loadMailboxCredentials } from "@/lib/mailbox-credentials";
 import { VIDEO_MAIL_ENABLED, firstTouch, followUp, pvFirstTouch, pvFollowUp, videoVariantFor } from "@/lib/outreach-copy";
 import { screenshotReadySet } from "@/lib/lead-screenshot";
+import { applyBlocklist } from "@/lib/lead-blocklist";
 
 export const APPOINTMENT_GOAL_PER_DAY = 4;
 export const LEAD_BUFFER_TARGET = 300;
@@ -410,6 +411,7 @@ async function ensureCampaignQueue(workspace:string,def:CampaignDef) {
 
 // Beide Kampagnen nacheinander planen; Ergebnis zusammenfassen.
 export async function ensureAppointmentGoalQueue(workspace="default") {
+  await applyBlocklist().catch(()=>null);
   const results: Array<Awaited<ReturnType<typeof ensureCampaignQueue>> & Record<string,unknown>> = [];
   for (const def of CAMPAIGN_DEFS) {
     try { results.push(await ensureCampaignQueue(workspace,def) as never); }
