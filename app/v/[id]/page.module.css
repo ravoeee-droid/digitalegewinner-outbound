@@ -7,6 +7,11 @@
 .headButton { flex: none; display: inline-flex; align-items: center; min-height: 44px; padding: 0 22px; border-radius: 999px; background: linear-gradient(135deg, #ffa44d, #e8791a); color: #1b1108; font-weight: 700; text-decoration: none; }
 .headButton:focus-visible, .bigPlay:focus-visible, .barButton:focus-visible { outline: 3px solid #1c1815; outline-offset: 3px; }
 .grid { max-width: 1320px; margin: 0 auto; display: grid; grid-template-columns: minmax(0, 1fr) 440px; gap: 24px; align-items: start; }
+.takeaway { margin: 18px 0 0; background: #fff; border: 1px solid #e4ded7; border-radius: 14px; padding: 18px 20px; }
+.takeaway h2 { margin: 0 0 6px; font-size: 19px; line-height: 1.3; }
+.takeaway p { margin: 0 0 8px; color: #5a5149; font-size: 15px; }
+.takeaway ul { margin: 0 0 10px; padding-left: 20px; display: grid; gap: 6px; font-size: 15px; line-height: 1.45; }
+.takeaway .takeNote { margin: 0; font-weight: 700; color: #1c1815; }
 .note { margin: 14px 4px 0; color: #5a5149; font-size: 15px; line-height: 1.5; }
 .calendar { background: #fff; border: 1px solid #e4ded7; border-radius: 16px; padding: 16px; position: sticky; top: 16px; }
 .calendar h2 { margin: 0 0 12px; font-size: 17px; }
