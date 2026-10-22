@@ -15,12 +15,14 @@
     "test:d1": "node --experimental-transform-types --test cloudflare/core.test.mjs"
   },
   "dependencies": {
+    "@sparticuz/chromium": "141.0.0",
     "@vercel/blob": "^2.8.0",
     "next": "16.4.2",
     "nodemailer": "10.1.7",
     "openai": "6.48.0",
     "pdf-lib": "1.17.1",
     "pg": "8.22.0",
+    "playwright-core": "1.56.1",
     "react": "19.2.6",
     "react-dom": "19.2.6",
     "sharp": "0.35.5",

@@ -10,7 +10,15 @@ export function withSignatureLink(body: string) {
   return /Raphael Hermann\s+Digitale Gewinner$/.test(trimmed) ? `${trimmed}\n${PFLEGE_PAGE}` : body;
 }
 
-export type CopyLead = { lead_id: string; company: string; contact: string; city: string; title: string; publishedAt?: string; general?: boolean };
+// Videomail (Variante V): enthält {{video_link}} (persönliche Videoseite, wird beim Versand eingesetzt). Nur aktiv mit VIDEO_MAIL=on.
+export const VIDEO_MAIL_ENABLED = process.env.VIDEO_MAIL === "on";
+export function videoVariantFor(leadId: string) {
+  let sum = 7;
+  for (let index = 0; index < leadId.length; index += 1) sum += leadId.charCodeAt(index) * (index % 3 + 1);
+  return sum % 2 === 0;
+}
+
+export type CopyLead = { lead_id: string; company: string; contact: string; city: string; title: string; publishedAt?: string; general?: boolean; video?: boolean };
 
 // Terminlink für die Videocall-Variante (Test B). Ist BOOKING_URL leer, läuft nur die Standard-Mail.
 const BOOKING_URL = (process.env.BOOKING_URL || "https://calendar.app.google/63jjwjMz48c9dAWb7").trim();
@@ -51,6 +59,15 @@ const GENERAL_SUBJECT = "Mitarbeitergewinnung in der Pflege";
 
 export function firstTouch(lead: CopyLead) {
   const title = cleanJobTitle(lead.title);
+  if (lead.video) {
+    const body = [
+      greeting(lead.contact),
+      "ich habe ein kurzes Video zur Mitarbeitergewinnung in der Pflege aufgenommen (ca. 90 Sekunden): {{video_link}}",
+      "Wenn es für Sie interessant klingt, können Sie sich dort direkt einen Termin buchen.",
+      SIGNATURE,
+    ].join("\n\n");
+    return { variant: "V", subject: "Kurzes Video zur Mitarbeitergewinnung", body };
+  }
   // Betriebe ohne belegte offene Stelle: kein Bezug auf eine Stelle, sondern auf das Thema Fachkräftegewinnung.
   if (lead.general) {
     const body = [
@@ -85,8 +102,13 @@ export function firstTouch(lead: CopyLead) {
   return { variant: "A", subject: `Ihre offene Stelle: ${title}`.slice(0, 78), body };
 }
 
-export function followUp(lead: Pick<CopyLead, "company" | "contact" | "title"> & { general?: boolean }, step: number) {
+export function followUp(lead: Pick<CopyLead, "company" | "contact" | "title"> & { general?: boolean; video?: boolean }, step: number) {
   const title = cleanJobTitle(lead.title);
+  if (lead.video) {
+    const videoSubject = "Re: Kurzes Video zur Mitarbeitergewinnung";
+    if (step === 1) return { subject: videoSubject, body: [greeting(lead.contact), "kurz zu meiner Nachricht: Hier nochmal das kurze Video, falls es untergegangen ist: {{video_link}}", "Dort können Sie sich auch direkt einen Termin buchen.", SIGNATURE].join("\n\n") };
+    return { subject: videoSubject, body: [greeting(lead.contact), "das ist meine letzte Nachricht dazu. Spielt das Thema bei Ihnen gerade keine Rolle, geben Sie mir bitte kurz Bescheid, dann melde ich mich nicht mehr bei Ihnen.", SIGNATURE].join("\n\n") };
+  }
   if (lead.general) {
     const generalSubject = `Re: ${GENERAL_SUBJECT}`;
     if (step === 1) return { subject: generalSubject, body: [greeting(lead.contact), `kurz zu meiner Nachricht: Hätten Sie diese Woche Zeit für einen kurzen Videocall zur Mitarbeitergewinnung? Hier können Sie sich direkt einen Termin buchen: ${BOOKING_URL}`, SIGNATURE].join("\n\n") };
@@ -112,7 +134,16 @@ export function pvVariantFor(leadId: string): "A" | "B" {
   return sum % 2 === 0 ? "A" : "B";
 }
 
-export function pvFirstTouch(lead: { contact: string; lead_id?: string }) {
+export function pvFirstTouch(lead: { contact: string; lead_id?: string; video?: boolean }) {
+  if (lead.video) {
+    const body = [
+      greeting(lead.contact),
+      "ich habe ein kurzes Video aufgenommen, wie PV-Betriebe ohne Leadportale an exklusive Anfragen unter ihrem eigenen Namen kommen (ca. 90 Sekunden): {{video_link}}",
+      "Wenn es für Sie interessant klingt, können Sie sich dort direkt einen Termin buchen.",
+      PV_SIGNATURE,
+    ].join("\n\n");
+    return { variant: "V", subject: "Kurzes Video zur Kundengewinnung", body };
+  }
   const variant = pvVariantFor(String(lead.lead_id || lead.contact || ""));
   const longBody = [
     greeting(lead.contact),
@@ -130,8 +161,11 @@ export function pvFirstTouch(lead: { contact: string; lead_id?: string }) {
   return { variant, subject: "Kurze Frage zur Kundengewinnung", body: variant === "A" ? longBody : shortBody };
 }
 
-export function pvFollowUp(lead: { contact: string }, step: number) {
-  const subject = "Re: Kurze Frage zur Kundengewinnung";
+export function pvFollowUp(lead: { contact: string; video?: boolean }, step: number) {
+  const subject = lead.video ? "Re: Kurzes Video zur Kundengewinnung" : "Re: Kurze Frage zur Kundengewinnung";
+  if (lead.video) {
+    if (step === 1) return { subject, body: [greeting(lead.contact), "kurz zu meiner Nachricht: Hier nochmal das kurze Video, falls es untergegangen ist: {{video_link}}", "Dort können Sie sich auch direkt einen Termin buchen.", PV_SIGNATURE].join("\n\n") };
+  }
   if (step === 1) {
     return { subject, body: [greeting(lead.contact), "kurz zu meiner Nachricht: Hätten Sie in den nächsten Tagen 20 Minuten, damit ich Ihnen zeigen kann, wie Sie ohne Leadportale an exklusive Anfragen unter Ihrem eigenen Namen kommen? Die Vorstellung ist kostenlos und unverbindlich.", PV_SIGNATURE].join("\n\n") };
   }

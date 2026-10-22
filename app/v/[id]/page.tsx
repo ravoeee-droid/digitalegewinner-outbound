@@ -4,6 +4,7 @@ import VideoPlayer from "./VideoBubble";
 import PageTracker from "./PageTracker";
 import { query } from "@/lib/db";
 import { verifyVideoToken } from "@/lib/email-tracking";
+import { hasScreenshot } from "@/lib/lead-screenshot";
 import styles from "./page.module.css";
 
 export const metadata: Metadata = {
@@ -37,7 +38,7 @@ export default async function VideoPage({ params }: { params: Promise<{ id: stri
       [leadId],
     ).catch(() => []);
     if (!row) notFound();
-    data = { ...DEMO, company: row.company };
+    data = { ...DEMO, company: row.company, screenshot: (await hasScreenshot(leadId)) ? `/api/t/shot/${encodeURIComponent(token)}` : "" };
   }
   return (
     <main className={styles.page}>
@@ -79,6 +80,12 @@ export default async function VideoPage({ params }: { params: Promise<{ id: stri
         </blockquote>
         <p className={styles.source}>Kampagnen, die Raphael Hermann bei Fachkraftmarketing verantwortet hat; Veröffentlichung mit schriftlicher Freigabe. Einzelergebnisse und keine Garantie. Bewerbungen und Einstellungen hängen auch von Region, Angebot und Ihrer Reaktionsgeschwindigkeit ab. Das Werbebudget ist nicht Teil unseres Honorars. <a href="https://digitalegewinner.de/pflege#fallstudien">Alle Fallstudien ansehen</a></p>
       </section>
+      <footer className={styles.legal}>
+        <span>Digitale Gewinner · Raphael Hermann</span>
+        <a href="https://digitalegewinner.de/impressum.html">Impressum</a>
+        <a href="https://digitalegewinner.de/datenschutz.html">Datenschutz</a>
+        <span>Wir messen, ob und wie lange diese Seite und das Video angesehen werden (ohne Cookies). Details in der Datenschutzerklärung.</span>
+      </footer>
     </main>
   );
 }

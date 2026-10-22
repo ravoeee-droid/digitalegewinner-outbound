@@ -96,7 +96,7 @@ export default function VideoPlayer({ youtubeId, screenshot, company }: { youtub
 
   return (
     <div className={styles.player} role="group" aria-label={`Video für ${company}`}>
-      <div className={styles.screen} style={{ backgroundImage: `url(${screenshot})` }} />
+      <div className={styles.screen} style={screenshot ? { backgroundImage: `url(${screenshot})` } : undefined} />
       <div className={styles.cam}>
         <div className={styles.camInner} ref={mount} />
         {!started && (
