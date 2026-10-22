@@ -1,5 +1,5 @@
 import { query } from "@/lib/db";
-import { capture, ensureScreenshotTable, launch, screenshotCandidates, websiteFor } from "@/lib/lead-screenshot";
+import { capture, ensureScreenshotTable, launch, purgeOldScreenshots, screenshotCandidates, websiteFor } from "@/lib/lead-screenshot";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -16,6 +16,7 @@ async function run(request: Request) {
   let ok = 0, failed = 0;
   try {
     await ensureScreenshotTable();
+    const purged = await purgeOldScreenshots();
     const leads = await screenshotCandidates(60);
     if (leads.length) {
       const browser = await launch();
@@ -36,7 +37,7 @@ async function run(request: Request) {
         }
       } finally { await browser.close().catch(() => null); }
     }
-    console.log("[screenshots]", JSON.stringify({ candidates: leads.length, ok, failed, seconds: Math.round((Date.now() - startedAt) / 1000) }));
+    console.log("[screenshots]", JSON.stringify({ candidates: leads.length, ok, failed, purged, seconds: Math.round((Date.now() - startedAt) / 1000) }));
     return Response.json({ ok: true, candidates: leads.length, created: ok, failed });
   } catch (error) {
     console.error("[screenshots-error]", error);
