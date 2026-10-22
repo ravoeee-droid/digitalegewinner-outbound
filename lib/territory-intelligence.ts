@@ -233,9 +233,12 @@ export async function importTerritoryCandidate(id: string, workspace = "default"
   );
   let leadId = existing[0]?.id;
   if (!leadId) {
+    const industry = ["Ambulante Pflege", "Intensivpflege"].includes(row.source_tags?.industry)
+      ? row.source_tags.industry : "Photovoltaik / Elektro";
     const result = await persistRadarLead({
       id: sourceId, company: row.name, city: row.city || row.county,
-      website: row.website, phone: row.phone, industry: "Photovoltaik / Elektro",
+      website: row.website, phone: row.phone, industry,
+      email: row.source_tags?.publicEmail || "",
       source: row.source,
     }, {});
     leadId = result.leadId;
@@ -252,7 +255,7 @@ export async function importTerritoryCandidate(id: string, workspace = "default"
 /** Add a company with its original public source URL even if OSM has no record. */
 export async function addSourcedCompany(input: {
   county: string; state: string; name: string; city: string;
-  website: string; phone: string; sourceUrl: string;
+  website: string; phone: string; sourceUrl: string; industry?: string; email?: string;
 }, workspace = "default") {
   await ensureTerritorySchema();
   const website = validWebsite(input.website);
@@ -262,6 +265,9 @@ export async function addSourcedCompany(input: {
     [input.name.toLocaleLowerCase("de-DE").trim(), input.county.toLocaleLowerCase("de-DE").trim(), website].join("|"),
   ).digest("hex").slice(0, 32);
   const tags: Record<string,string> = { provenance: "manual-public-source" };
+  tags.industry = ["Ambulante Pflege", "Intensivpflege"].includes(input.industry || "")
+    ? input.industry! : "Photovoltaik / Elektro";
+  if (input.email) tags.publicEmail = input.email;
   const score = baseScore({ name: input.name, website, phone: input.phone, source_tags: tags });
   const rows = await query<{ id: string }>(`
     insert into dg_territory_candidates
