@@ -46,6 +46,10 @@
       "schedule": "0,30 5-15 * * 1-5"
     },
     {
+      "path": "/api/cron/contacts-enrich",
+      "schedule": "20,50 5-17 * * 1-5"
+    },
+    {
       "path": "/api/cron/pflege-source",
       "schedule": "0 6-15/3 * * 1-5"
     }

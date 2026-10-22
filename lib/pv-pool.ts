@@ -56,7 +56,7 @@ export async function processPvPool({ batch = 40, limit = 40, budgetMs = 200_000
         await persistRadarLead({ id: sourceId, company: r.name, contact: c.person || "", email: c.email, phone: c.phone || r.phone || "", website: r.website, city: r.city || "", industry: "Photovoltaik", source: "ba-pv" }, { email: c.email, phone: c.phone || r.phone || "" } as never, undefined, "default");
         await query(
           "update sales_companies set source='ba-pv', metadata=coalesce(metadata,'{}'::jsonb) || $2::jsonb, updated_at=now() where workspace='default' and source_id=$1",
-          [sourceId, JSON.stringify({ source: "ba-pv", via: "pv-pool", state: r.state, category: "pv_installer" })],
+          [sourceId, JSON.stringify({ source: "ba-pv", via: "pv-pool", contact_enriched_at: new Date().toISOString(), state: r.state, category: "pv_installer" })],
         );
         await query("update pv_pool set status='lead',email=$2 where host=$1", [r.host, c.email]);
         added++;

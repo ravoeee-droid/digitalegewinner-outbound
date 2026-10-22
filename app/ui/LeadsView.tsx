@@ -7,7 +7,7 @@ import styles from "./LeadsView.module.css";
 type Row = { id: string; company: string; city: string; website: string; contact: string; email: string; phone: string; stage: string; score: number; mail_status: string | null; last_sent: string | null; do_not_contact: boolean; shot?: boolean | null; video_token?: string; views?: number; plays?: number; progress?: number; watch?: number; dwell?: number; calendar?: number };
 type Data = { counts: { total: number; with_email: number; ready: number; contacted: number }; filter: string; page: number; pages: number; total: number; rows: Row[] };
 
-const FILTERS: Array<[string, string]> = [["alle", "Alle"], ["bereit", "Bereit zum Anschreiben"], ["email", "Mit E-Mail"], ["angeschrieben", "Angeschrieben"], ["ohne_email", "Ohne E-Mail"]];
+const FILTERS: Array<[string, string]> = [["alle", "Alle"], ["bereit", "Bereit zum Anschreiben"], ["email", "Mit E-Mail"], ["angeschrieben", "Angeschrieben"], ["ohne_email", "Ohne E-Mail"], ["video", "Video angesehen (anrufen)"]];
 const nf = new Intl.NumberFormat("de-DE");
 
 function status(row: Row) {

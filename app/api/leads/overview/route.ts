@@ -13,6 +13,8 @@ const FILTERS: Record<string, string> = {
   bereit: "coalesce(ct.email,'')<>'' and not l.do_not_contact and l.stage in ('Neu','Research','Bereit') and o.status is null",
   angeschrieben: "o.status in ('sent','stopped')",
   ohne_email: "coalesce(ct.email,'')=''",
+  // Interessiert: hat die persönliche Videoseite geöffnet, das Video gestartet oder den Kalender angeklickt (Bots zählen nicht).
+  video: "exists(select 1 from er_events ve where ve.workspace=l.workspace and ve.lead_id=l.id::text and ve.type in ('video_view','video_play','video_calendar_focus','video_booking_click') and coalesce(ve.meta->>'bot','false')='false')",
 };
 
 export async function GET(request: Request) {
@@ -62,7 +64,7 @@ export async function GET(request: Request) {
       from er_events e where e.workspace=l.workspace and e.lead_id=l.id::text and e.type like 'video\\_%' and coalesce(e.meta->>'bot','false')='false'
     ) ev on true
     where l.workspace`)} and ${FILTERS[filter]}${search}
-      order by l.priority_score desc nulls last, c.name
+      order by ${filter === "video" ? "(select max(ve.created_at) from er_events ve where ve.workspace=l.workspace and ve.lead_id=l.id::text and ve.type like 'video\\_%') desc nulls last," : ""} l.priority_score desc nulls last, c.name
       limit ${PAGE_SIZE} offset ${(page - 1) * PAGE_SIZE}`, params);
 
     return Response.json({
