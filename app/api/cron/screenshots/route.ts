@@ -32,7 +32,7 @@ async function run(request: Request) {
             await query("insert into lead_screenshots(lead_id,url,status,data) values($1,$2,'ok',$3) on conflict (lead_id) do update set url=excluded.url,status='ok',data=excluded.data,error=null", [lead.lead_id, website, jpg]);
             ok++;
           } catch (error) {
-            const message = String(error instanceof Error ? error.message : error).slice(0, 300);
+            const message = String(error instanceof Error ? error.message : error).slice(0, 900);
             if (errors.length < 3) errors.push(`${website}: ${message}`);
             await query("insert into lead_screenshots(lead_id,url,status,error,attempts) values($1,$2,'failed',$3,1) on conflict (lead_id) do update set status='failed', error=excluded.error, created_at=now(), attempts=lead_screenshots.attempts+1 where lead_screenshots.status='failed'", [lead.lead_id, website, message]).catch(() => null);
             failed++;

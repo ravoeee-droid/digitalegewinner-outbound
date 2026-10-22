@@ -38,7 +38,10 @@ export async function launch() {
   const local = process.env.CHROMIUM_PATH;
   if (local) return pw.launch({ executablePath: local, headless: true });
   const sparticuz = (await import("@sparticuz/chromium")).default;
-  return pw.launch({ executablePath: await sparticuz.executablePath(), args: sparticuz.args, headless: true });
+  // Playwright startet Chromium über eine Pipe; "--single-process" aus den Lambda-Argumenten lässt den Browser dabei sofort abstürzen.
+  sparticuz.setGraphicsMode = false;
+  const args = sparticuz.args.filter((arg: string) => arg !== "--single-process");
+  return pw.launch({ executablePath: await sparticuz.executablePath(), args, headless: true, timeout: 30_000 });
 }
 
 export async function capture(browser: Browser, website: string) {
