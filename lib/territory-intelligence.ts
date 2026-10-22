@@ -233,7 +233,7 @@ export async function importTerritoryCandidate(id: string, workspace = "default"
   );
   let leadId = existing[0]?.id;
   if (!leadId) {
-    const industry = ["Ambulante Pflege", "Intensivpflege"].includes(row.source_tags?.industry)
+    const industry = ["Ambulante Pflege", "Intensivpflege", "Stationäre Pflege"].includes(row.source_tags?.industry)
       ? row.source_tags.industry : "Photovoltaik / Elektro";
     const result = await persistRadarLead({
       id: sourceId, company: row.name, city: row.city || row.county,
@@ -265,7 +265,7 @@ export async function addSourcedCompany(input: {
     [input.name.toLocaleLowerCase("de-DE").trim(), input.county.toLocaleLowerCase("de-DE").trim(), website].join("|"),
   ).digest("hex").slice(0, 32);
   const tags: Record<string,string> = { provenance: "manual-public-source" };
-  tags.industry = ["Ambulante Pflege", "Intensivpflege"].includes(input.industry || "")
+  tags.industry = ["Ambulante Pflege", "Intensivpflege", "Stationäre Pflege"].includes(input.industry || "")
     ? input.industry! : "Photovoltaik / Elektro";
   if (input.email) tags.publicEmail = input.email;
   const score = baseScore({ name: input.name, website, phone: input.phone, source_tags: tags });
