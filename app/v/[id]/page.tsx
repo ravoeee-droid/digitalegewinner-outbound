@@ -13,11 +13,8 @@ const CALENDAR_URL = `https://calendar.google.com/appointments/schedules/${SCHED
 // Vorerst nur die Beispielseite; später kommen Firma, Screenshot und Video pro Lead aus der Datenbank.
 const DEMO = { company: "Ihr Betrieb", screenshot: "/v-demo.jpg", youtubeId: "iYU1SEsBusI" };
 
-const PROOF = [
-  { src: "/proof/ergebnis-5.jpg", alt: "Conversion-Funnel im Werbeanzeigenmanager: Leads, qualifizierte Bewerber und gebuchte Calls", caption: "Funnel: von Anzeigen-Klicks zu gebuchten Calls" },
-  { src: "/proof/ergebnis-6.jpg", alt: "Kampagnenübersicht mit Leads und Kosten pro Lead", caption: "Kampagnen mit Leads und Kosten pro Lead" },
-  { src: "/proof/ergebnis-4.jpg", alt: "Einzelne Anzeigen mit Ergebnissen", caption: "Anzeigen im Vergleich" },
-];
+// Ergebnis-Auszüge (echte, geschwärzte Screenshots aus Pflege-Kampagnen) kommen hier hinein, sobald sie vorliegen.
+const PROOF: { src: string; alt: string; caption: string }[] = [];
 
 export default async function VideoPage({ params }: { params: Promise<{ id: string }> }) {
   await params;
@@ -44,9 +41,10 @@ export default async function VideoPage({ params }: { params: Promise<{ id: stri
           <iframe src={CALENDAR_URL} title="Terminbuchung bei Raphael Hermann" loading="lazy" />
         </section>
       </div>
+      {PROOF.length > 0 && (
       <section className={styles.proof} aria-label="Ergebnisse aus Kundenkampagnen">
         <h2>Ergebnisse aus Recruiting-Kampagnen</h2>
-        <p>Auszüge aus dem Werbeanzeigenmanager von Kundenkampagnen für Steuerkanzleien in Baden-Württemberg. Kundennamen und Kontodaten sind aus Datenschutzgründen geschwärzt. Ergebnisse hängen vom Einzelfall ab.</p>
+        <p>Auszüge aus dem Werbeanzeigenmanager von Kundenkampagnen. Kundennamen und Kontodaten sind aus Datenschutzgründen geschwärzt. Ergebnisse hängen vom Einzelfall ab.</p>
         <ul>
           {PROOF.map((item) => (
             <li key={item.src}>
@@ -59,6 +57,7 @@ export default async function VideoPage({ params }: { params: Promise<{ id: stri
           ))}
         </ul>
       </section>
+      )}
     </main>
   );
 }
