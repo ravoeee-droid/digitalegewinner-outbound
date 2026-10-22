@@ -1,5 +1,7 @@
 import { query } from "@/lib/db";
 import { cleanPersonName } from "@/lib/outreach-copy";
+import { videoToken } from "@/lib/email-tracking";
+import { ensureScreenshotTable } from "@/lib/lead-screenshot";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -41,21 +43,31 @@ export async function GET(request: Request) {
         count(*) filter(where ${FILTERS.angeschrieben})::int contacted
       ${from}`);
 
+    await ensureScreenshotTable();
     const params: unknown[] = [];
     let search = "";
     if (q) { params.push(`%${q}%`); search = ` and (c.name ilike $1 or c.city ilike $1 or ct.email ilike $1 or ct.name ilike $1)`; }
     const [{ n: total } = { n: 0 }] = await query<{ n: number }>(`select count(*)::int n ${from} and ${FILTERS[filter]}${search}`, params);
 
-    const rows = await query<{ id: string; company: string; city: string; website: string; contact: string; email: string; phone: string; stage: string; score: number; mail_status: string | null; last_sent: string | null; do_not_contact: boolean }>(`
+    const rows = await query<{ id: string; company: string; city: string; website: string; contact: string; email: string; phone: string; stage: string; score: number; mail_status: string | null; last_sent: string | null; do_not_contact: boolean; shot: boolean | null; views: number; plays: number; progress: number; watch: number; dwell: number; calendar: number }>(`
       select l.id, c.name company, c.city, coalesce(nullif(c.website,''),c.domain) website, coalesce(ct.name,'') contact, coalesce(ct.email,'') email, c.phone,
-        l.stage, coalesce(l.priority_score,0)::int score, o.status mail_status, o.sent_at::text last_sent, l.do_not_contact
-      ${from} and ${FILTERS[filter]}${search}
+        l.stage, coalesce(l.priority_score,0)::int score, o.status mail_status, o.sent_at::text last_sent, l.do_not_contact,
+        (s.status='ok') shot, coalesce(ev.views,0)::int views, coalesce(ev.plays,0)::int plays, coalesce(ev.progress,0)::int progress,
+        coalesce(ev.watch,0)::int watch, coalesce(ev.dwell,0)::int dwell, coalesce(ev.calendar,0)::int calendar
+      ${from.replace("where l.workspace", `left join lead_screenshots s on s.lead_id=l.id::text
+    left join lateral (
+      select count(*) filter(where type='video_view') views, count(*) filter(where type='video_play') plays,
+        max(case when type='video_progress' then (meta->>'v')::int end) progress, max(case when type='video_watch' then (meta->>'v')::int end) watch,
+        max(case when type='video_dwell' then (meta->>'v')::int end) dwell, count(*) filter(where type in ('video_booking_click','video_calendar_focus')) calendar
+      from er_events e where e.workspace=l.workspace and e.lead_id=l.id::text and e.type like 'video\\_%' and coalesce(e.meta->>'bot','false')='false'
+    ) ev on true
+    where l.workspace`)} and ${FILTERS[filter]}${search}
       order by l.priority_score desc nulls last, c.name
       limit ${PAGE_SIZE} offset ${(page - 1) * PAGE_SIZE}`, params);
 
     return Response.json({
       counts, filter, q, page, pageSize: PAGE_SIZE, total, pages: Math.max(1, Math.ceil(total / PAGE_SIZE)),
-      rows: rows.map((row) => ({ ...row, contact: cleanPersonName(row.contact) })),
+      rows: rows.map((row) => ({ ...row, contact: cleanPersonName(row.contact), video_token: row.shot ? videoToken(String(row.id)) : "" })),
     }, { headers: { "cache-control": "no-store" } });
   } catch (error) {
     return Response.json({ error: error instanceof Error ? error.message : "Leads konnten nicht geladen werden." }, { status: 503 });
