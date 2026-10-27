@@ -1,7 +1,7 @@
 {
   "contractVersion": "1.0.0",
   "instance": "DG-MAIN",
-  "updatedAt": "2026-10-22",
+  "updatedAt": "2026-10-27",
   "policy": "same-task-adapt-both-directions",
   "status": "parity-realignment-in-progress",
   "sharedSurfaces": {
@@ -23,7 +23,7 @@
     "outboundOsV3": "dg-foundation-feature-branch-peer-parity-blocked",
     "appointmentGoalAutopilot": "dg-implemented-peer-parity-blocked",
     "dailyCockpitHeute": "dg-implemented-peer-parity-blocked",
-    "crmKanbanWorkspace": "dg-implemented-peer-parity-blocked",
+    "crmKanbanWorkspace": "DG: sector-tabbed Pflege/PV-Trust/Weitere with scoped KPIs, source-aware assignment, deep-links. CLIENT-WALKENHORST has its own commercial/private/production CRM lanes; DG-specific Pflege/PV industry rules are not copied to peer.",
     "territorySourceImport": "DG supports explicit Pflege sector and public email, preserves legacy PV default; peer parity blocked"
   },
   "blockers": [
@@ -75,6 +75,12 @@
       "surface": "territorySourceImport",
       "peer": "CLIENT-WALKENHORST",
       "detail": "Read-only requests for peer main app/api/territories/route.ts and lib/territory-intelligence.ts returned HTTP404. No equivalent import seam could be inspected. Peer source and all peer runtime/data are unchanged. Shared-core parity is not claimed."
+    },
+    {
+      "id": "crm-sector-dg-2026-10-27",
+      "surface": "crmKanbanWorkspace",
+      "peer": "CLIENT-WALKENHORST",
+      "detail": "Read-only inspected peer app/crm/commercial/page.tsx: it delegates to LeadCrm customerType=commercial, while DG uses a revenue-opportunity board. DG-only Pflege/PV sector classification is industry-specific and not portable to the energy client without mixing customer-specific logic. Peer runtime and source are unchanged; generic shared-core parity is not claimed."
     }
   ],
   "rules": [
