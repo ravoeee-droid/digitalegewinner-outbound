@@ -85,55 +85,44 @@ export default async function VideoPage({ params }: { params: Promise<{ id: stri
       <ChatWidget token={token} company={data.company} whatsapp={WHATSAPP_NUMBER} />
       <header className={styles.head}>
         <div className={styles.author}>
-          <span className={styles.avatar} aria-hidden="true">RH</span>
+          <span className={styles.logoMark} aria-hidden="true">DG<span>.</span></span>
           <div>
-            <h1>Eine kurze Nachricht für {data.company}</h1>
-            <p>Raphael Hermann · Digitale Gewinner</p>
+            <strong className={styles.brandName}>DIGITALE GEWINNER</strong>
+            <p>Persönliche Videonachricht von Raphael Hermann</p>
           </div>
         </div>
-        <a href="#termin" className={styles.headButton}>Termin buchen</a>
+        <a href="#termin" className={styles.headButton}>Gespräch vereinbaren <span aria-hidden="true">↗</span></a>
       </header>
+      <section className={styles.heroIntro} aria-label="Persönliche Videobotschaft">
+        <div className={styles.eyebrow}><span className={styles.orangeDot} /> {segment === "pv" ? "PV-TRUST" : segment === "pflege" ? "PFLEGE-RECRUITING" : "DIGITALE GEWINNER"} <span className={styles.heroDivider}>/</span> PERSÖNLICH FÜR {data.company}</div>
+        <h1>Eine kurze Nachricht <em>für Ihren Betrieb.</em></h1>
+        <p>{segment === "pv" ? "Wie Sie mehr eigene Anfragen gewinnen und unabhängiger von Leadportalen und Empfehlungen werden können." : segment === "pflege" ? "Wie Sie einen eigenen Bewerberkanal aufbauen, der nicht nach der nächsten Einstellung wieder verschwindet." : "Wo wir konkrete Potenziale für Ihr Unternehmen sehen."}</p>
+      </section>
       <div className={styles.grid}>
         <section className={styles.videoCol} aria-label="Video">
+          <div className={styles.videoHeading}><span className={styles.videoHeadingDot} /> <span>Persönliche Videonachricht</span><span className={styles.videoTo}>Für {data.company}</span></div>
           {(segment !== "other" && Boolean(VIDEO_IDS[segment])) || token === "demo" ? <VideoPlayer youtubeId={token === "demo" ? (VIDEO_IDS.pflege || data.youtubeId) : (segment === "pv" ? VIDEO_IDS.pv : VIDEO_IDS.pflege)} screenshot={data.screenshot} company={data.company} /> : (
             <div className={styles.staticShot} style={data.screenshot ? { backgroundImage: `url(${data.screenshot})` } : undefined} role="img" aria-label={`Website von ${data.company}`} />
           )}
+          <p className={styles.videoCaption}>Raphael Hermann · Digitale Gewinner</p>
           <div className={styles.takeaway}>
-            <h2>15 Minuten, die sich auch ohne Zusammenarbeit lohnen</h2>
-            <p className={styles.bonus}><strong>Bonus nach Ihrer Buchung:</strong> Sie erhalten vorab Ihre persönliche Wettbewerbsanalyse als PDF: welche Betriebe in Ihrem Umkreis wie aufgestellt sind, was sie gut machen und wo Ihre größten Chancen liegen.</p>
+            <span className={styles.cardKicker}>IHR MEHRWERT</span>
+            <h2>15 Minuten, die Klarheit bringen.</h2>
+            <p className={styles.bonus}>Wir sprechen darüber, was für Ihren Betrieb wirtschaftlich sinnvoll ist – oder eben nicht. <strong>Beides ist vollkommen in Ordnung.</strong></p>
             <ul>{TAKEAWAYS[segment].map((item) => <li key={item}>{item}</li>)}</ul>
-            <p className={styles.takeNote}>Kostenlos und unverbindlich. Wählen Sie rechts direkt einen Termin.</p>
+            <p className={styles.takeNote}>Persönlich · unverbindlich · kein Verkaufsdruck</p>
           </div>
         </section>
         <section id="termin" className={styles.calendar} aria-label="Termin buchen">
-          <h2>Termin direkt buchen</h2>
-          <p className={styles.calBonus}>Inklusive: Ihre persönliche Wettbewerbsanalyse (PDF)</p>
+          <span className={styles.cardKicker}>PERSÖNLICHES GESPRÄCH</span>
+          <h2>Passt das wirtschaftlich zu Ihrem Betrieb?</h2>
+          <p className={styles.calBonus}>15 Minuten mit Raphael Hermann · kostenlos und unverbindlich</p>
           <iframe src={CALENDAR_URL} title="Terminbuchung bei Raphael Hermann" loading="lazy" />
         </section>
       </div>
-      {(segment === "pflege" || segment === "pv") && (
-        <section className={styles.funding} aria-label="Förderchance Unternehmensberatung 2026">
-          <div className={styles.fundingTopline}>FÖRDERCHANCE · ANTRAGSFRIST 31.12.2026</div>
-          <h2>50–80 % Zuschuss für förderfähige Unternehmensberatung – nur noch 2026 beantragen</h2>
-          <p>
-            Für kleine und mittlere Unternehmen sind je nach Betriebsstätte 50 % oder 80 % Zuschuss
-            auf förderfähige Beratungskosten möglich – maximal 1.750 € bzw. 2.800 € pro Beratung.
-            Ob Ihr Betrieb die Voraussetzungen erfüllt, klären wir gerne im persönlichen Gespräch.
-          </p>
-          <div className={styles.fundingBottom}>
-            <a className={styles.fundingButton} href="#termin">Fördermöglichkeiten kostenlos prüfen</a>
-            <span>
-              Wichtig: Diese BAFA-Förderung betrifft ausschließlich förderfähige, eigenständige
-              Unternehmensberatung – nicht pauschal die Umsetzung unseres Systems, Website-Bau,
-              Werbung oder Anzeigenbudget. Förderfähigkeit, Beratereignung und Antragstellung
-              vor Beratungsbeginn sind Voraussetzung; ein Zuschuss ist nicht garantiert.
-              {" "}<a href="https://www.bafa.de/SharedDocs/Downloads/DE/Wirtschaft/unb_flyer.pdf?__blob=publicationFile&v=2" target="_blank" rel="noopener noreferrer">BAFA-Förderinformationen</a>
-            </span>
-          </div>
-        </section>
-      )}
       {segment === "pflege" && (
       <section className={styles.proof} aria-label="Fallstudien aus der Pflege">
+        <span className={styles.sectionKicker}>01 / NACHWEISBARE ERGEBNISSE</span>
         <h2>Echte Pflegebetriebe. Echte Ergebnisse.</h2>
         <ul>
           {CASES.map((item) => (
@@ -153,6 +142,7 @@ export default async function VideoPage({ params }: { params: Promise<{ id: stri
       )}
       {segment === "pv" && (
         <section className={styles.proof} aria-label="Ergebnisse aus der Anfragegewinnung">
+          <span className={styles.sectionKicker}>01 / NACHWEISBARE ERGEBNISSE</span>
           <h2>Exklusive Anfragen. Messbare Ergebnisse.</h2>
           <p>Ergebnisse aus zwei PV-Trust-Kundenprojekten: exklusiv für den jeweiligen Auftraggeber generierte Anfragen.</p>
           <ul>
@@ -164,6 +154,7 @@ export default async function VideoPage({ params }: { params: Promise<{ id: stri
               </li>
             ))}
           </ul>
+          <div className={styles.comparisonIntro}><span className={styles.sectionKicker}>02 / DER ENTSCHEIDENDE UNTERSCHIED</span><h2>Weg von der Abhängigkeit. Hin zu Ihrem eigenen Anfragekanal.</h2></div>
           <div className={styles.pvTransformation} aria-label="Vorher und nachher mit einem eigenen Anfragekanal">
             <div className={styles.pvBefore}>
               <span className={styles.pvTransformLabel}>VORHER</span>
@@ -178,6 +169,27 @@ export default async function VideoPage({ params }: { params: Promise<{ id: stri
           </div>
           <p className={styles.pvTransformationFootnote}>Das Ziel: weg vom Vertriebschaos, hin zu besser planbarer Kundengewinnung und mehr Potenzial für profitables Wachstum.</p>
           <p className={styles.source}>Kundenbeispiele mit den angegebenen durchschnittlichen Leadkosten im jeweiligen Projekt, keine Preis- oder Ergebnisgarantie. Aufwand und Profitabilität hängen vom einzelnen Betrieb und seinen Abschlüssen ab.</p>
+        </section>
+      )}
+      {(segment === "pflege" || segment === "pv") && (
+        <section className={styles.funding} aria-label="Förderchance Unternehmensberatung 2026">
+          <div className={styles.fundingTopline}>03 / FÖRDERMÖGLICHKEIT · BIS 31.12.2026</div>
+          <h2>50–80 % Zuschuss für förderfähige Beratung möglich.</h2>
+          <p>
+            Für kleine und mittlere Unternehmen sind je nach Betriebsstätte 50 % oder 80 % Zuschuss
+            auf förderfähige Beratungskosten möglich – maximal 1.750 € bzw. 2.800 € pro Beratung.
+            Ob Ihr Betrieb die Voraussetzungen erfüllt, klären wir gerne im persönlichen Gespräch.
+          </p>
+          <div className={styles.fundingBottom}>
+            <a className={styles.fundingButton} href="#termin">Fördermöglichkeiten kostenlos prüfen</a>
+            <span>
+              Wichtig: Diese BAFA-Förderung betrifft ausschließlich förderfähige, eigenständige
+              Unternehmensberatung – nicht pauschal die Umsetzung unseres Systems, Website-Bau,
+              Werbung oder Anzeigenbudget. Förderfähigkeit, Beratereignung und Antragstellung
+              vor Beratungsbeginn sind Voraussetzung; ein Zuschuss ist nicht garantiert.
+              {" "}<a href="https://www.bafa.de/SharedDocs/Downloads/DE/Wirtschaft/unb_flyer.pdf?__blob=publicationFile&v=2" target="_blank" rel="noopener noreferrer">BAFA-Förderinformationen</a>
+            </span>
+          </div>
         </section>
       )}
       <footer className={styles.legal}>
