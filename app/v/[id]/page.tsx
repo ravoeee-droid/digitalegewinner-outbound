@@ -144,7 +144,7 @@ export default async function VideoPage({ params }: { params: Promise<{ id: stri
             ))}
           </ul>
           <blockquote className={styles.quote}>
-            <strong>Vorher: Vertriebschaos. Danach: Ein strukturierter Weg von der Anfrage bis zum Kundengespräch.</strong>
+            <strong>Vorher: Vertriebschaos. Heute: strukturierter Vertrieb – weniger Handarbeit, mehr Profit.</strong>
             <span className={styles.proofDescription}> Weniger manuelle Nacharbeit und mehr Überblick schaffen die Voraussetzung für einen wirtschaftlicheren Vertrieb.</span>
           </blockquote>
           <p className={styles.source}>Kundenbeispiele mit den angegebenen durchschnittlichen Leadkosten im jeweiligen Projekt, keine Preis- oder Ergebnisgarantie. Libi Elektronik ist kein PV-Unternehmen. Aufwand und Profitabilität hängen vom einzelnen Betrieb und seinen Abschlüssen ab.</p>
