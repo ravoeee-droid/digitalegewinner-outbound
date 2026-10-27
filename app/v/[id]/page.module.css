@@ -22,10 +22,12 @@
 .staticShot { width: 100%; aspect-ratio: 16 / 9; border-radius: 14px; background: #1d1814 center top / cover no-repeat; box-shadow: 0 12px 40px rgba(28, 24, 21, 0.22); }
 .player { position: relative; width: 100%; aspect-ratio: 16 / 9; background: #14110f; border-radius: 14px; overflow: hidden; box-shadow: 0 12px 40px rgba(28, 24, 21, 0.22); }
 .screen { position: absolute; inset: 0; background-size: cover; background-position: top center; background-color: #1d1814; }
-.cam { position: absolute; left: 3.2%; bottom: 13%; width: 19%; aspect-ratio: 1; border-radius: 50%; overflow: hidden; border: 4px solid #fff; background: #000; box-shadow: 0 8px 28px rgba(0, 0, 0, 0.5); }
-.camInner { position: absolute; left: 50%; top: 50%; width: 330%; aspect-ratio: 16 / 9; transform: translate(-50%, -46%); pointer-events: none; }
+/* Dezente Loom-Kamera: kleinerer Kreis und deutlich mehr Raum um das Gesicht. */
+.cam { position: absolute; left: 3.2%; bottom: 14%; width: 16%; aspect-ratio: 1; border-radius: 50%; overflow: hidden; border: 3px solid #fff; background: #000; box-shadow: 0 8px 28px rgba(0, 0, 0, 0.5); }
+/* 16:9-YouTube-Video im runden Ausschnitt: weniger Zoom = mehr Schultern/Oberkörper. */
+.camInner { position: absolute; left: 50%; top: 50%; width: 245%; aspect-ratio: 16 / 9; transform: translate(-50%, -52%); pointer-events: none; }
 .camInner iframe { width: 100%; height: 100%; display: block; border: 0; }
-.poster { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center 30%; transform: scale(1.7); transform-origin: 50% 35%; }
+.poster { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center; transform: scale(1.18); transform-origin: center; }
 .bigPlay { position: absolute; inset: 0; width: 100%; border: 0; background: rgba(0, 0, 0, 0.28); cursor: pointer; display: grid; place-content: center; justify-items: center; gap: 12px; color: #fff; }
 .bigPlay:disabled { cursor: default; }
 .bigIcon { width: 76px; height: 76px; border-radius: 50%; background: rgba(255, 255, 255, 0.94); color: #1c1815; display: grid; place-items: center; font-size: 28px; padding-left: 5px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4); }
@@ -87,7 +89,7 @@
   .head { flex-wrap: wrap; }
   .author h1 { font-size: 18px; }
   .headButton { width: 100%; justify-content: center; }
-  .cam { width: 26%; left: 4%; bottom: 16%; }
+  .cam { width: 22%; left: 4%; bottom: 16%; }
   .bigIcon { width: 60px; height: 60px; font-size: 22px; }
   .bigLabel { display: none; }
   .calendar iframe { height: 600px; }

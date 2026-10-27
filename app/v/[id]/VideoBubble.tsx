@@ -101,7 +101,7 @@ export default function VideoPlayer({ youtubeId, screenshot, company }: { youtub
         <div className={styles.camInner} ref={mount} />
         {!started && (
           // eslint-disable-next-line @next/next/no-img-element
-          <img className={styles.poster} src={`https://i.ytimg.com/vi/${youtubeId}/hqdefault.jpg`} alt="" />
+          <img className={styles.poster} src={`https://i.ytimg.com/vi/${youtubeId}/mqdefault.jpg`} alt="" />
         )}
       </div>
       {!playing && (
