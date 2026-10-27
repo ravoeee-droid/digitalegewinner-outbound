@@ -234,7 +234,9 @@ async function run(request: Request) {
       limited++; return;
     }
 
-    if(runtimeConfig.complianceMode!=="off"){
+    // Loom-Kampagnen erzwingen dokumentierte E-Mail-Kontaktberechtigung unabhängig vom globalen Shadow-Modus.
+    const sendComplianceMode=(row.campaign_id==="pflege-loom-150-v1"||row.campaign_id==="pv-loom-150-v1")?"enforce":runtimeConfig.complianceMode;
+    if(sendComplianceMode!=="off"){
       try{
         const compliance=await evaluateEmailSendCompliance(row.lead_id,row.recipient);
         await recordOutboundEventByMode({
@@ -246,7 +248,7 @@ async function run(request: Request) {
           leadId:row.lead_id,
           idempotencyKey:`compliance:email:${row.id}:${compliance.decision.policyVersion}`,
           payload:{
-            mode:runtimeConfig.complianceMode,
+            mode:sendComplianceMode,
             allowed:compliance.decision.allowed,
             reason:compliance.decision.reason,
             policyVersion:compliance.decision.policyVersion,
@@ -260,7 +262,7 @@ async function run(request: Request) {
           },
         });
 
-        if(runtimeConfig.complianceMode==="enforce"&&!compliance.decision.allowed){
+        if(sendComplianceMode==="enforce"&&!compliance.decision.allowed){
           await query(
             "update er_outbox set status='suppressed',error=$2 where id=$1 and status='sending'",
             [row.id,`Compliance gate: ${compliance.decision.reason}`],
@@ -277,7 +279,7 @@ async function run(request: Request) {
           leadId:row.lead_id,
           idempotencyKey:`compliance-error:email:${row.id}:${row.attempts}`,
           payload:{
-            mode:runtimeConfig.complianceMode,
+            mode:sendComplianceMode,
             allowed:false,
             reason:"evaluation_error",
             error:message,
@@ -286,7 +288,7 @@ async function run(request: Request) {
             variant:row.variant,
           },
         });
-        if(runtimeConfig.complianceMode==="enforce"){
+        if(sendComplianceMode==="enforce"){
           await query(
             "update er_outbox set status='queued',attempts=greatest(attempts-1,0),scheduled_at=now()+interval '60 minutes',error=$2 where id=$1 and status='sending'",
             [row.id,`Compliance evaluator unavailable: ${message}`],
