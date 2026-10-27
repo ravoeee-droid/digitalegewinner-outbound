@@ -115,13 +115,20 @@ async function run(request: Request) {
   // Harte Versand-Sperre: Die beiden Geschäftsfeldkampagnen dürfen ausschließlich
   // an passend klassifizierte Leads gehen. Uneindeutige Leads bleiben für Prüfung liegen.
   await query(`update er_outbox o set status='suppressed', error='Geschäftsfeld stimmt nicht zur Kampagne' 
-    where o.workspace='default' and o.status='queued' and o.campaign_id in ('pv-starter-v1','pflege-starter-v2')
+    where o.workspace='default' and o.status='queued' and o.campaign_id in ('pv-starter-v1','pflege-starter-v2','pv-loom-150-v1','pflege-loom-150-v1')
       and not exists (select 1 from sales_leads l join sales_companies c on c.id=l.company_id and c.workspace=l.workspace
         where l.id::text=o.lead_id and l.workspace=o.workspace and ${leadSegmentSql("c")} =
-          case when o.campaign_id='pv-starter-v1' then 'pv' else 'pflege' end)`);
+          case when o.campaign_id in ('pv-starter-v1','pv-loom-150-v1') then 'pv' else 'pflege' end)`);
 
   // PV-Mails richten sich an die Geschäftsführung, nicht an Bewerbungs-/Personalpostfächer.
-  await query("update er_outbox set status='suppressed',error='Personal-/Bewerbungsadresse (PV)' where workspace='default' and status='queued' and campaign_id='pv-starter-v1' and recipient ~* '^(bewerbung|bewerbungen|bewerber|karriere|jobs?|hr|personal|recruiting|career|careers|application|applications|stellen|ausbildung)[._-]?[a-z0-9]*@'");
+  await query("update er_outbox set status='suppressed',error='Personal-/Bewerbungsadresse (PV)' where workspace='default' and status='queued' and campaign_id in ('pv-starter-v1','pv-loom-150-v1') and recipient ~* '^(bewerbung|bewerbungen|bewerber|karriere|jobs?|hr|personal|recruiting|career|careers|application|applications|stellen|ausbildung)[._-]?[a-z0-9]*@'");
+  // DG Loom requires a real company-specific screenshot; a video placeholder alone is insufficient.
+  // This is campaign-specific and does not alter other customers' sending behavior.
+  await query(`update er_outbox o set status='suppressed',error='Loom-Screenshot fehlt oder ist nicht mehr verfügbar'
+    where o.workspace='default' and o.status='queued'
+      and o.campaign_id in ('pflege-loom-150-v1','pv-loom-150-v1')
+      and not exists(select 1 from lead_screenshots sc where sc.lead_id=o.lead_id and sc.status='ok')`);
+
   const due = await query<OutboxRow>(
     `with claim as (
        select o.id
