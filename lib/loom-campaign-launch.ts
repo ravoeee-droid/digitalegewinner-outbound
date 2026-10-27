@@ -93,6 +93,121 @@ async function candidatePool(segment:Segment,limit:number) {
      limit $2`, [segment,limit],
   );
 }
+
+export type LoomReadiness = {
+  segment: Segment;
+  inPipeline: number;
+  withEmail: number;
+  notSuppressed: number;
+  neverSent: number;
+  verifiedPermission: number;
+  screenshotReady: number;
+  fullyReady: number;
+  waitingScreenshots: number;
+};
+export async function diagnoseLoomReadiness():Promise<LoomReadiness[]> {
+  const result:LoomReadiness[]=[];
+  for(const segment of ["pflege","pv"] as const) {
+    const [row]=await query<{
+      in_pipeline:number;with_email:number;not_suppressed:number;never_sent:number;
+      verified_permission:number;screenshot_ready:number;fully_ready:number;waiting_screenshots:number;
+    }>(`
+      with base as (
+        select l.id::text lead_id, ct.email,
+          (ct.email ~* '^[^[:space:]@]+@[^[:space:]@]+\\.[^[:space:]@]+
+  // Old sequences must not survive the switch.
+  const [old] = await query<{n:string}>(
+    "with affected as (update er_outbox set status='suppressed',error='Alte Kampagne durch Loom ersetzt' where workspace='default' and status='queued' and campaign_id in ('pflege-starter-v2','pv-starter-v1') returning id) select count(*)::text n from affected",
+  );
+  const creds=await loadMailboxCredentials();
+  const oldState=(await readState())?.payload as {mailboxes?:Array<{email?:string;enabled?:boolean}>}|undefined;
+  const enabledByEmail=new Map((oldState?.mailboxes||[]).map(m=>[m.email?.toLowerCase(),m.enabled!==false]));
+  const mailboxes=creds.filter(c=>c.provider==="smtp"&&enabledByEmail.get(c.email?.toLowerCase())!==false);
+  const result:Record<Segment,{already:number;queued:number;rejected:number;scanned:number;reason?:string}>={
+    pflege:{already:0,queued:0,rejected:0,scanned:0},
+    pv:{already:0,queued:0,rejected:0,scanned:0},
+  };
+  for(const segment of ["pflege","pv"] as const) {
+    const id=LOOM_CAMPAIGNS[segment];
+    const [count]=await query<{n:string}>("select count(distinct lead_id)::text n from er_outbox where workspace='default' and campaign_id=$1",[id]);
+    const already=Number(count?.n||0);
+    result[segment].already=already;
+    const remaining=Math.max(0,MAX_PER_SEGMENT-already);
+    if(!remaining){result[segment].reason="target_reached";continue;}
+    if(!VIDEO_IDS[segment]){result[segment].reason="video_missing";continue;}
+    if(!mailboxes.length){result[segment].reason="mailboxes_unavailable";continue;}
+    const pool=await candidatePool(segment,Math.min(650,Math.max(remaining*3,remaining)));
+    // Rank by lead priority after distinct-email selection.
+    pool.sort((a,b)=>b.priority_score-a.priority_score);
+    result[segment].scanned=pool.length;
+    for(const lead of pool) {
+      if(result[segment].queued>=remaining)break;
+      if(segment==="pv"&&PV_CAREER_RECIPIENT.test(lead.email)){result[segment].rejected++;continue;}
+      let allowed=false;
+      try{
+        allowed=(await evaluateEmailSendCompliance(lead.id,lead.email)).decision.allowed;
+      }catch{return {...result,oldSuppressed:Number(old?.n||0),error:"Compliance-Prüfung nicht erreichbar: Versand sicherheitshalber gestoppt."};}
+      if(!allowed){result[segment].rejected++;continue;}
+      const mailbox=mailboxes[(already+result[segment].queued)%mailboxes.length];
+      const body=emailBody(segment,lead.company,lead.contact);
+      const subject=`Persönliche Videonachricht für ${lead.company}`.slice(0,125);
+      await query(
+        `insert into er_outbox(id,workspace,campaign_id,lead_id,mailbox_id,recipient,subject,body,variant,scheduled_at)
+         values(gen_random_uuid(),'default',$1,$2,$3,$4,$5,$6,'V',now())`,
+        [id,lead.id,mailbox.id,lead.email,subject,body],
+      );
+      result[segment].queued++;
+    }
+    result[segment].reason=result[segment].queued>0?"queued":"no_verified_unsent_screenshot_ready_recipients";
+  }
+  await writeCampaignDashboard({
+    pflege:result.pflege.already+result.pflege.queued,
+    pv:result.pv.already+result.pv.queued,
+  });
+  const readiness=await diagnoseLoomReadiness().catch((err:unknown)=>({error:String(err instanceof Error?err.message:err)}));
+  return {ok:true,oldSuppressed:Number(old?.n||0),maxPerSegment:MAX_PER_SEGMENT,campaigns:result,readiness};
+}
+) as valid_email,
+          not exists(select 1 from er_suppressions s where s.workspace='default' and lower(s.email)=lower(ct.email))
+          and not exists(select 1 from outbound_compliance_suppressions s where s.workspace='default'
+            and s.channel='email' and s.status='active' and lower(s.identifier)=lower(ct.email)) as no_suppression,
+          not exists(select 1 from er_outbox o where o.workspace='default'
+            and (o.lead_id=l.id::text or lower(o.recipient)=lower(ct.email))
+            and (o.status='sent' or (o.status in ('queued','sending')
+              and coalesce(o.campaign_id,'') not in ('pflege-starter-v2','pv-starter-v1')))) as untouched,
+          exists(select 1 from outbound_contact_permissions p where p.workspace='default'
+            and p.channel='email' and p.status='verified'
+            and (p.contact_id=l.contact_id or p.company_id=l.company_id)
+            and p.revoked_at is null and (p.valid_from is null or p.valid_from<=now())
+            and (p.valid_until is null or p.valid_until>=now())) as permitted,
+          exists(select 1 from lead_screenshots sc where sc.lead_id=l.id::text and sc.status='ok') as shot
+        from sales_leads l
+        join sales_companies c on c.id=l.company_id and c.workspace=l.workspace
+        join sales_contacts ct on ct.id=l.contact_id and ct.workspace=l.workspace
+        where l.workspace='default' and l.status='active'
+          and l.stage in ('Neu','Research','Bereit')
+          and coalesce(l.do_not_contact,false)=false
+          and ${leadSegmentSql("c")}=$1
+      )
+      select count(*)::int in_pipeline,
+        count(*) filter(where valid_email)::int with_email,
+        count(*) filter(where valid_email and no_suppression)::int not_suppressed,
+        count(*) filter(where valid_email and no_suppression and untouched)::int never_sent,
+        count(*) filter(where valid_email and no_suppression and untouched and permitted)::int verified_permission,
+        count(*) filter(where valid_email and no_suppression and untouched and shot)::int screenshot_ready,
+        count(*) filter(where valid_email and no_suppression and untouched and permitted and shot)::int fully_ready,
+        count(*) filter(where valid_email and no_suppression and untouched and permitted and not shot)::int waiting_screenshots
+      from base`, [segment]);
+    result.push({
+      segment,inPipeline:row?.in_pipeline||0,withEmail:row?.with_email||0,
+      notSuppressed:row?.not_suppressed||0,neverSent:row?.never_sent||0,
+      verifiedPermission:row?.verified_permission||0,screenshotReady:row?.screenshot_ready||0,
+      fullyReady:row?.fully_ready||0,waitingScreenshots:row?.waiting_screenshots||0,
+    });
+  }
+  return result;
+}
+
 export async function ensureLoomCampaigns() {
   // Old sequences must not survive the switch.
   const [old] = await query<{n:string}>(
