@@ -249,3 +249,10 @@
   .videoFinish a { padding: 10px 12px; font-size: 12px; }
   .secondaryContact { font-size: 11px; }
 }
+
+/* Three decisive benefits in the Pflege video sidebar. */
+.careBenefits { list-style: none; display: grid; gap: 14px; padding: 0; margin: 2px 0 22px; }
+.careBenefits li { display: flex; align-items: flex-start; gap: 12px; color: #e6e3df; font-size: 14px; line-height: 1.48; }
+.careBenefits li > span:first-child { flex: none; display: grid; place-items: center; width: 23px; height: 23px; border-radius: 50%; color: #171717; background: #ff8745; font-size: 12px; font-weight: 850; }
+.careBenefits li strong { color: #fff; font-weight: 810; }
+@media(max-width: 620px) { .careBenefits { gap: 11px; margin-bottom: 19px; } .careBenefits li { font-size: 13px; } }
