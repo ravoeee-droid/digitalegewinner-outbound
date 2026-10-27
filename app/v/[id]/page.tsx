@@ -49,7 +49,7 @@ const CASES = [
   { name: "Häusliche Krankenpflege Raik Radloff", big: "2 neue Fachkräfte", line: "in unter 4 Wochen · 11 Gespräche" },
 ];
 
-// Kundenbeispiele für die PV-Ansprache: Das Elektronikprojekt ist ausdrücklich kein PV-Referenzbetrieb.
+// Von Raphael bestätigte Ergebnisse aus zwei PV-Trust-Kundenprojekten.
 const PV_CASES = [
   {
     name: "Solavol · PV-Trust-Kunde",
@@ -111,6 +111,27 @@ export default async function VideoPage({ params }: { params: Promise<{ id: stri
           <iframe src={CALENDAR_URL} title="Terminbuchung bei Raphael Hermann" loading="lazy" />
         </section>
       </div>
+      {(segment === "pflege" || segment === "pv") && (
+        <section className={styles.funding} aria-label="Förderchance Unternehmensberatung 2026">
+          <div className={styles.fundingTopline}>FÖRDERCHANCE · ANTRAGSFRIST 31.12.2026</div>
+          <h2>50–80 % Zuschuss für förderfähige Unternehmensberatung – nur noch 2026 beantragen</h2>
+          <p>
+            Für kleine und mittlere Unternehmen sind je nach Betriebsstätte 50 % oder 80 % Zuschuss
+            auf förderfähige Beratungskosten möglich – maximal 1.750 € bzw. 2.800 € pro Beratung.
+            Ob Ihr Betrieb die Voraussetzungen erfüllt, klären wir gerne im persönlichen Gespräch.
+          </p>
+          <div className={styles.fundingBottom}>
+            <a className={styles.fundingButton} href="#termin">Fördermöglichkeiten kostenlos prüfen</a>
+            <span>
+              Wichtig: Diese BAFA-Förderung betrifft ausschließlich förderfähige, eigenständige
+              Unternehmensberatung – nicht pauschal die Umsetzung unseres Systems, Website-Bau,
+              Werbung oder Anzeigenbudget. Förderfähigkeit, Beratereignung und Antragstellung
+              vor Beratungsbeginn sind Voraussetzung; ein Zuschuss ist nicht garantiert.
+              {" "}<a href="https://www.bafa.de/SharedDocs/Downloads/DE/Wirtschaft/unb_flyer.pdf?__blob=publicationFile&v=2" target="_blank" rel="noopener noreferrer">BAFA-Förderinformationen</a>
+            </span>
+          </div>
+        </section>
+      )}
       {segment === "pflege" && (
       <section className={styles.proof} aria-label="Fallstudien aus der Pflege">
         <h2>Echte Pflegebetriebe. Echte Ergebnisse.</h2>
