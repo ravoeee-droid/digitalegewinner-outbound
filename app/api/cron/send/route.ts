@@ -33,7 +33,7 @@ type OutboxRow = {
 };
 type Credential = StoredMailboxCredential;
 type State = { mailboxes?: Array<{id:string;email?:string;enabled:boolean;dailyLimit:number}>; campaigns?: Array<{id:string;status?:string;dailyLimit?:number}> };
-const MIN_DAILY_SENDS_PER_MAILBOX=30;
+const DEFAULT_DAILY_SENDS_PER_MAILBOX=5;
 const PFLEGE_CAMPAIGN_DAILY_TARGET=150;
 const KNOWN_CAMPAIGN_IDS=new Set(["pflege-starter-v2","pv-starter-v1"]);
 
@@ -87,7 +87,7 @@ async function run(request: Request) {
     credentials
       .map((c) => ({ id: c.id, known: mailboxSettingsByEmail.get(c.email?.toLowerCase()) }))
       .filter(({ known }) => known?.enabled ?? true)
-      .map(({ id, known }) => [id, Math.max(MIN_DAILY_SENDS_PER_MAILBOX, Math.min(100, Number(known?.dailyLimit || MIN_DAILY_SENDS_PER_MAILBOX)))] as const),
+      .map(({ id, known }) => [id, Math.max(1, Math.min(100, Number(known?.dailyLimit ?? DEFAULT_DAILY_SENDS_PER_MAILBOX)))] as const),
   );
   const campaignLimits = new Map((state?.campaigns || []).map((c) => [c.id, Math.max(1, Math.min(500, Number(c.dailyLimit || 150)))]));
   const healthMap = runtimeConfig.deliverabilityMode==="off"
@@ -167,6 +167,10 @@ async function run(request: Request) {
       await query("update er_outbox set status='queued',attempts=greatest(attempts-1,0),scheduled_at=now(),error=null where id=$1 and status='sending'", [row.id]);
       skipped++; return;
     }
+    if (!mailboxLimits.has(row.mailbox_id)) {
+      await query("update er_outbox set status='queued',attempts=greatest(attempts-1,0),scheduled_at=now()+interval '1 hour',error='Postfach deaktiviert oder nicht freigegeben' where id=$1 and status='sending'",[row.id]);
+      limited++; return;
+    }
     const credential = credMap.get(row.mailbox_id);
     if (!credential) {
       await query("update er_outbox set status='failed',error='Keine Zugangsdaten für Mailbox-ID' where id=$1 and status='sending'", [row.id]);
@@ -186,7 +190,7 @@ async function run(request: Request) {
       });
       failed++; return;
     }
-    const configuredMailboxLimit = Math.max(MIN_DAILY_SENDS_PER_MAILBOX, mailboxLimits.get(row.mailbox_id) ?? MIN_DAILY_SENDS_PER_MAILBOX);
+    const configuredMailboxLimit = Math.max(1, mailboxLimits.get(row.mailbox_id) ?? DEFAULT_DAILY_SENDS_PER_MAILBOX);
     const health = healthMap.get(row.mailbox_id) as {
       health_status?:string;
       recommended_daily_limit?:number|null;
@@ -211,7 +215,7 @@ async function run(request: Request) {
         return;
       }
       const healthLimit=health.health_status==="healthy"
-        ?Math.max(MIN_DAILY_SENDS_PER_MAILBOX,Number(health.enforced_daily_limit??configuredMailboxLimit))
+        ?Math.max(1,Number(health.enforced_daily_limit??configuredMailboxLimit))
         :Math.max(1,Number(health.enforced_daily_limit??configuredMailboxLimit));
       mailboxLimit=Math.min(configuredMailboxLimit,healthLimit);
     }else if(runtimeConfig.deliverabilityMode==="shadow"&&health){
