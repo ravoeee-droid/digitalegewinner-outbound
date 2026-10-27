@@ -3,6 +3,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import styles from "./CRMWorkspace.module.css";
 
+type Contact = { id: string; company_id: string; name: string; role: string; phone: string; email: string; is_primary: boolean; source: string };
+type ContactDraft = { contactId?: string; name: string; role: string; phone: string; email: string; isPrimary: boolean };
+
 type Opp = {
   id: string;
   lead_id: string;
@@ -20,6 +23,9 @@ type Opp = {
   city: string;
   industry: string;
   segment: Segment;
+  company_phone: string;
+  do_not_contact: boolean;
+  contacts: Contact[];
   website: string;
   phone: string;
   email: string;
@@ -50,7 +56,7 @@ const FOCUS = ["Info angefragt", "Info versendet", "Interesse", "Termin", "Angeb
 const OUTCOMES = ["Nicht erreicht", "Erreicht", "Info angefragt", "Interesse", "Termin", "Angebot", "Gewonnen", "Verloren"];
 
 // Nur ein Entwurf: Das Öffnen des E-Mail-Clients darf niemals als Versand gezählt werden.
-function infoMailDraft(o: Opp) {
+function infoMailDraft(o: Opp, address = o.email) {
   const pv = o.segment === "pv";
   const subject = pv ? "Wie Ihr Solarbetrieb eigene PV-Anfragen gewinnt" : "Informationen zu unserem Recruiting-System für Pflegebetriebe";
   const body = pv
@@ -74,7 +80,7 @@ Gern zeige ich Ihnen in einem kurzen Gespräch, wie das konkret für Ihren Betri
 
 Viele Grüße
 Digitale Gewinner`;
-  return `mailto:${o.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  return `mailto:${encodeURIComponent(address)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 }
 const euro = (v: number) => new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(v || 0);
 const when = (iso: string) => new Intl.DateTimeFormat("de-DE", { weekday: "short", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", timeZone: "Europe/Berlin" }).format(new Date(iso));
@@ -108,6 +114,9 @@ export default function CRMWorkspace({ embedded = false, initialSegment = "pfleg
   const [quick, setQuick] = useState<Quick>("all");
   const [allStages, setAllStages] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [contactDraft, setContactDraft] = useState<ContactDraft | null>(null);
+  const [contactBusy, setContactBusy] = useState(false);
+  const [contactError, setContactError] = useState("");
   const [dragOver, setDragOver] = useState<string | null>(null);
   const search = useRef<HTMLInputElement>(null);
 
@@ -128,6 +137,11 @@ export default function CRMWorkspace({ embedded = false, initialSegment = "pfleg
     const timer = window.setInterval(() => void load(), 60_000);
     return () => { window.clearTimeout(first); window.clearInterval(timer); };
   }, [load]);
+
+  useEffect(() => {
+    setContactDraft(null);
+    setContactError("");
+  }, [selectedId]);
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -205,6 +219,44 @@ export default function CRMWorkspace({ embedded = false, initialSegment = "pfleg
   }, [filtered, stages]);
 
   const selected = useMemo(() => all.find((o) => o.id === selectedId) || null, [all, selectedId]);
+  const selectedEmail = selected?.contacts.find((contact) => contact.is_primary && contact.email)?.email ||
+    selected?.contacts.find((contact) => contact.email)?.email || selected?.email || "";
+
+  function editContact(contact?: Contact) {
+    if (!selected) return;
+    setContactError("");
+    setContactDraft(contact ? {
+      contactId: contact.id, name: contact.name, role: contact.role, phone: contact.phone,
+      email: contact.email, isPrimary: contact.is_primary,
+    } : { name: "", role: "", phone: "", email: "", isPrimary: !selected.contacts.some((c) => c.is_primary) });
+  }
+
+  async function persistContact() {
+    if (!selected || !contactDraft || contactBusy) return;
+    if (!contactDraft.name.trim() && !contactDraft.phone.trim() && !contactDraft.email.trim()) {
+      setContactError("Bitte mindestens Namen, Telefonnummer oder E-Mail eintragen.");
+      return;
+    }
+    setContactBusy(true);
+    setContactError("");
+    try {
+      const response = await fetch("/api/revenue-opportunities/contacts", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ opportunityId: selected.id, ...contactDraft }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Ansprechpartner konnte nicht gespeichert werden.");
+      await load();
+      setContactDraft(null);
+      setToast("Ansprechpartner gespeichert");
+    } catch (error) {
+      setContactError(error instanceof Error ? error.message : "Speichern fehlgeschlagen.");
+    } finally {
+      setContactBusy(false);
+    }
+  }
+
   const dueList = useMemo(() => filtered.filter(isDue).sort((a, b) => new Date(a.next_action_at as string).getTime() - new Date(b.next_action_at as string).getTime()), [filtered]);
   const meetings = active.filter((o) => o.stage === "Termin").length;
   const overdue = active.filter(isDue).length;
@@ -306,13 +358,68 @@ export default function CRMWorkspace({ embedded = false, initialSegment = "pfleg
             <div><strong>{selected.company}</strong><small>{[selected.city, selected.industry].filter(Boolean).join(" · ")}</small></div>
             <button type="button" onClick={() => setSelectedId(null)} aria-label="Schließen">✕</button>
           </div>
+          {selected.do_not_contact && <p className={styles.blocked}>Kontakt gesperrt – nicht anrufen oder anschreiben.</p>}
           <div className={styles.quickRow}>
-            {selected.phone && <a href={`tel:${selected.phone}`}>☎ Anrufen</a>}
-            {selected.email && <a href={`mailto:${selected.email}`}>✉ Mail</a>}
+            {!selected.do_not_contact && (selected.company_phone || selected.phone) && <a href={`tel:${selected.company_phone || selected.phone}`}>☎ Firmenzentrale</a>}
+            {!selected.do_not_contact && selectedEmail && <a href={`mailto:${selectedEmail}`}>✉ Mail</a>}
             {selected.website && <a href={selected.website.startsWith("http") ? selected.website : `https://${selected.website}`} target="_blank" rel="noreferrer">Website ↗</a>}
             <a href={`/a/${encodeURIComponent(selected.lead_id)}`} target="_blank" rel="noreferrer">Analyse ↗</a>
           </div>
+
+          <section className={styles.contactSection} aria-label="Ansprechpartner und Kontaktdaten">
+            <div className={styles.contactHead}>
+              <strong>Ansprechpartner <span>{selected.contacts.length}</span></strong>
+              <button type="button" onClick={() => editContact()}>+ Hinzufügen</button>
+            </div>
+            {selected.contacts.length === 0 && <p className={styles.contactEmpty}>Noch kein Kontakt hinterlegt. Ansprechpartner und Durchwahl hier ergänzen.</p>}
+            {selected.contacts.map((contact) => (
+              <div className={styles.contactCard} key={contact.id}>
+                <div className={styles.contactTitle}>
+                  <div>
+                    <strong>{contact.name || "Name noch nicht ermittelt"}</strong>
+                    {contact.is_primary && <span className={styles.primaryContact}>Hauptkontakt</span>}
+                    <small>{contact.role || "Funktion noch nicht erfasst"}</small>
+                  </div>
+                  <button type="button" onClick={() => editContact(contact)} aria-label={`Kontakt ${contact.name || "ohne Namen"} bearbeiten`}>Bearbeiten</button>
+                </div>
+                <div className={styles.contactMethods}>
+                  {contact.phone ? (selected.do_not_contact ? <span>☎ {contact.phone}</span> : <a href={`tel:${contact.phone}`}>☎ {contact.phone}</a>) : <span>Keine Durchwahl</span>}
+                  {contact.email ? (selected.do_not_contact ? <span>✉ {contact.email}</span> : <a href={`mailto:${contact.email}`}>✉ {contact.email}</a>) : <span>Keine E-Mail</span>}
+                </div>
+              </div>
+            ))}
+            {selected.contacts.length === 0 && selected.phone && <p className={styles.contactEmpty}>Bekannte Rufnummer: {selected.phone}</p>}
+
+            {contactDraft && (
+              <div className={styles.contactEditor}>
+                <strong>{contactDraft.contactId ? "Ansprechpartner bearbeiten" : "Neuen Ansprechpartner erfassen"}</strong>
+                <label>Name
+                  <input value={contactDraft.name} onChange={(e) => setContactDraft({ ...contactDraft, name: e.target.value })} placeholder="Vor- und Nachname" maxLength={180} />
+                </label>
+                <label>Funktion / Position
+                  <input value={contactDraft.role} onChange={(e) => setContactDraft({ ...contactDraft, role: e.target.value })} placeholder="z. B. Geschäftsführung, PDL" maxLength={160} />
+                </label>
+                <div className={styles.contactFields}>
+                  <label>Direktwahl / Handy
+                    <input type="tel" value={contactDraft.phone} onChange={(e) => setContactDraft({ ...contactDraft, phone: e.target.value })} placeholder="+49 ..." maxLength={80} />
+                  </label>
+                  <label>E-Mail
+                    <input type="email" value={contactDraft.email} onChange={(e) => setContactDraft({ ...contactDraft, email: e.target.value })} placeholder="kontakt@firma.de" maxLength={320} />
+                  </label>
+                </div>
+                <label className={styles.primaryCheck}><input type="checkbox" checked={contactDraft.isPrimary} onChange={(e) => setContactDraft({ ...contactDraft, isPrimary: e.target.checked })} /> Als Hauptkontakt verwenden</label>
+                {contactError && <p role="alert" className={styles.error}>{contactError}</p>}
+                <div className={styles.contactEditorActions}>
+                  <button type="button" onClick={() => setContactDraft(null)} disabled={contactBusy}>Abbrechen</button>
+                  <button type="button" onClick={() => void persistContact()} disabled={contactBusy}>{contactBusy ? "Speichert …" : "Kontakt speichern"}</button>
+                </div>
+              </div>
+            )}
+          </section>
           {summary(selected) && <p className={styles.signal}>{summary(selected)}</p>}
+          <label className={styles.field}>Gesprächsnotizen
+            <textarea key={`n-${selected.id}`} rows={3} defaultValue={selected.notes} placeholder="Gesprächspartner, Bedarf, Einwände, nächste Schritte …" onBlur={(e) => e.target.value !== selected.notes && void save(selected.id, { notes: e.target.value }, { notes: e.target.value })} />
+          </label>
 
           <label className={styles.field}>Stufe
             <select value={selected.stage} onChange={(e) => void save(selected.id, { stage: e.target.value }, { stage: e.target.value })}>
@@ -329,7 +436,7 @@ export default function CRMWorkspace({ embedded = false, initialSegment = "pfleg
               <strong>✉ Info-Mail</strong>
               {selected.stage === "Info angefragt" ? (
                 <>
-                  {selected.email ? <a href={infoMailDraft(selected)}>Info-Mail-Entwurf öffnen</a> : <span className={styles.infoMailHint}>Noch keine E-Mail-Adresse hinterlegt – erst Adresse ermitteln.</span>}
+                  {selectedEmail && !selected.do_not_contact ? <a href={infoMailDraft(selected, selectedEmail)}>Info-Mail-Entwurf öffnen</a> : <span className={styles.infoMailHint}>{selected.do_not_contact ? "Kontakt gesperrt – kein Versand." : "Noch keine E-Mail-Adresse hinterlegt – erst Adresse ermitteln."}</span>}
                   <button type="button" onClick={() => void save(selected.id, { outcome: "Info versendet" })}>✓ Versand bestätigen</button>
                   <small>Nur nach tatsächlichem Versand bestätigen. Danach wird automatisch eine Wiedervorlage in 2 Werktagen gesetzt.</small>
                 </>
@@ -363,10 +470,6 @@ export default function CRMWorkspace({ embedded = false, initialSegment = "pfleg
           <label className={styles.field}>Wahrscheinlichkeit: {selected.probability} %
             <input type="range" min={0} max={100} step={5} value={selected.probability} onChange={(e) => setSnap((s) => s && { ...s, opportunities: s.opportunities.map((o) => (o.id === selected.id ? { ...o, probability: Number(e.target.value) } : o)) })} onMouseUp={(e) => void save(selected.id, { probability: Number((e.target as HTMLInputElement).value) })} onTouchEnd={(e) => void save(selected.id, { probability: Number((e.target as HTMLInputElement).value) })} onKeyUp={(e) => void save(selected.id, { probability: Number((e.target as HTMLInputElement).value) })} />
           </label>
-          <label className={styles.field}>Notizen
-            <textarea key={`n-${selected.id}`} rows={5} defaultValue={selected.notes} onBlur={(e) => e.target.value !== selected.notes && void save(selected.id, { notes: e.target.value }, { notes: e.target.value })} />
-          </label>
-
           <h3 className={styles.h3}>Verlauf</h3>
           <ol className={styles.timeline}>
             {(snap?.activities || []).filter((a) => a.lead_id === selected.lead_id).slice(0, 12).map((a) => (
