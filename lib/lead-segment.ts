@@ -25,12 +25,16 @@ function explicitSegment(metadata?: Record<string, unknown> | null): LeadSegment
 
 export function classifyLeadSegment(input: CompanySegmentInput): LeadSegment {
   const explicit = explicitSegment(input.metadata);
-  if (explicit) return explicit;
   const source = input.source || "";
   const identity = [input.company || input.name || "", input.industry || ""].join(" ");
   const pv = PV_SOURCE.test(source) || PV_IDENTITY.test(identity);
   const pflege = PFLEGE_SOURCE.test(source) || PFLEGE_IDENTITY.test(identity);
+  // Importquellen, Firmenidentität und manuelle Branchenfelder können widersprüchlich sein.
+  // Ein gespeichertes Segment darf solche Widersprüche niemals verdecken.
   if (pv && pflege) return "other";
+  if (explicit === "pv" && pflege) return "other";
+  if (explicit === "pflege" && pv) return "other";
+  if (explicit) return explicit;
   if (pv) return "pv";
   if (pflege) return "pflege";
   return "other";
@@ -46,10 +50,12 @@ export function leadSegmentSql(alias = "c") {
   const pv = "(" + source + " ~* '^(ba-pv$|pv[-_]|solar[-_]|photovoltaik)' or " + identity + " ~* '(photovolta|solar|solaranlag|solartechnik|pv[- /])')";
   const care = "(" + source + " ~* '^(ba-jobboerse$|pflegedienstjobs24$|pflege[-_])' or " + identity + " ~* '(pflegedienst|pflegeheim|pflegezentrum|pflegehaus|pflegeresidenz|pflegeteam|pflegeeinrichtung|pflegefach|senior|ambulant|krankenpflege|altenheim|sozialstation|intensivpflege|(^|[[:space:]])pflege([[:space:]]|$))')";
   return "(case " +
-    "when " + explicit + " in ('pv','photovoltaik','solar','pv-trust') then 'pv' " +
-    "when " + explicit + " in ('pflege','care','pflege-recruiting') then 'pflege' " +
     "when " + explicit + " in ('other','unassigned') then 'other' " +
     "when " + pv + " and " + care + " then 'other' " +
+    "when " + explicit + " in ('pv','photovoltaik','solar','pv-trust') and " + care + " then 'other' " +
+    "when " + explicit + " in ('pflege','care','pflege-recruiting') and " + pv + " then 'other' " +
+    "when " + explicit + " in ('pv','photovoltaik','solar','pv-trust') then 'pv' " +
+    "when " + explicit + " in ('pflege','care','pflege-recruiting') then 'pflege' " +
     "when " + pv + " then 'pv' " +
     "when " + care + " then 'pflege' " +
     "else 'other' end)";
