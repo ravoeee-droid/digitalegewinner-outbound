@@ -64,28 +64,38 @@ async function writeCampaignDashboard(pending:Record<Segment,number>) {
 }
 async function candidatePool(segment:Segment,limit:number) {
   const segmentSql=leadSegmentSql("c");
+  // Deduplicate both company and recipient, not just one of them.
+  // Rank globally by priority; DISTINCT ON(company) previously selected by company UUID,
+  // accidentally ignoring high-priority candidates outside the first 650 UUIDs.
   return query<Candidate>(
-    `select distinct on (l.company_id) l.id::text id,trim(ct.email) email,c.name company,
-       coalesce(ct.name,'') contact,l.priority_score
-     from sales_leads l
-     join sales_companies c on c.id=l.company_id and c.workspace=l.workspace
-     join sales_contacts ct on ct.id=l.contact_id and ct.workspace=l.workspace
-     join lead_screenshots sc on sc.lead_id=l.id::text and sc.status='ok'
-     where l.workspace='default' and l.status='active'
-       and l.stage in ('Neu','Research','Bereit')
-       and coalesce(l.do_not_contact,false)=false
-       and ${segmentSql}=$1
-       and ct.email ~* '^[^[:space:]@]+@[^[:space:]@]+\\.[^[:space:]@]+$'
-       and not exists(select 1 from er_suppressions s where s.workspace='default' and lower(s.email)=lower(ct.email))
-       and not exists(select 1 from outbound_compliance_suppressions s where s.workspace='default' and s.channel='email' and s.status='active' and lower(s.identifier)=lower(ct.email))
-       and not exists(select 1 from er_outbox o
-          where o.workspace='default' and
-             (o.lead_id=l.id::text or lower(o.recipient)=lower(ct.email))
-             and (o.status='sent' or (o.status in ('queued','sending') and o.campaign_id not in ('pflege-starter-v2','pv-starter-v1'))))
-       and not exists(select 1 from er_events e where e.workspace='default' and e.lead_id=l.id::text and e.type in ('reply','positive_reply','appointment','bounce'))
-       and not exists(select 1 from er_outbox d where d.workspace='default'
-         and d.lead_id=l.id::text and d.campaign_id in ('pflege-loom-150-v1','pv-loom-150-v1'))
-     order by l.company_id, l.priority_score desc,l.updated_at desc
+    `with ranked as (
+       select l.id::text id,trim(ct.email) email,c.name company,
+         coalesce(ct.name,'') contact,coalesce(l.priority_score,0) priority_score,
+         row_number() over (partition by l.company_id order by l.priority_score desc nulls last,l.updated_at desc,l.id) company_rank,
+         row_number() over (partition by lower(trim(ct.email)) order by l.priority_score desc nulls last,l.updated_at desc,l.id) recipient_rank
+       from sales_leads l
+       join sales_companies c on c.id=l.company_id and c.workspace=l.workspace
+       join sales_contacts ct on ct.id=l.contact_id and ct.workspace=l.workspace
+       join lead_screenshots sc on sc.lead_id=l.id::text and sc.status='ok'
+       where l.workspace='default' and l.status='active'
+         and l.stage in ('Neu','Research','Bereit')
+         and coalesce(l.do_not_contact,false)=false
+         and ${segmentSql}=$1
+         and ct.email ~* '^[^[:space:]@]+@[^[:space:]@]+\\.[^[:space:]@]+$'
+         and not exists(select 1 from er_suppressions s where s.workspace='default' and lower(s.email)=lower(ct.email))
+         and not exists(select 1 from outbound_compliance_suppressions s where s.workspace='default' and s.channel='email' and s.status='active' and lower(s.identifier)=lower(ct.email))
+         and not exists(select 1 from er_outbox o
+            where o.workspace='default' and
+               (o.lead_id=l.id::text or lower(o.recipient)=lower(ct.email))
+               and (o.status='sent' or (o.status in ('queued','sending') and o.campaign_id not in ('pflege-starter-v2','pv-starter-v1'))))
+         and not exists(select 1 from er_events e where e.workspace='default' and e.lead_id=l.id::text and e.type in ('reply','positive_reply','appointment','bounce'))
+         and not exists(select 1 from er_outbox d where d.workspace='default'
+           and (d.lead_id=l.id::text or lower(d.recipient)=lower(ct.email))
+           and d.campaign_id in ('pflege-loom-150-v1','pv-loom-150-v1'))
+     )
+     select id,email,company,contact,priority_score from ranked
+     where company_rank=1 and recipient_rank=1
+     order by priority_score desc,id
      limit $2`, [segment,limit],
   );
 }
