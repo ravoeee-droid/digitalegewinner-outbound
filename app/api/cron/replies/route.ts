@@ -128,9 +128,10 @@ async function recordReply(messageId:string,from:string,subject:string,mailboxId
  }
  await query("update er_outbox set status='stopped' where workspace='default' and lead_id=$1 and status='queued'",[leadId]);
  if(!optOut.matched){
+  const insight=analyzeReply(subject,bodyText||"");
+  const highIntent=["positive","meeting_intent","needs_information"].includes(insight.replyClass);
   try{
-   const insight=analyzeReply(subject,bodyText||"");
-   await query("update sales_leads set next_action=$2,next_action_at=$3,updated_at=now() where id=$1 and workspace='default'",[leadId,insight.action,insight.due]);
+   await query("update sales_leads set next_action=$2,next_action_at=$3,last_outcome=$4,updated_at=now() where id=$1 and workspace='default'",[leadId,insight.action,insight.due,insight.replyClass]);
    await query("insert into er_events(workspace,lead_id,type,meta) values('default',$1,'reply_classified',$2::jsonb)",[leadId,JSON.stringify({messageId,replyClass:insight.replyClass,label:insight.label,action:insight.action,due:insight.due?.toISOString()||null})]);
    if(insight.suppress){
     await queryIfTable("insert into er_suppressions(workspace,email,reason) values('default',lower($1),$2) on conflict(workspace,email) do update set reason=excluded.reason",[from,insight.replyClass]);
@@ -142,9 +143,19 @@ async function recordReply(messageId:string,from:string,subject:string,mailboxId
    await sendAlert(`${insight.suppress?"🚨 ACHTUNG, bitte selbst lesen und NICHT mehr anschreiben (bereits gesperrt)":"💬 Antwort"} von ${from}\n${insight.label}\n„${snippet}"\nNächster Schritt: ${insight.action}${when}`);
   }catch(insightError){console.error("[reply-insight] failed",insightError instanceof Error?insightError.message:"unknown")}
   await queryIfTable("update pflege_email_outreach set status='replied',updated_at=now() where lower(email)=lower($1) and status in ('approved','sent')",[from]);
-  await query("update sales_leads set intent_score=least(100,intent_score+30),stage=case when stage in ('Neu','Kontaktiert') then 'Engaged' else stage end,last_contact_at=now(),updated_at=now() where id=$1 and workspace='default'",[leadId]);
+  // A reply is NOT necessarily buying intent: objections and refusals stay in
+  // their existing pipeline stage. Callbacks, information requests and actual
+  // interest advance to "Engaged" (the CRM's existing interest stage).
+  await query(
+   "update sales_leads set intent_score=least(100,intent_score+case when $2::boolean then 30 else 5 end),stage=case when $2::boolean and not do_not_contact and stage in ('Neu','Research','Bereit','Kontaktiert') then 'Engaged' else stage end,last_contact_at=now(),updated_at=now() where id=$1 and workspace='default'",
+   [leadId,highIntent&&!insight.suppress],
+  );
   if(state?.leads){
-   const leads=state.leads.map(l=>String(l.id)===leadId?{...l,intentScore:Math.min(100,Number(l.intentScore||0)+30),stage:String(l.stage)==="Neu"||String(l.stage)==="Kontaktiert"?"Engaged":l.stage}:l);
+   const leads=state.leads.map(l=>{
+    if(String(l.id)!==leadId)return l;
+    const promote=highIntent&&!insight.suppress&&["Neu","Research","Bereit","Kontaktiert"].includes(String(l.stage));
+    return {...l,intentScore:Math.min(100,Number(l.intentScore||0)+(highIntent?30:5)),stage:promote?"Engaged":l.stage};
+   });
    await writeState({...state,leads});
   }
  }else{
