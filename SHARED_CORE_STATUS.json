@@ -23,7 +23,7 @@
     "outboundOsV3": "dg-foundation-feature-branch-peer-parity-blocked",
     "appointmentGoalAutopilot": "dg-implemented-peer-parity-blocked",
     "dailyCockpitHeute": "dg-implemented-peer-parity-blocked",
-    "crmKanbanWorkspace": "DG: segment-scoped Pflege/PV pipelines plus explicit 'Info angefragt' -> 'Info versendet' steps, draft mailto, manual send confirmation, two-business-day followup, no false sent/call events. Peer LeadCrm has different workflow model and no generic sales_opportunities stage seam.",
+    "crmKanbanWorkspace": "DG: Pflege/PV sector-separated pipeline, Info-Mail flow, call-ready contact cards with contact name/role, direct number/mail, company switchboard, preferred contact updates and notes. Peer CRM uses separate energy_leads + workflow model; generic parity pending.",
     "territorySourceImport": "DG supports explicit Pflege sector and public email, preserves legacy PV default; peer parity blocked"
   },
   "blockers": [
@@ -87,6 +87,12 @@
       "surface": "crmKanbanWorkspace",
       "peer": "CLIENT-WALKENHORST",
       "detail": "Read-only inspected components/crm/lead-crm.tsx: peer uses energy_leads LeadStatus and energy_crm_lead_workflow email_sent state, not DG sales_opportunities / revenue.outcome. Direct port of DG post-call Info angefragt/Info versendet would collide with its existing outreach email tracking; generic parity requires separate model-specific design. Peer runtime/source remain unchanged; shared-core parity not claimed."
+    },
+    {
+      "id": "crm-contact-cockpit-dg-2026-10-27",
+      "surface": "crmKanbanWorkspace",
+      "peer": "CLIENT-WALKENHORST",
+      "detail": "DG contact cockpit adds native sales_contacts (company-level, metadata.role), linked sales_opportunities and DNC signals. Read-only inspected peer components/crm/lead-crm.tsx, which uses energy_leads and its own Supabase workflow view; DG sales_contacts and endpoint do not exist in peer. Instance-specific data and code were not copied; generic cross-instance parity requires separate mapping."
     }
   ],
   "rules": [
