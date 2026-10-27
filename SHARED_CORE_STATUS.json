@@ -23,7 +23,7 @@
     "outboundOsV3": "dg-foundation-feature-branch-peer-parity-blocked",
     "appointmentGoalAutopilot": "dg-implemented-peer-parity-blocked",
     "dailyCockpitHeute": "dg-implemented-peer-parity-blocked",
-    "crmKanbanWorkspace": "DG: sector-tabbed Pflege/PV-Trust/Weitere with scoped KPIs, source-aware assignment, deep-links. CLIENT-WALKENHORST has its own commercial/private/production CRM lanes; DG-specific Pflege/PV industry rules are not copied to peer.",
+    "crmKanbanWorkspace": "DG: segment-scoped Pflege/PV pipelines plus explicit 'Info angefragt' -> 'Info versendet' steps, draft mailto, manual send confirmation, two-business-day followup, no false sent/call events. Peer LeadCrm has different workflow model and no generic sales_opportunities stage seam.",
     "territorySourceImport": "DG supports explicit Pflege sector and public email, preserves legacy PV default; peer parity blocked"
   },
   "blockers": [
@@ -81,6 +81,12 @@
       "surface": "crmKanbanWorkspace",
       "peer": "CLIENT-WALKENHORST",
       "detail": "Read-only inspected peer app/crm/commercial/page.tsx: it delegates to LeadCrm customerType=commercial, while DG uses a revenue-opportunity board. DG-only Pflege/PV sector classification is industry-specific and not portable to the energy client without mixing customer-specific logic. Peer runtime and source are unchanged; generic shared-core parity is not claimed."
+    },
+    {
+      "id": "crm-info-mail-dg-2026-10-27",
+      "surface": "crmKanbanWorkspace",
+      "peer": "CLIENT-WALKENHORST",
+      "detail": "Read-only inspected components/crm/lead-crm.tsx: peer uses energy_leads LeadStatus and energy_crm_lead_workflow email_sent state, not DG sales_opportunities / revenue.outcome. Direct port of DG post-call Info angefragt/Info versendet would collide with its existing outreach email tracking; generic parity requires separate model-specific design. Peer runtime/source remain unchanged; shared-core parity not claimed."
     }
   ],
   "rules": [
