@@ -107,7 +107,10 @@ export default function UnifiedInbox() {
     }
   }, []);
 
-  useEffect(() => { void refresh(); }, [refresh]);
+  useEffect(() => {
+    const timer = window.setTimeout(() => { void refresh(); }, 0);
+    return () => window.clearTimeout(timer);
+  }, [refresh]);
   useEffect(() => {
     const timer = window.setInterval(() => { void refresh(true); }, 120_000);
     return () => window.clearInterval(timer);
