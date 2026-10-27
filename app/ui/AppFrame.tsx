@@ -20,7 +20,8 @@ const GROUPS: Group[] = [
     { href: "/call", label: "Anrufe", icon: "call", hint: "Nächster Anruf", sales: true },
   ] },
   { title: "Mehr", more: true, items: [
-    { href: "/crm", label: "CRM Pipeline", icon: "dot", sales: true },
+    { href: "/crm?segment=pflege", label: "CRM · Pflege", icon: "dot", sales: true },
+    { href: "/crm?segment=pv", label: "CRM · PV-Trust", icon: "dot", sales: true },
     { href: "/pflege?view=finder", label: "Deutschland-Radar", icon: "dot", sales: true },
     { href: "/landkreise", label: "Landkreis-Scanner", icon: "dot", sales: true },
     { href: "/pflege", label: "Pflege Übersicht", icon: "dot", sales: true },
