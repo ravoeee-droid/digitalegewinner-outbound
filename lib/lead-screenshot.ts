@@ -1,6 +1,7 @@
 // Screenshot der Website eines Leads für die persönliche Videoseite (/v/<token>): Chromium auf dem Server, Ablage als Bild in der Datenbank.
 import sharp from "sharp";
 import { query } from "@/lib/db";
+import { leadSegmentSql } from "@/lib/lead-segment";
 
 const FREEMAIL = /^(gmail|googlemail|gmx|web|t-online|outlook|hotmail|live|yahoo|icloud|me|arcor|freenet|posteo|mail|aol|online|1und1|email|protonmail|proton|kabelmail)\./i;
 const PRIVATE_HOST = /^(localhost|.*\.local|.*\.internal|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|169\.254\.|0\.|\[)/i;
@@ -79,19 +80,38 @@ export async function screenshotReadySet(leadIds: string[]) {
 
 // Nächste Leads, die als Nächstes in die Warteschlange kommen (gleiche Reihenfolge wie die Kampagnen-Planung) und noch keinen Screenshot haben.
 export async function screenshotCandidates(limit: number) {
+  // Gleiche Branchenklassifikation wie CRM, Video und Loom-Worker.
+  // Die alte Filterung auf lediglich zwei Quellen ließ die meisten CRM-Leads aus.
+  // Nur aktive, noch nicht angeschriebene und nicht gesperrte Zielbetriebe vorbereiten.
+  // Verifizierte Kontaktberechtigungen haben bei der Screenshot-Erzeugung Vorrang,
+  // alle anderen erhalten kein Senderecht durch den Screenshot.
   return query<{ lead_id: string; website: string; email: string }>(`
     select l.id::text lead_id, coalesce(c.website,'') website, ct.email
     from sales_leads l
     join sales_companies c on c.id=l.company_id and c.workspace=l.workspace
     join sales_contacts ct on ct.id=l.contact_id and ct.workspace=l.workspace
     left join lead_screenshots s on s.lead_id=l.id::text
-    where l.workspace='default' and l.status='active' and l.stage in ('Neu','Research','Bereit')
-      and coalesce(l.do_not_contact,false)=false and coalesce(ct.email,'')<>''
-      and lower(coalesce(c.source,''))=any(array['ba-jobboerse','ba-pv'])
+    where l.workspace='default' and l.status='active'
+      and l.stage in ('Neu','Research','Bereit')
+      and coalesce(l.do_not_contact,false)=false
+      and ${leadSegmentSql("c")} in ('pflege','pv')
+      and coalesce(ct.email,'') ~* '^[^[:space:]@]+@[^[:space:]@]+\\.[^[:space:]@]+$'
       and (s.lead_id is null or (s.status='failed' and s.attempts<4 and s.created_at<now()-interval '20 minutes'))
-      and not exists(select 1 from er_outbox o where o.workspace='default' and o.lead_id=l.id::text and o.status not in ('failed','suppressed'))
-    order by l.priority_score desc, l.updated_at desc
-    limit $1`, [limit]);
+      and not exists (select 1 from er_suppressions b where b.workspace='default' and lower(b.email)=lower(ct.email))
+      and not exists (select 1 from outbound_compliance_suppressions b where b.workspace='default' and b.channel='email' and b.status='active' and lower(b.identifier)=lower(ct.email))
+      and not exists (select 1 from er_outbox o where o.workspace='default'
+           and (o.lead_id=l.id::text or lower(o.recipient)=lower(ct.email)) and o.status in ('sent','queued','sending'))
+    order by (
+      case when exists (
+        select 1 from outbound_contact_permissions p
+        where p.workspace='default' and p.channel='email' and p.status='verified'
+          and (p.contact_id=l.contact_id or p.company_id=l.company_id)
+          and p.revoked_at is null
+          and (p.valid_from is null or p.valid_from<=now())
+          and (p.valid_until is null or p.valid_until>=now())
+      ) then 0 else 1 end
+    ) asc, l.priority_score desc, l.updated_at desc
+    limit $1`, [Math.min(60, Math.max(1, limit))]);
 }
 
 // Platzsparen: Screenshots von Leads, die die Seite nie geöffnet haben, werden nach 21 Tagen gelöscht (der Datensatz bleibt, die Seite zeigt dann ohne Bild).
