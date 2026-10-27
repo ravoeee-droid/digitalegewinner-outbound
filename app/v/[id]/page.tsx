@@ -171,6 +171,18 @@ export default async function VideoPage({ params }: { params: Promise<{ id: stri
           <p className={styles.source}>Kundenbeispiele mit den angegebenen durchschnittlichen Leadkosten im jeweiligen Projekt, keine Preis- oder Ergebnisgarantie. Aufwand und Profitabilität hängen vom einzelnen Betrieb und seinen Abschlüssen ab.</p>
         </section>
       )}
+      {segment === "pflege" && (
+        <section className={[styles.proof, styles.careComparison].join(" ")} aria-label="Vom Recruiting-Hamsterrad zum eigenen Bewerbersystem">
+          <span className={styles.sectionKicker}>02 / DER ENTSCHEIDENDE UNTERSCHIED</span>
+          <h2>Nicht die nächste Kampagne. Ein System, das bleibt.</h2>
+          <p>Ein Personalengpass sollte nicht jedes Mal bedeuten, wieder bei null anzufangen.</p>
+          <div className={styles.pvTransformation}>
+            <div className={styles.pvBefore}><span className={styles.pvTransformLabel}>BISHER</span><h3>Neue Stelle. Neues Recruiting. Neue Kosten.</h3><p>Eine Pflegekraft geht, das Team springt ein – und die Suche beginnt von vorn. Die letzte Kampagne hat oft wenig hinterlassen.</p></div>
+            <div className={styles.pvAfter}><span className={styles.pvTransformLabel}>MIT UNSEREM SYSTEM</span><h3>Eine eigene Karrierewelt für Ihren Betrieb.</h3><p>Ein fester digitaler Bewerberkanal, den Sie bei neuen Vakanzen erneut nutzen und gezielt erweitern können.</p></div>
+          </div>
+          <p className={styles.pvTransformationFootnote}>Das Ziel: mehr Unabhängigkeit und eine nachhaltige Basis für kommende Einstellungen.</p>
+        </section>
+      )}
       {(segment === "pflege" || segment === "pv") && (
         <section className={styles.funding} aria-label="Förderchance Unternehmensberatung 2026">
           <div className={styles.fundingTopline}>03 / FÖRDERMÖGLICHKEIT · BIS 31.12.2026</div>
@@ -190,6 +202,12 @@ export default async function VideoPage({ params }: { params: Promise<{ id: stri
               {" "}<a href="https://www.bafa.de/SharedDocs/Downloads/DE/Wirtschaft/unb_flyer.pdf?__blob=publicationFile&v=2" target="_blank" rel="noopener noreferrer">BAFA-Förderinformationen</a>
             </span>
           </div>
+        </section>
+      )}
+      {(segment === "pflege" || segment === "pv") && (
+        <section className={styles.finalCta} aria-label="Persönliches Beratungsgespräch">
+          <div><span>04 / DER NÄCHSTE SCHRITT</span><h2>Finden wir heraus, ob sich das für Sie lohnt.</h2><p>Eine ehrliche Einschätzung in 15 Minuten. Wenn es nicht passt, ist das genauso in Ordnung.</p></div>
+          <a href="#termin">Gespräch auswählen <span aria-hidden="true">↗</span></a>
         </section>
       )}
       <footer className={styles.legal}>
