@@ -164,10 +164,19 @@ export default async function VideoPage({ params }: { params: Promise<{ id: stri
               </li>
             ))}
           </ul>
-          <blockquote className={styles.quote}>
-            <strong>Vorher: Vertriebschaos. Heute: strukturierter Vertrieb – weniger Handarbeit, mehr Profit.</strong>
-            <span className={styles.proofDescription}> Weniger manuelle Nacharbeit und mehr Überblick schaffen die Voraussetzung für einen wirtschaftlicheren Vertrieb.</span>
-          </blockquote>
+          <div className={styles.pvTransformation} aria-label="Vorher und nachher mit einem eigenen Anfragekanal">
+            <div className={styles.pvBefore}>
+              <span className={styles.pvTransformLabel}>VORHER</span>
+              <h3>Abhängig von Leadportalen und Empfehlungen.</h3>
+              <p>Schwankende Auftragslage, unberechenbare Umsätze und das ständige Hoffen auf die nächste Empfehlung. Oder teure Anfragen kaufen – und wieder in den Preiskampf geraten.</p>
+            </div>
+            <div className={styles.pvAfter}>
+              <span className={styles.pvTransformLabel}>MIT PV-TRUST</span>
+              <h3>Eigene, exklusive Kundenanfragen. Mehr Kontrolle.</h3>
+              <p>Ein strukturierter Vertriebsprozess, weniger manuelle Nacharbeit und ein eigener Anfragekanal, der Ihre Marke stärkt – statt die eines Leadportals.</p>
+            </div>
+          </div>
+          <p className={styles.pvTransformationFootnote}>Das Ziel: weg vom Vertriebschaos, hin zu besser planbarer Kundengewinnung und mehr Potenzial für profitables Wachstum.</p>
           <p className={styles.source}>Kundenbeispiele mit den angegebenen durchschnittlichen Leadkosten im jeweiligen Projekt, keine Preis- oder Ergebnisgarantie. Aufwand und Profitabilität hängen vom einzelnen Betrieb und seinen Abschlüssen ab.</p>
         </section>
       )}
