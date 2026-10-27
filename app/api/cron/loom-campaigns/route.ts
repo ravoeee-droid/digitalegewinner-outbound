@@ -7,7 +7,9 @@ export async function GET(request: Request) {
   if(!secret||request.headers.get("authorization")!==`Bearer ${secret}`)
     return Response.json({ok:false,error:"Unauthorized"},{status:401});
   try{
-    return Response.json(await ensureLoomCampaigns());
+    const result=await ensureLoomCampaigns();
+    console.log("[loom-campaigns]",JSON.stringify(result));
+    return Response.json(result);
   }catch(error){
     return Response.json({ok:false,error:error instanceof Error?error.message:"Loom-Einplanung fehlgeschlagen."},{status:503});
   }
