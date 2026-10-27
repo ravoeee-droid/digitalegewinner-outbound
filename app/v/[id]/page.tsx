@@ -52,14 +52,14 @@ const CASES = [
 // Kundenbeispiele für die PV-Ansprache: Das Elektronikprojekt ist ausdrücklich kein PV-Referenzbetrieb.
 const PV_CASES = [
   {
-    name: "Solavol · Photovoltaik",
+    name: "Solavol · PV-Trust-Kunde",
     big: "Ø 43 €",
     line: "Kosten pro exklusiver Kundenanfrage im Projekt",
   },
   {
-    name: "Libi Elektronik · Elektronik",
+    name: "Libi Elektronik · PV-Trust-Kunde",
     big: "Ø 58 €",
-    line: "Kosten pro exklusiver Kundenanfrage in einem anderen Geschäftsfeld",
+    line: "Kosten pro exklusiver Kundenanfrage im PV-Trust-Projekt",
   },
 ];
 
@@ -133,7 +133,7 @@ export default async function VideoPage({ params }: { params: Promise<{ id: stri
       {segment === "pv" && (
         <section className={styles.proof} aria-label="Ergebnisse aus der Anfragegewinnung">
           <h2>Exklusive Anfragen. Messbare Ergebnisse.</h2>
-          <p>Beispiele aus Kundenprojekten: Interessenten, die nicht gleichzeitig an mehrere Wettbewerber verkauft werden.</p>
+          <p>Ergebnisse aus zwei PV-Trust-Kundenprojekten: exklusiv für den jeweiligen Auftraggeber generierte Anfragen.</p>
           <ul>
             {PV_CASES.map((item) => (
               <li key={item.name} className={styles.caseCard}>
@@ -147,7 +147,7 @@ export default async function VideoPage({ params }: { params: Promise<{ id: stri
             <strong>Vorher: Vertriebschaos. Heute: strukturierter Vertrieb – weniger Handarbeit, mehr Profit.</strong>
             <span className={styles.proofDescription}> Weniger manuelle Nacharbeit und mehr Überblick schaffen die Voraussetzung für einen wirtschaftlicheren Vertrieb.</span>
           </blockquote>
-          <p className={styles.source}>Kundenbeispiele mit den angegebenen durchschnittlichen Leadkosten im jeweiligen Projekt, keine Preis- oder Ergebnisgarantie. Libi Elektronik ist kein PV-Unternehmen. Aufwand und Profitabilität hängen vom einzelnen Betrieb und seinen Abschlüssen ab.</p>
+          <p className={styles.source}>Kundenbeispiele mit den angegebenen durchschnittlichen Leadkosten im jeweiligen Projekt, keine Preis- oder Ergebnisgarantie. Aufwand und Profitabilität hängen vom einzelnen Betrieb und seinen Abschlüssen ab.</p>
         </section>
       )}
       <footer className={styles.legal}>
