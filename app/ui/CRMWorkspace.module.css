@@ -44,7 +44,7 @@
 .row:focus-visible{outline:2px solid #34c759}
 .stage{font-size:11px;font-weight:900;color:#5eeaa0;text-transform:uppercase;letter-spacing:.06em}
 .error{padding:10px 14px;border:1px solid rgba(255,120,120,.4);border-radius:10px;background:rgba(255,80,80,.08);color:#ffb4b4;font-size:13px}
-.drawer{position:fixed;top:0;right:0;bottom:0;width:min(440px,100%);z-index:650;background:#09100d;border-left:1px solid rgba(255,255,255,.12);box-shadow:-20px 0 60px rgba(5,10,8,.5);padding:16px;overflow-y:auto;display:grid;gap:12px;align-content:start}
+.drawer{position:fixed;top:0;right:0;bottom:0;width:min(500px,100%);z-index:650;background:#09100d;border-left:1px solid rgba(255,255,255,.12);box-shadow:-20px 0 60px rgba(5,10,8,.5);padding:16px;overflow-y:auto;display:grid;gap:12px;align-content:start}
 .drawerHead{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
 .drawerHead strong{display:block;font-size:18px;letter-spacing:-.01em}
 .drawerHead small{color:#9aa3a9}
@@ -89,3 +89,32 @@
 .infoMailActions a,.infoMailActions button{display:inline-flex;align-items:center;justify-content:center;padding:8px 10px;border:1px solid rgba(52,199,89,.5);border-radius:8px;background:rgba(52,199,89,.14);color:#83f2ad;font-size:12px;font-weight:800;text-decoration:none;cursor:pointer}
 .infoMailActions a:hover,.infoMailActions button:hover{background:rgba(52,199,89,.25)}
 .infoMailActions small,.infoMailHint{flex-basis:100%;font-size:11px;color:#aeb9b2;line-height:1.5}
+
+/* Anruf-Arbeitsplatz: zentral gepflegte Kontaktpersonen statt nur Rufnummern. */
+.contactSection{display:grid;gap:9px;border:1px solid rgba(255,255,255,.13);padding:12px;border-radius:12px;background:rgba(255,255,255,.025)}
+.contactHead,.contactTitle{display:flex;align-items:flex-start;justify-content:space-between;gap:8px}
+.contactHead strong{font-size:14px}
+.contactHead strong span{font-size:11px;color:#a9b7ae;margin-left:5px}
+.contactHead button,.contactTitle button,.contactEditorActions button{border:1px solid rgba(255,255,255,.18);background:#142019;color:#ebf3ed;padding:8px 10px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:750}
+.contactHead button:hover,.contactTitle button:hover,.contactEditorActions button:hover{border-color:#34c759}
+.contactCard{padding:11px;border:1px solid rgba(255,255,255,.11);border-radius:9px;background:#0e1813;display:grid;gap:9px}
+.contactTitle>div{display:flex;flex-wrap:wrap;align-items:center;gap:6px;min-width:0}
+.contactTitle strong{font-size:13px;overflow-wrap:anywhere}
+.contactTitle small{display:block;flex-basis:100%;font-size:12px;color:#acb7b1}
+.primaryContact{padding:2px 7px;border:1px solid rgba(52,199,89,.35);border-radius:20px;color:#70df9c;background:rgba(52,199,89,.08);font-size:10px}
+.contactMethods{display:flex;gap:6px;flex-wrap:wrap}
+.contactMethods a,.contactMethods span{color:#c1cec6;border:1px solid rgba(255,255,255,.13);border-radius:8px;padding:8px 10px;font-size:12px;overflow-wrap:anywhere;text-decoration:none;max-width:100%}
+.contactMethods a:hover{border-color:#34c759;color:#6ceba2}
+.contactEmpty{margin:0;color:#9dab9f;font-size:12px;line-height:1.5}
+.contactEditor{display:grid;gap:10px;border:1px solid rgba(52,199,89,.3);border-radius:10px;padding:12px;background:rgba(52,199,89,.04)}
+.contactEditor>strong{font-size:13px}
+.contactEditor label{display:grid;gap:5px;color:#a9b8ac;font-size:11px;font-weight:750}
+.contactEditor input:not([type=checkbox]){min-width:0;width:100%;height:39px;border-radius:8px;border:1px solid rgba(255,255,255,.16);background:#0a150f;padding:7px 10px;color:#f3f7f3;font-size:13px}
+.contactEditor input:focus-visible{outline:2px solid #34c759}
+.contactFields{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.contactEditor .primaryCheck{display:flex;align-items:center;gap:8px;font-size:12px}
+.contactEditorActions{display:flex;justify-content:flex-end;gap:7px}
+.contactEditorActions button:last-child{background:#34c759;color:#06110a}
+.contactEditorActions button:disabled{opacity:.55;cursor:wait}
+.blocked{margin:0;padding:10px;border-radius:9px;border:1px solid rgba(255,143,143,.45);color:#ffc0c0;background:rgba(220,40,40,.11);font-size:12px;font-weight:800}
+@media(max-width:540px){.contactFields{grid-template-columns:1fr}}
