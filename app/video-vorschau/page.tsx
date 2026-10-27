@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import VideoPlayer from "../v/[id]/VideoBubble";
 
 const clips = {
   pflege: {
     title: "Pflege-Recruiting",
     hls: "https://stream.mux.com/wcQEdyzanJcAqXoW01I00Sb02KKoPqnQSitcZ00lwNAHr01k.m3u8",
-    filename: "Aufnahme 07:42",
+    filename: "Neues Pflege-Video",
     duration: "1:34",
   },
   pv: {
@@ -107,8 +108,8 @@ export default function VideoPreviewPage() {
         </div>
         <div className="layout">
           <div className="video-col">
-            <PreviewPlayer key={segment} segment={segment} />
-            <p className="meta">{clips[segment].filename} · {clips[segment].duration} · Ton optimiert</p>
+            {segment === "pflege" ? <VideoPlayer key="pflege" youtubeId="rRGXVr0Oygg" screenshot="/v-demo.jpg" company="Pflegebetrieb (Demo)" /> : <PreviewPlayer key={segment} segment={segment} />}
+            <p className="meta">{segment === "pflege" ? "Neues Pflege-Video · YouTube rRGXVr0Oygg" : `${clips[segment].filename} · ${clips[segment].duration} · Ton optimiert`}</p>
             <div className="detail"><h2>Vorschau – noch kein Live-Versand</h2><p>Diese Seite dient nur zur Kontrolle von Bild, Ton und Position der Bubble. Die automatisierten Kampagnen wurden dadurch nicht verändert.</p></div>
           </div>
           <div className="booking"><h2>Termin direkt buchen</h2><p>Hier sehen Interessenten später die reguläre Buchungsfunktion der individuellen Videoseite.</p><div className="calendar-placeholder">Kalender und freie Termine des jeweiligen Funnels</div></div>
