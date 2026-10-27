@@ -7,6 +7,7 @@ import { evaluateAutonomy } from "@/lib/outbound-policy";
 import { replyClassSchema, type ReplyClass } from "@/lib/outbound-contracts";
 import { resolveOutboundRuntimeConfig } from "@/lib/outbound-runtime-config";
 import { createComplianceSuppression } from "@/lib/outbound-compliance-engine";
+import { classifyInboxMessage, currentReplyText } from "@/lib/inbox-classifier";
 
 export const CONVERSATION_POLICY_VERSION="dg-conversation-2026-09-27-v1";
 export const CONVERSATION_PROMPT_VERSION="reply-classifier-v1";
@@ -111,7 +112,15 @@ function safetyPolicy(result:Classification,trustedOptOut=false):Classification{
 }
 
 export function heuristicClassification(subject:string,body:string):Classification{
-  const text=`${subject}\n${body}`.toLowerCase();
+  const current=currentReplyText(body);
+  const inbox=classifyInboxMessage({from:"",subject,bodyText:current});
+  if(inbox.category==="rueckruf"){
+    return safetyPolicy({replyClass:"meeting_intent",confidence:0.99,rationale:"Expliziter Rückrufwunsch in der neuen Nachricht.",recommendedAction:"call_now",priority:"high",requiresHuman:true,draftReply:null});
+  }
+  if(inbox.category==="vermittler"){
+    return safetyPolicy({replyClass:"objection_existing_solution",confidence:0.97,rationale:"Einwand zur Personalvermittlung; das Angebot ist keine Vermittlung.",recommendedAction:"human_reply",priority:"normal",requiresHuman:true,draftReply:null});
+  }
+  const text=`${subject}\n${current}`.toLowerCase();
   const has=(pattern:RegExp)=>pattern.test(text);
 
   if(has(/\b(out of office|automatic reply|automatische antwort|abwesen|urlaub|nicht im büro|not in the office)\b/i)){
@@ -166,8 +175,12 @@ async function classifyWithModel(input:{
   body:string;
   context:ConversationContext;
 }):Promise<{classification:Classification;classifier:string;model:string|null;raw:Record<string,unknown>}>{
+  const replyBody=currentReplyText(input.body);
   const apiKey=process.env.OPENAI_API_KEY;
-  const heuristic=heuristicClassification(input.subject,input.body);
+  const heuristic=heuristicClassification(input.subject,replyBody);
+  if(["rueckruf","vermittler"].includes(classifyInboxMessage({from:"",subject:input.subject,bodyText:replyBody}).category)){
+    return {classification:heuristic,classifier:"deterministic-reply-signal",model:null,raw:{reason:"Callback or agency objection in new reply"}};
+  }
   if(!apiKey){
     return {classification:heuristic,classifier:"heuristic",model:null,raw:{fallback:"OPENAI_API_KEY missing"}};
   }
@@ -193,7 +206,7 @@ async function classifyWithModel(input:{
     `Latest outbound subject: ${input.context.latestOutboundSubject||"unknown"}`,
     `Latest outbound message:\n${cleanText(input.context.latestOutboundBody||"",3500)}`,
     `Inbound subject: ${cleanText(input.subject,500)}`,
-    `CURRENT inbound reply:\n${cleanText(input.body,5000)}`,
+    `CURRENT inbound reply:\n${cleanText(replyBody,5000)}`,
   ].join("\n\n");
 
   const response=await (client.responses.create as any)({
@@ -465,6 +478,8 @@ async function persistClassification(input:{
                   else 'Inbound-Antwort prüfen' end
              else next_action end,
            next_action_at=case when $4 then now() else next_action_at end,
+           stage=case when $3 in ('positive','meeting_intent','needs_information') and not coalesce(do_not_contact,false) and stage in ('Neu','Research','Bereit','Kontaktiert') then 'Engaged' else stage end,
+           intent_score=least(100,intent_score+case when $3 in ('positive','meeting_intent','needs_information') then 30 else 0 end),
            updated_at=now()
        where workspace=$1 and id=$2`,
       ["default",input.thread.lead_id,safe.replyClass,safe.requiresHuman],
