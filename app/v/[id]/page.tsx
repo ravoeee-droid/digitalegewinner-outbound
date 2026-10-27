@@ -81,7 +81,7 @@ export default async function VideoPage({ params }: { params: Promise<{ id: stri
       </header>
       <div className={styles.grid}>
         <section className={styles.videoCol} aria-label="Video">
-          {(segment !== "other" && Boolean(VIDEO_IDS[segment])) || token === "demo" ? <VideoPlayer youtubeId={segment === "pv" && token !== "demo" ? VIDEO_IDS.pv : data.youtubeId} screenshot={data.screenshot} company={data.company} /> : (
+          {(segment !== "other" && Boolean(VIDEO_IDS[segment])) || token === "demo" ? <VideoPlayer youtubeId={token === "demo" ? (VIDEO_IDS.pflege || data.youtubeId) : (segment === "pv" ? VIDEO_IDS.pv : VIDEO_IDS.pflege)} screenshot={data.screenshot} company={data.company} /> : (
             <div className={styles.staticShot} style={data.screenshot ? { backgroundImage: `url(${data.screenshot})` } : undefined} role="img" aria-label={`Website von ${data.company}`} />
           )}
           <div className={styles.takeaway}>
