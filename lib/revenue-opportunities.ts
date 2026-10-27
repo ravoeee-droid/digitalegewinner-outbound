@@ -86,6 +86,17 @@ type SeedLeadRow = {
   seo_score: number;
 };
 
+export type OpportunityContact = {
+  id: string;
+  company_id: string;
+  name: string;
+  role: string;
+  phone: string;
+  email: string;
+  is_primary: boolean;
+  source: string;
+};
+
 type OpportunityRow = {
   id: string;
   workspace: string;
@@ -108,6 +119,8 @@ type OpportunityRow = {
   city: string;
   industry: string;
   company_source: string;
+  company_phone: string;
+  do_not_contact: boolean;
   website: string;
   phone: string;
   email: string;
@@ -449,7 +462,8 @@ async function loadOpportunityRows(workspace: string) {
     select o.id,o.workspace,o.lead_id,o.company_id,o.product_key,o.stage,o.status,o.source,
            o.setup_value::float8 setup_value,o.monthly_value::float8 monthly_value,
            o.probability,o.score,o.next_action,o.next_action_at,o.notes,o.created_at,o.updated_at,
-           c.name company,c.city,c.industry,c.source company_source,c.website,coalesce(ct.phone,c.phone,'') phone,coalesce(ct.email,'') email,
+           c.name company,c.city,c.industry,c.source company_source,coalesce(c.phone,'') company_phone,c.website,
+           coalesce(ct.phone,c.phone,'') phone,coalesce(ct.email,'') email,coalesce(l.do_not_contact,false) do_not_contact,
            l.priority_score lead_priority,l.opportunity_score lead_opportunity,l.extreme_hot,c.metadata company_metadata,
            coalesce(rr.website_score,0)::int website_score,
            ${seoScoreSql("rr")} seo_score
@@ -472,8 +486,30 @@ export async function getRevenueSnapshot(workspace = "default") {
   await ensureRevenueOpportunitySchema();
   await seedRevenueOpportunities(workspace, true);
   const rows = await loadOpportunityRows(workspace);
+  // Kontakte der Unternehmen unabhängig vom Lead-Primärkontakt lesen. Viele importierte
+  // Leads besitzen bereits mehrere Datensätze, die bislang im CRM unsichtbar waren.
+  const companyIds = [...new Set(rows.map((row) => row.company_id))];
+  const contacts = companyIds.length
+    ? await query<OpportunityContact>(`
+        select id,company_id,coalesce(name,'') name,coalesce(phone,'') phone,
+               coalesce(email,'') email,coalesce(is_primary,false) is_primary,
+               coalesce(source,'') source,
+               coalesce(nullif(metadata->>'role',''),nullif(metadata->>'position',''),
+                        nullif(metadata->>'job_title',''),nullif(metadata->>'title',''),'') role
+        from sales_contacts
+        where workspace=$1 and company_id = any($2::text[])
+        order by is_primary desc,(nullif(name,'') is not null) desc,updated_at desc
+      `, [workspace, companyIds])
+    : [];
+  const contactsByCompany = new Map<string, OpportunityContact[]>();
+  for (const contact of contacts) {
+    const group = contactsByCompany.get(contact.company_id) || [];
+    group.push(contact);
+    contactsByCompany.set(contact.company_id, group);
+  }
   const opportunities = rows.map((row) => ({
     ...row,
+    contacts: contactsByCompany.get(row.company_id) || [],
     annual_value: Number(row.setup_value || 0) + Number(row.monthly_value || 0) * 12,
     weighted_value: (Number(row.setup_value || 0) + Number(row.monthly_value || 0) * 12) * Number(row.probability || 0) / 100,
     call_score: callScore(row),
