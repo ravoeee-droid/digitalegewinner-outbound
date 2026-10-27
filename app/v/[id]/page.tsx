@@ -89,7 +89,7 @@ export default async function VideoPage({ params, searchParams }: { params: Prom
 
         <div className={styles.heroGrid}>
           <section className={styles.videoFrame} aria-label="Persönliche Videonachricht">
-            {(hasVertical&&Boolean(VIDEO_IDS[segment]))||token==="demo" ? (
+            {(hasVertical&&Boolean(VIDEO_IDS[isPv?"pv":"pflege"]))||token==="demo" ? (
               <VideoPlayer
                 youtubeId={token==="demo"?(VIDEO_IDS.pflege||data.youtubeId):(isPv?VIDEO_IDS.pv:VIDEO_IDS.pflege)}
                 screenshot={data.screenshot}
