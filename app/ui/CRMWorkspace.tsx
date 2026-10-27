@@ -293,6 +293,8 @@ export default function CRMWorkspace({ embedded = false, initialSegment = "pfleg
         ))}
       </nav>
 
+      {segment === "pv" && <div style={{ marginBottom: 14 }}><a href="/outbound/whatsapp" style={{ display: "inline-flex", padding: "9px 15px", border: "1px solid rgba(94,234,160,.45)", borderRadius: 10, textDecoration: "none", color: "#5eeaa0", fontWeight: 800, fontSize: 13 }}>📱 WhatsApp 30er-Sprint · tägliche PV-Kontaktliste</a></div>}
+
       <div className={styles.bar}>
         <input ref={search} className={styles.search} value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Suchen: Firma, Ort, Telefon …  ( / )" aria-label="Suchen" />
         <select value={product} onChange={(e) => setProduct(e.target.value)} aria-label="Produkt">
