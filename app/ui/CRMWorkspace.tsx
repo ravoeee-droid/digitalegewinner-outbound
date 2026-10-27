@@ -19,6 +19,7 @@ type Opp = {
   company: string;
   city: string;
   industry: string;
+  segment: Segment;
   website: string;
   phone: string;
   email: string;
@@ -36,7 +37,13 @@ type Snapshot = {
   opportunities: Opp[];
   activities: Activity[];
 };
+type Segment = "pflege" | "pv" | "other";
 type Quick = "all" | "due" | "meetings" | "hot" | "noaction";
+const SEGMENTS: Array<{ key: Segment; label: string }> = [
+  { key: "pflege", label: "Pflege-Recruiting" },
+  { key: "pv", label: "PV-Trust" },
+  { key: "other", label: "Weitere" },
+];
 type Patch = Partial<{ stage: string; setupValue: number; monthlyValue: number; probability: number; nextAction: string; nextActionAt: string | null; notes: string; outcome: string }>;
 
 const FOCUS = ["Interesse", "Termin", "Angebot", "Verhandlung", "Gewonnen"];
@@ -63,12 +70,13 @@ function summary(o: Opp) {
   return Array.isArray(s) ? s.map(String).join(" · ") : typeof s === "string" ? s : "";
 }
 
-export default function CRMWorkspace({ embedded = false }: { embedded?: boolean }) {
+export default function CRMWorkspace({ embedded = false, initialSegment = "pflege" }: { embedded?: boolean; initialSegment?: Segment }) {
   const [snap, setSnap] = useState<Snapshot | null>(null);
   const [error, setError] = useState("");
   const [toast, setToast] = useState("");
   const [query, setQuery] = useState("");
   const [product, setProduct] = useState("all");
+  const [segment, setSegment] = useState<Segment>(initialSegment);
   const [quick, setQuick] = useState<Quick>("all");
   const [allStages, setAllStages] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -120,7 +128,25 @@ export default function CRMWorkspace({ embedded = false }: { embedded?: boolean 
   }, [snap]);
 
   const all = useMemo(() => snap?.opportunities || [], [snap]);
-  const open = useMemo(() => all.filter((o) => o.status === "open" || o.stage === "Gewonnen"), [all]);
+  const segmentRows = useMemo(() => all.filter((o) => o.segment === segment), [all, segment]);
+  const open = useMemo(() => segmentRows.filter((o) => o.status === "open" || o.stage === "Gewonnen" || o.status === "won"), [segmentRows]);
+  const active = useMemo(() => open.filter((o) => o.status === "open" && o.stage !== "Gewonnen" && o.stage !== "Verloren"), [open]);
+  const won = useMemo(() => segmentRows.filter((o) => o.status === "won" || o.stage === "Gewonnen"), [segmentRows]);
+  const segmentTotals = useMemo(() => Object.fromEntries(SEGMENTS.map(({ key }) => [
+    key, all.filter((o) => o.segment === key && o.status === "open" && o.stage !== "Gewonnen" && o.stage !== "Verloren").length
+  ])) as Record<Segment, number>, [all]);
+
+  function chooseSegment(next: Segment) {
+    if (next === segment) return;
+    setSegment(next);
+    setProduct("all");
+    setQuick("all");
+    setSelectedId(null);
+    // Deep-Link für Pflege/PV, ohne beim Umschalten die komplette App neu zu laden.
+    const url = new URL(window.location.href);
+    url.searchParams.set("segment", next);
+    window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+  }
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return open.filter((o) => {
@@ -152,8 +178,8 @@ export default function CRMWorkspace({ embedded = false }: { embedded?: boolean 
 
   const selected = useMemo(() => all.find((o) => o.id === selectedId) || null, [all, selectedId]);
   const dueList = useMemo(() => filtered.filter(isDue).sort((a, b) => new Date(a.next_action_at as string).getTime() - new Date(b.next_action_at as string).getTime()), [filtered]);
-  const meetings = filtered.filter((o) => o.stage === "Termin").length;
-  const overdue = open.filter(isDue).length;
+  const meetings = active.filter((o) => o.stage === "Termin").length;
+  const overdue = active.filter(isDue).length;
 
   function onDrop(stage: string, e: React.DragEvent) {
     e.preventDefault();
@@ -168,20 +194,29 @@ export default function CRMWorkspace({ embedded = false }: { embedded?: boolean 
   return (
     <main className={`${styles.page} ${embedded ? styles.embedded : ""}`}>
       <header className={styles.top}>
-        {!embedded && <div><span className={styles.eyebrow}>CRM</span><h1>Pipeline</h1></div>}
+        {!embedded && <div><span className={styles.eyebrow}>CRM / GESCHÄFTSBEREICH</span><h1>{segment === "pflege" ? "Pflege-Pipeline" : segment === "pv" ? "PV-Trust-Pipeline" : "Weitere Chancen"}</h1></div>}
         <div className={styles.kpis}>
-          <div><span>Offene Chancen</span><strong>{snap?.stats.openOpportunities ?? "–"}</strong></div>
+          <div><span>Offene Chancen</span><strong>{snap ? active.length : "–"}</strong></div>
           <div className={overdue ? styles.warn : undefined}><span>Jetzt fällig</span><strong>{overdue}</strong></div>
           <div><span>Termine</span><strong>{meetings}</strong></div>
-          <div><span>Gewichtete Pipeline</span><strong>{euro(snap?.stats.weightedPotential || 0)}</strong></div>
-          <div><span>Gewonnen</span><strong>{euro(snap?.stats.wonRevenue || 0)}</strong></div>
+          <div><span>Gewichtete Pipeline</span><strong>{euro(active.reduce((sum, o) => sum + o.weighted_value, 0))}</strong></div>
+          <div><span>Gewonnen</span><strong>{euro(won.reduce((sum, o) => sum + o.annual_value, 0))}</strong></div>
         </div>
       </header>
+
+      <nav className={styles.segmentBar} aria-label="CRM-Geschäftsbereich">
+        {SEGMENTS.map(({ key, label }) => (
+          <button key={key} type="button" className={`${styles.segmentButton} ${segment === key ? styles.segmentActive : ""}`}
+            aria-current={segment === key ? "page" : undefined} onClick={() => chooseSegment(key)}>
+            {label} <span className={styles.segmentCount}>{segmentTotals[key]}</span>
+          </button>
+        ))}
+      </nav>
 
       <div className={styles.bar}>
         <input ref={search} className={styles.search} value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Suchen: Firma, Ort, Telefon …  ( / )" aria-label="Suchen" />
         <select value={product} onChange={(e) => setProduct(e.target.value)} aria-label="Produkt">
-          <option value="all">Alle Produkte</option>
+          <option value="all">Alle Produkte im Bereich</option>
           {products.map(([key, p]) => <option key={key} value={key}>{p.shortLabel}</option>)}
         </select>
         <div className={styles.chips} role="group" aria-label="Schnellfilter">
