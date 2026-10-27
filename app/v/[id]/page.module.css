@@ -384,3 +384,46 @@
   .fundingButton { white-space: normal; text-align: center; }
   .chatPanel { bottom: 138px; }
 }
+
+/* Closing action after the proof / funding journey */
+.careComparison .pvTransformation { margin-top: 25px; }
+.finalCta {
+  max-width: 1160px;
+  margin: 24px auto 0;
+  padding: clamp(26px, 3.5vw, 42px);
+  border: 1px solid #e6e3df;
+  border-radius: 21px;
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 27px;
+}
+.finalCta div { max-width: 710px; }
+.finalCta div > span { color: #dd5c1e; font-size: 11px; font-weight: 850; letter-spacing: .11em; }
+.finalCta h2 { margin: 10px 0 8px; font-size: clamp(24px, 2.6vw, 32px); line-height: 1.18; letter-spacing: -.035em; }
+.finalCta p { margin: 0; color: #69635c; font-size: 14px; line-height: 1.55; }
+.finalCta > a {
+  text-decoration: none;
+  min-width: 205px;
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  gap: 14px;
+  border-radius: 9px;
+  background: #f7742b;
+  color: #171310;
+  font-weight: 790;
+  font-size: 13px;
+  padding: 15px 18px;
+  transition: background .15s ease, transform .15s ease;
+}
+.finalCta > a:hover { background: #ff914f; transform: translateY(-1px); }
+.finalCta > a:focus-visible { outline: 3px solid #282523; outline-offset: 3px; }
+@media(max-width: 750px) {
+  .finalCta { flex-direction: column; align-items: stretch; }
+  .finalCta > a { width: 100%; }
+}
+@media(max-width: 640px) {
+  .finalCta { border-radius: 17px; padding: 24px 22px; }
+}
