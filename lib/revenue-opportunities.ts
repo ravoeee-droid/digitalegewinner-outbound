@@ -6,6 +6,8 @@ export const REVENUE_STAGES = [
   "Geprüft",
   "Call bereit",
   "Kontaktiert",
+  "Info angefragt",
+  "Info versendet",
   "Nachfassen",
   "Interesse",
   "Termin",
@@ -203,6 +205,8 @@ function stageProbability(stage: RevenueStage) {
     "Geprüft": 10,
     "Call bereit": 12,
     Kontaktiert: 18,
+    "Info angefragt": 25,
+    "Info versendet": 30,
     Nachfassen: 22,
     Interesse: 40,
     Termin: 60,
@@ -220,6 +224,8 @@ function defaultActionForStage(stage: RevenueStage) {
     "Geprüft": "Entscheider und Kontaktdaten prüfen",
     "Call bereit": "Jetzt anrufen und Bedarf qualifizieren",
     Kontaktiert: "Bedarf konkret qualifizieren",
+    "Info angefragt": "Gewünschte Info-Mail senden",
+    "Info versendet": "Info-Mail besprechen und Termin vereinbaren",
     Nachfassen: "Wiedervorlage anrufen",
     Interesse: "Termin verbindlich fixieren",
     Termin: "Termin vorbereiten",
@@ -233,6 +239,19 @@ function defaultActionForStage(stage: RevenueStage) {
 
 function tomorrowIso() {
   return new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+}
+
+// Wiedervorlage zwei Werktage nach dem bestätigten Versand; Wochenende überspringen.
+// 09:00 UTC entspricht 10/11 Uhr in Deutschland je nach Sommerzeit.
+function infoMailFollowUpIso() {
+  const day = new Date();
+  day.setUTCHours(9, 0, 0, 0);
+  let remaining = 2;
+  while (remaining > 0) {
+    day.setUTCDate(day.getUTCDate() + 1);
+    if (day.getUTCDay() !== 0 && day.getUTCDay() !== 6) remaining--;
+  }
+  return day.toISOString();
 }
 
 function signalSummary(row: OpportunityRow) {
@@ -559,6 +578,8 @@ export async function addProductOpportunity(leadId: string, productKey: ProductK
 function outcomePatch(outcome: string, currentStage: RevenueStage) {
   if (outcome === "Nicht erreicht") return { stage: "Nachfassen" as RevenueStage, probability: Math.max(15, stageProbability(currentStage)), nextAction: "Morgen erneut anrufen", nextActionAt: tomorrowIso(), status: "open" };
   if (outcome === "Erreicht") return { stage: "Kontaktiert" as RevenueStage, probability: Math.max(22, stageProbability(currentStage)), nextAction: "Bedarf konkret qualifizieren", nextActionAt: null, status: "open" };
+  if (outcome === "Info angefragt") return { stage: "Info angefragt" as RevenueStage, probability: 25, nextAction: "Gewünschte Info-Mail senden", nextActionAt: new Date().toISOString(), status: "open" };
+  if (outcome === "Info versendet") return { stage: "Info versendet" as RevenueStage, probability: 30, nextAction: "Info-Mail besprechen und Termin vereinbaren", nextActionAt: infoMailFollowUpIso(), status: "open" };
   if (outcome === "Interesse") return { stage: "Interesse" as RevenueStage, probability: 40, nextAction: "Termin verbindlich fixieren", nextActionAt: null, status: "open" };
   if (outcome === "Termin") return { stage: "Termin" as RevenueStage, probability: 60, nextAction: "Termin vorbereiten", nextActionAt: null, status: "open" };
   if (outcome === "Angebot") return { stage: "Angebot" as RevenueStage, probability: 75, nextAction: "Angebot nachfassen", nextActionAt: null, status: "open" };
@@ -573,6 +594,8 @@ function legacyStage(stage: RevenueStage) {
     "Geprüft": "Research",
     "Call bereit": "Bereit",
     Kontaktiert: "Kontaktiert",
+    "Info angefragt": "Wiedervorlage",
+    "Info versendet": "Wiedervorlage",
     Nachfassen: "Wiedervorlage",
     Interesse: "Engaged",
     Termin: "Termin",
@@ -629,7 +652,7 @@ export async function updateRevenueOpportunity(id: string, patch: OpportunityPat
     : outcome?.nextActionAt !== undefined
       ? outcome.nextActionAt
       : stageChanged
-        ? (stage === "Nachfassen" ? tomorrowIso() : null)
+        ? (stage === "Nachfassen" ? tomorrowIso() : stage === "Info angefragt" ? new Date().toISOString() : stage === "Info versendet" ? infoMailFollowUpIso() : null)
         : current.next_action_at;
 
   await query(`
@@ -655,7 +678,7 @@ export async function updateRevenueOpportunity(id: string, patch: OpportunityPat
     values($1,$2,$3,$4,$5,$6::jsonb)
   `, [
     workspace, current.lead_id, current.company_id,
-    patch.outcome ? "revenue.outcome" : "revenue.stage",
+    patch.outcome === "Info versendet" ? "revenue.email" : patch.outcome ? "revenue.outcome" : "revenue.stage",
     summary,
     JSON.stringify({ opportunityId: id, outcome: patch.outcome || "", stage, probability }),
   ]);
