@@ -6,6 +6,8 @@ export const REVENUE_STAGES = [
   "Geprüft",
   "Call bereit",
   "Kontaktiert",
+  "Info angefragt",
+  "Info versendet",
   "Nachfassen",
   "Interesse",
   "Termin",
@@ -84,6 +86,17 @@ type SeedLeadRow = {
   seo_score: number;
 };
 
+export type OpportunityContact = {
+  id: string;
+  company_id: string;
+  name: string;
+  role: string;
+  phone: string;
+  email: string;
+  is_primary: boolean;
+  source: string;
+};
+
 type OpportunityRow = {
   id: string;
   workspace: string;
@@ -105,6 +118,9 @@ type OpportunityRow = {
   company: string;
   city: string;
   industry: string;
+  company_source: string;
+  company_phone: string;
+  do_not_contact: boolean;
   website: string;
   phone: string;
   email: string;
@@ -202,6 +218,8 @@ function stageProbability(stage: RevenueStage) {
     "Geprüft": 10,
     "Call bereit": 12,
     Kontaktiert: 18,
+    "Info angefragt": 25,
+    "Info versendet": 30,
     Nachfassen: 22,
     Interesse: 40,
     Termin: 60,
@@ -219,6 +237,8 @@ function defaultActionForStage(stage: RevenueStage) {
     "Geprüft": "Entscheider und Kontaktdaten prüfen",
     "Call bereit": "Jetzt anrufen und Bedarf qualifizieren",
     Kontaktiert: "Bedarf konkret qualifizieren",
+    "Info angefragt": "Gewünschte Info-Mail senden",
+    "Info versendet": "Info-Mail besprechen und Termin vereinbaren",
     Nachfassen: "Wiedervorlage anrufen",
     Interesse: "Termin verbindlich fixieren",
     Termin: "Termin vorbereiten",
@@ -232,6 +252,19 @@ function defaultActionForStage(stage: RevenueStage) {
 
 function tomorrowIso() {
   return new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+}
+
+// Wiedervorlage zwei Werktage nach dem bestätigten Versand; Wochenende überspringen.
+// 09:00 UTC entspricht 10/11 Uhr in Deutschland je nach Sommerzeit.
+function infoMailFollowUpIso() {
+  const day = new Date();
+  day.setUTCHours(9, 0, 0, 0);
+  let remaining = 2;
+  while (remaining > 0) {
+    day.setUTCDate(day.getUTCDate() + 1);
+    if (day.getUTCDay() !== 0 && day.getUTCDay() !== 6) remaining--;
+  }
+  return day.toISOString();
 }
 
 function signalSummary(row: OpportunityRow) {
@@ -260,6 +293,20 @@ function signalSummary(row: OpportunityRow) {
     return "Website vorhanden · Local-/SEO-Potenzial priorisiert prüfen";
   }
   return "Telefonischer Servicebetrieb · Automationspotenzial im Erstgespräch qualifizieren";
+}
+
+export type RevenueSegment = "pflege" | "pv" | "other";
+
+// Geschäftsfeld ≠ verkauftes Produkt: PV-Betriebe können z.B. auch eine Website-Chance haben.
+// Daher die Zuordnung über die Firmenherkunft/Branche, niemals über die Angebotsart allein.
+function revenueSegment(row: OpportunityRow): RevenueSegment {
+  const source = (row.company_source || "").toLowerCase();
+  const identity = `${row.company} ${row.industry}`.toLowerCase();
+  if (source === "ba-pv" || /^(pv-|solar-|photovoltaik)/.test(source) ||
+      /photovoltaik|solartechnik|solaranlag|solarenergie|solarstrom|solar solutions|solar solutions|solarinstall|pv-anlag|\bpv\b/i.test(identity)) return "pv";
+  if (source.startsWith("pflege-") || row.product_key === "pflege_recruiting" ||
+      /pflege|pflegedienst|senior|altenheim|ambulatory_care|social_facility|healthcare|gesundheit|care home|nursing/i.test(identity)) return "pflege";
+  return "other";
 }
 
 function callScore(row: OpportunityRow) {
@@ -415,7 +462,8 @@ async function loadOpportunityRows(workspace: string) {
     select o.id,o.workspace,o.lead_id,o.company_id,o.product_key,o.stage,o.status,o.source,
            o.setup_value::float8 setup_value,o.monthly_value::float8 monthly_value,
            o.probability,o.score,o.next_action,o.next_action_at,o.notes,o.created_at,o.updated_at,
-           c.name company,c.city,c.industry,c.website,coalesce(ct.phone,c.phone,'') phone,coalesce(ct.email,'') email,
+           c.name company,c.city,c.industry,c.source company_source,coalesce(c.phone,'') company_phone,c.website,
+           coalesce(ct.phone,c.phone,'') phone,coalesce(ct.email,'') email,coalesce(l.do_not_contact,false) do_not_contact,
            l.priority_score lead_priority,l.opportunity_score lead_opportunity,l.extreme_hot,c.metadata company_metadata,
            coalesce(rr.website_score,0)::int website_score,
            ${seoScoreSql("rr")} seo_score
@@ -438,12 +486,35 @@ export async function getRevenueSnapshot(workspace = "default") {
   await ensureRevenueOpportunitySchema();
   await seedRevenueOpportunities(workspace, true);
   const rows = await loadOpportunityRows(workspace);
+  // Kontakte der Unternehmen unabhängig vom Lead-Primärkontakt lesen. Viele importierte
+  // Leads besitzen bereits mehrere Datensätze, die bislang im CRM unsichtbar waren.
+  const companyIds = [...new Set(rows.map((row) => row.company_id))];
+  const contacts = companyIds.length
+    ? await query<OpportunityContact>(`
+        select id,company_id,coalesce(name,'') name,coalesce(phone,'') phone,
+               coalesce(email,'') email,coalesce(is_primary,false) is_primary,
+               coalesce(source,'') source,
+               coalesce(nullif(metadata->>'role',''),nullif(metadata->>'position',''),
+                        nullif(metadata->>'job_title',''),nullif(metadata->>'title',''),'') role
+        from sales_contacts
+        where workspace=$1 and company_id = any($2::text[])
+        order by is_primary desc,(nullif(name,'') is not null) desc,updated_at desc
+      `, [workspace, companyIds])
+    : [];
+  const contactsByCompany = new Map<string, OpportunityContact[]>();
+  for (const contact of contacts) {
+    const group = contactsByCompany.get(contact.company_id) || [];
+    group.push(contact);
+    contactsByCompany.set(contact.company_id, group);
+  }
   const opportunities = rows.map((row) => ({
     ...row,
+    contacts: contactsByCompany.get(row.company_id) || [],
     annual_value: Number(row.setup_value || 0) + Number(row.monthly_value || 0) * 12,
     weighted_value: (Number(row.setup_value || 0) + Number(row.monthly_value || 0) * 12) * Number(row.probability || 0) / 100,
     call_score: callScore(row),
     signal_summary: signalSummary(row),
+    segment: revenueSegment(row),
   })).sort((a, b) => b.call_score - a.call_score);
 
   const active = opportunities.filter((item) => item.stage !== "Gewonnen" && item.stage !== "Verloren" && item.status === "open");
@@ -543,6 +614,8 @@ export async function addProductOpportunity(leadId: string, productKey: ProductK
 function outcomePatch(outcome: string, currentStage: RevenueStage) {
   if (outcome === "Nicht erreicht") return { stage: "Nachfassen" as RevenueStage, probability: Math.max(15, stageProbability(currentStage)), nextAction: "Morgen erneut anrufen", nextActionAt: tomorrowIso(), status: "open" };
   if (outcome === "Erreicht") return { stage: "Kontaktiert" as RevenueStage, probability: Math.max(22, stageProbability(currentStage)), nextAction: "Bedarf konkret qualifizieren", nextActionAt: null, status: "open" };
+  if (outcome === "Info angefragt") return { stage: "Info angefragt" as RevenueStage, probability: 25, nextAction: "Gewünschte Info-Mail senden", nextActionAt: new Date().toISOString(), status: "open" };
+  if (outcome === "Info versendet") return { stage: "Info versendet" as RevenueStage, probability: 30, nextAction: "Info-Mail besprechen und Termin vereinbaren", nextActionAt: infoMailFollowUpIso(), status: "open" };
   if (outcome === "Interesse") return { stage: "Interesse" as RevenueStage, probability: 40, nextAction: "Termin verbindlich fixieren", nextActionAt: null, status: "open" };
   if (outcome === "Termin") return { stage: "Termin" as RevenueStage, probability: 60, nextAction: "Termin vorbereiten", nextActionAt: null, status: "open" };
   if (outcome === "Angebot") return { stage: "Angebot" as RevenueStage, probability: 75, nextAction: "Angebot nachfassen", nextActionAt: null, status: "open" };
@@ -557,6 +630,8 @@ function legacyStage(stage: RevenueStage) {
     "Geprüft": "Research",
     "Call bereit": "Bereit",
     Kontaktiert: "Kontaktiert",
+    "Info angefragt": "Wiedervorlage",
+    "Info versendet": "Wiedervorlage",
     Nachfassen: "Wiedervorlage",
     Interesse: "Engaged",
     Termin: "Termin",
@@ -613,7 +688,7 @@ export async function updateRevenueOpportunity(id: string, patch: OpportunityPat
     : outcome?.nextActionAt !== undefined
       ? outcome.nextActionAt
       : stageChanged
-        ? (stage === "Nachfassen" ? tomorrowIso() : null)
+        ? (stage === "Nachfassen" ? tomorrowIso() : stage === "Info angefragt" ? new Date().toISOString() : stage === "Info versendet" ? infoMailFollowUpIso() : null)
         : current.next_action_at;
 
   await query(`
@@ -639,7 +714,7 @@ export async function updateRevenueOpportunity(id: string, patch: OpportunityPat
     values($1,$2,$3,$4,$5,$6::jsonb)
   `, [
     workspace, current.lead_id, current.company_id,
-    patch.outcome ? "revenue.outcome" : "revenue.stage",
+    patch.outcome === "Info versendet" ? "revenue.email" : patch.outcome ? "revenue.outcome" : "revenue.stage",
     summary,
     JSON.stringify({ opportunityId: id, outcome: patch.outcome || "", stage, probability }),
   ]);
