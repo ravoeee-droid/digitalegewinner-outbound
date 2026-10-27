@@ -166,3 +166,86 @@
   .bigIcon { width: 55px; height: 55px; font-size: 21px; }
   .bigLabel { display: none; }
 }
+
+
+/* CRO adjustments: primary appointment action first, secondary contact unobtrusive. */
+.secondaryContact {
+  display: block;
+  color: #c6c5c2;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  font-size: 12px;
+  line-height: 1.45;
+  margin-top: 15px;
+  text-align: center;
+}
+.secondaryContact:hover { color: #fff; }
+.funding { margin-top: 16px; padding: 0 21px; background: #f7f6f4; border: 1px solid #eae8e5; }
+.funding summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 51px;
+  color: #6c6862;
+  font-weight: 650;
+  font-size: 12px;
+  line-height: 1.5;
+  cursor: pointer;
+  list-style: none;
+}
+.funding summary::-webkit-details-marker { display: none; }
+.funding summary span { color: #d46b36; font-size: 20px; font-weight: 600; flex: none; }
+.funding[open] summary span { transform: rotate(45deg); }
+.funding .fundingNote { margin: 0 0 18px; padding: 10px 0 0; border-top: 1px solid #e9e7e3; }
+.playerFallback {
+  position: absolute;
+  z-index: 7;
+  inset: 0 0 43px 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  text-align: center;
+  background: rgba(18, 18, 18, .9);
+  color: white;
+  font-weight: 750;
+  font-size: 14px;
+  text-decoration: underline;
+}
+.videoFinish {
+  position: absolute;
+  z-index: 5;
+  inset: 0 0 43px 0;
+  background: rgba(18, 18, 18, .9);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 13px;
+  padding: 18px;
+  text-align: center;
+}
+.videoFinish strong { font-size: 19px; }
+.videoFinish a {
+  display: inline-block;
+  max-width: 100%;
+  padding: 12px 18px;
+  background: #ff8745;
+  border-radius: 8px;
+  color: #1e1309;
+  font-size: 13px;
+  font-weight: 800;
+  text-decoration: none;
+}
+.videoFinish button { background: none; border: 0; color: #ded6d0; text-decoration: underline; cursor: pointer; font-size: 12px; }
+.track:focus-visible, .videoFinish a:focus-visible, .videoFinish button:focus-visible,
+.funding summary:focus-visible, .secondaryContact:focus-visible { outline: 3px solid #ee782b; outline-offset: 3px; }
+@media(max-width: 620px) {
+  .funding { padding: 0 14px; }
+  .funding summary { font-size: 11px; }
+  .videoFinish strong { font-size: 15px; }
+  .videoFinish a { padding: 10px 12px; font-size: 12px; }
+  .secondaryContact { font-size: 11px; }
+}
