@@ -174,8 +174,8 @@ export async function ensureLoomCampaigns() {
       const subject=`Persönliche Videonachricht für ${lead.company}`.slice(0,125);
       await query(
         `insert into er_outbox(id,workspace,campaign_id,lead_id,mailbox_id,recipient,subject,body,variant,scheduled_at)
-         values(gen_random_uuid(),'default',$1,$2,$3,$4,$5,$6,'V',now())`,
-        [id,lead.id,mailbox.id,lead.email,subject,body],
+         values(gen_random_uuid(),'default',$1,$2,$3,$4,$5,$6,'V',greatest(now(),$7::timestamptz))`,
+        [id,lead.id,mailbox.id,lead.email,subject,body,"2026-10-28T08:30:00+01:00"],
       );
       result[segment].queued++;
     }
