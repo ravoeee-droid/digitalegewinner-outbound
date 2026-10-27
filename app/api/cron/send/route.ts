@@ -95,6 +95,12 @@ async function run(request: Request) {
     : await getMailboxHealthMap("default").catch(()=>new Map());
 
   await applyBlocklist().catch(() => null);
+  // Die früheren Pflege- und PV-Textkampagnen wurden explizit durch Loom-Outreach ersetzt.
+  // Die Sperre ist bewusst im Versandworker und nicht nur als UI-Status hinterlegt.
+  await query(
+    "update er_outbox set status='suppressed',error='Alte Textkampagne durch Loom-Video-Kampagne ersetzt' where workspace='default' and status='queued' and campaign_id in ('pflege-starter-v2','pv-starter-v1')",
+  );
+
   await query("update er_outbox set status='queued',scheduled_at=now()+interval '5 minutes',error='Stale send claim recovered' where workspace='default' and status='sending' and scheduled_at<now()-interval '15 minutes'");
 
   const sentTodayRows = await query<{mailbox_id:string;count:string}>(
@@ -149,6 +155,13 @@ async function run(request: Request) {
   const sentThisCycle=new Map<string,number>();
   // Postfächer laufen parallel (jede Mail dauert mehrere Sekunden), Mails desselben Postfachs nacheinander.
   const handleRow = async (row: OutboxRow) => {
+    // Zweite Sicherung gegen parallel bereits beanspruchte Alt-E-Mails.
+    if(row.campaign_id==="pflege-starter-v2"||row.campaign_id==="pv-starter-v1"){
+      await query("update er_outbox set status='suppressed',error='Alte Textkampagne beendet' where id=$1 and status='sending'",[row.id]);
+      skipped++;
+      return;
+    }
+
     // Zeitbudget: Rest der Mails sofort wieder freigeben, statt vom Plattform-Timeout mitten im Versand abgebrochen zu werden.
     if (Date.now() - startedAt > 200_000) {
       await query("update er_outbox set status='queued',attempts=greatest(attempts-1,0),scheduled_at=now(),error=null where id=$1 and status='sending'", [row.id]);
