@@ -50,6 +50,17 @@
 .fundingBottom span a { color: #36281d; font-weight: 700; text-decoration: underline; }
 @media (max-width: 640px) { .funding { padding: 20px 18px; } .fundingBottom { flex-direction: column; align-items: stretch; } }
 
+.pvTransformation { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin: 0 0 12px; }
+.pvBefore, .pvAfter { padding: 23px 24px; border-radius: 15px; border: 1px solid #e4ded7; }
+.pvBefore { background: #f4eeeb; border-color: #e4d7d0; }
+.pvAfter { background: #fff8eb; border-color: #f1d6af; }
+.pvTransformLabel { display: block; font-size: 12px; font-weight: 800; letter-spacing: .075em; color: #a45422; margin-bottom: 10px; }
+.pvAfter .pvTransformLabel { color: #9b5b05; }
+.pvTransformation h3 { margin: 0 0 9px; font-size: 21px; line-height: 1.25; }
+.pvTransformation p { margin: 0; font-size: 15px; line-height: 1.55; color: #4c423b; }
+.proof p.pvTransformationFootnote { max-width: none; font-size: 15px; font-weight: 650; margin: 0 0 18px; }
+@media (max-width: 640px) { .pvTransformation { grid-template-columns: 1fr; } .pvBefore, .pvAfter { padding: 18px; } }
+
 .proof { max-width: 1320px; margin: 36px auto 0; }
 .proof h2 { margin: 0 0 8px; font-size: 20px; }
 .proof p { margin: 0 0 16px; max-width: 760px; color: #5a5149; font-size: 14px; line-height: 1.5; }
