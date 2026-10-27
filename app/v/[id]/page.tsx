@@ -49,6 +49,20 @@ const CASES = [
   { name: "Häusliche Krankenpflege Raik Radloff", big: "2 neue Fachkräfte", line: "in unter 4 Wochen · 11 Gespräche" },
 ];
 
+// Kundenbeispiele für die PV-Ansprache: Das Elektronikprojekt ist ausdrücklich kein PV-Referenzbetrieb.
+const PV_CASES = [
+  {
+    name: "Solavol · Photovoltaik",
+    big: "Ø 43 €",
+    line: "Kosten pro exklusiver Kundenanfrage im Projekt",
+  },
+  {
+    name: "Libi Elektronik · Elektronik",
+    big: "Ø 58 €",
+    line: "Kosten pro exklusiver Kundenanfrage in einem anderen Geschäftsfeld",
+  },
+];
+
 export default async function VideoPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const token = decodeURIComponent(id);
@@ -115,6 +129,26 @@ export default async function VideoPage({ params }: { params: Promise<{ id: stri
         </blockquote>
         <p className={styles.source}>Einzelergebnisse, keine Garantie.</p>
       </section>
+      )}
+      {segment === "pv" && (
+        <section className={styles.proof} aria-label="Ergebnisse aus der Anfragegewinnung">
+          <h2>Exklusive Anfragen. Messbare Ergebnisse.</h2>
+          <p>Beispiele aus Kundenprojekten: Interessenten, die nicht gleichzeitig an mehrere Wettbewerber verkauft werden.</p>
+          <ul>
+            {PV_CASES.map((item) => (
+              <li key={item.name} className={styles.caseCard}>
+                <span className={styles.caseName}>{item.name}</span>
+                <strong>{item.big}</strong>
+                <span>{item.line}</span>
+              </li>
+            ))}
+          </ul>
+          <blockquote className={styles.quote}>
+            <strong>Vorher: Vertriebschaos. Danach: Ein strukturierter Weg von der Anfrage bis zum Kundengespräch.</strong>
+            <span className={styles.proofDescription}> Weniger manuelle Nacharbeit und mehr Überblick schaffen die Voraussetzung für einen wirtschaftlicheren Vertrieb.</span>
+          </blockquote>
+          <p className={styles.source}>Kundenbeispiele mit den angegebenen durchschnittlichen Leadkosten im jeweiligen Projekt, keine Preis- oder Ergebnisgarantie. Libi Elektronik ist kein PV-Unternehmen. Aufwand und Profitabilität hängen vom einzelnen Betrieb und seinen Abschlüssen ab.</p>
+        </section>
       )}
       <footer className={styles.legal}>
         <span>Digitale Gewinner · Raphael Hermann</span>
