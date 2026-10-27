@@ -43,11 +43,11 @@
     },
     {
       "path": "/api/cron/screenshots",
-      "schedule": "0,30 5-15 * * 1-5"
+      "schedule": "*/30 * * * *"
     },
     {
       "path": "/api/cron/contacts-enrich",
-      "schedule": "20,50 5-17 * * 1-5"
+      "schedule": "*/30 * * * *"
     },
     {
       "path": "/api/cron/pflege-source",
@@ -63,7 +63,7 @@
     },
     {
       "path": "/api/cron/loom-campaigns",
-      "schedule": "7,37 6-16 * * 1-5"
+      "schedule": "*/30 * * * *"
     }
   ],
   "regions": [
