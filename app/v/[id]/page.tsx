@@ -22,25 +22,6 @@ const CALENDAR_URL = `https://calendar.google.com/appointments/schedules/${SCHED
 // Vorerst nur die Beispielseite; später kommen Firma, Screenshot und Video pro Lead aus der Datenbank.
 const DEMO = { company: "Ihr Betrieb", screenshot: "/v-demo.jpg", youtubeId: "iYU1SEsBusI" };
 
-// Was der Besucher aus dem Termin mitnimmt, auch ohne Zusammenarbeit (Versprechen, die im Gespräch eingelöst werden müssen).
-const TAKEAWAYS = {
-  pflege: [
-    "Eine ehrliche Einschätzung, warum bei Ihnen zu wenige passende Bewerber ankommen.",
-    "Welcher Weg zu Fachkräften wirtschaftlich passt (Vermittlung, Ausland, Portale, eigene Kampagnen) und ob eine Förderung infrage kommt.",
-    "Zwei bis drei Sofortmaßnahmen, die Sie selbst umsetzen können.",
-  ],
-  other: [
-    "Eine unverbindliche Einschätzung Ihres aktuellen Online-Auftritts.",
-    "Konkrete Verbesserungsmöglichkeiten für Ihr Unternehmen.",
-    "Die nächsten sinnvollen Schritte für Ihre digitale Sichtbarkeit.",
-  ],
-  pv: [
-    "Eine ehrliche Einschätzung, was Leadportale Sie aktuell an Marge und Aufträgen kosten.",
-    "Welcher Weg zu Kunden wirtschaftlich passt (Empfehlungen, Portale, Agenturen, eigene exklusive Anfragen) und ob eine Förderung infrage kommt.",
-    "Zwei bis drei Sofortmaßnahmen, die Sie selbst umsetzen können.",
-  ],
-};
-
 // Fallstudien wie auf digitalegewinner.de/pflege (Zahlen und Quellenangabe von dort übernommen).
 const CASES = [
   { name: "Pflegeeinrichtung", big: "3 Einstellungen", line: "2.000 € Werbebudget · 43 Bewerbungen · Ø 46 € pro Bewerbung" },
@@ -79,143 +60,98 @@ export default async function VideoPage({ params }: { params: Promise<{ id: stri
     segment = row.segment;
     data = { ...DEMO, company: row.company, screenshot: (await hasScreenshot(leadId)) ? `/api/t/shot/${encodeURIComponent(token)}` : "" };
   }
+
+  const isPv=segment==="pv";
+  const hasVertical=segment==="pflege"||segment==="pv";
+  const proofItems=isPv?PV_CASES:[CASES[2],CASES[3]];
   return (
     <main className={styles.page}>
-      <PageTracker token={token} />
-      <ChatWidget token={token} company={data.company} whatsapp={WHATSAPP_NUMBER} />
-      <header className={styles.head}>
-        <div className={styles.author}>
-          <span className={styles.logoMark} aria-hidden="true">DG<span>.</span></span>
-          <div>
-            <strong className={styles.brandName}>DIGITALE GEWINNER</strong>
-            <p>Persönliche Videonachricht von Raphael Hermann</p>
-          </div>
+      <PageTracker token={token}/>
+      <ChatWidget token={token} company={data.company} whatsapp={WHATSAPP_NUMBER}/>
+      <div className={styles.wrap}>
+        <header className={styles.header}>
+          <a href="#start" className={styles.brand} aria-label="Digitale Gewinner">
+            <span className={styles.brandIcon}>DG<span>.</span></span>
+            <span className={styles.brandWord}>DIGITALE GEWINNER</span>
+          </a>
+          <a className={styles.headerLink} href="#termin">15-Minuten-Gespräch <span aria-hidden="true">↗</span></a>
+        </header>
+
+        <section id="start" className={styles.hero} aria-labelledby="personal-title">
+          <p className={styles.kicker}><span aria-hidden="true" className={styles.dot}/> PERSÖNLICHE VIDEONACHRICHT</p>
+          <h1 id="personal-title">Für <span>{data.company}</span></h1>
+          <p className={styles.heroSub}>Eine kurze Nachricht von Raphael Hermann – direkt für Ihren Betrieb.</p>
+        </section>
+
+        <div className={styles.heroGrid}>
+          <section className={styles.videoFrame} aria-label="Persönliche Videonachricht">
+            {(hasVertical&&Boolean(VIDEO_IDS[segment]))||token==="demo" ? (
+              <VideoPlayer
+                youtubeId={token==="demo"?(VIDEO_IDS.pflege||data.youtubeId):(isPv?VIDEO_IDS.pv:VIDEO_IDS.pflege)}
+                screenshot={data.screenshot}
+                company={data.company}
+              />
+            ):(
+              <div className={styles.staticShot} style={data.screenshot?{backgroundImage:"url("+data.screenshot+")"}:undefined} role="img" aria-label={"Website von "+data.company}/>
+            )}
+            <div className={styles.videoByline}><span className={styles.bylineAvatar}>RH</span><span>Raphael Hermann <small>· Digitale Gewinner</small></span></div>
+          </section>
+          <aside className={styles.pitch} aria-label="Kostenloses Gespräch">
+            <span className={styles.pitchTop}>PERSÖNLICHES GESPRÄCH · 15 MIN</span>
+            <h2>Passt das wirtschaftlich zu Ihrem Betrieb?</h2>
+            <p>Genau das schauen wir uns gemeinsam an. Ob sich eine Zusammenarbeit lohnt oder nicht – <strong>beides ist vollkommen in Ordnung.</strong></p>
+            <a href="#termin" className={styles.cta}>Kostenlosen Termin wählen <span aria-hidden="true">↗</span></a>
+            <span className={styles.ctaNote}>Unverbindlich. Kein Verkaufsdruck.</span>
+          </aside>
         </div>
-        <a href="#termin" className={styles.headButton}>Gespräch vereinbaren <span aria-hidden="true">↗</span></a>
-      </header>
-      <section className={styles.heroIntro} aria-label="Persönliche Videobotschaft">
-        <div className={styles.eyebrow}><span className={styles.orangeDot} /> {segment === "pv" ? "PV-TRUST" : segment === "pflege" ? "PFLEGE-RECRUITING" : "DIGITALE GEWINNER"} <span className={styles.heroDivider}>/</span> PERSÖNLICH FÜR {data.company}</div>
-        <h1>Eine kurze Nachricht <em>für Ihren Betrieb.</em></h1>
-        <p>{segment === "pv" ? "Wie Sie mehr eigene Anfragen gewinnen und unabhängiger von Leadportalen und Empfehlungen werden können." : segment === "pflege" ? "Wie Sie einen eigenen Bewerberkanal aufbauen, der nicht nach der nächsten Einstellung wieder verschwindet." : "Wo wir konkrete Potenziale für Ihr Unternehmen sehen."}</p>
-      </section>
-      <div className={styles.grid}>
-        <section className={styles.videoCol} aria-label="Video">
-          <div className={styles.videoHeading}><span className={styles.videoHeadingDot} /> <span>Persönliche Videonachricht</span><span className={styles.videoTo}>Für {data.company}</span></div>
-          {(segment !== "other" && Boolean(VIDEO_IDS[segment])) || token === "demo" ? <VideoPlayer youtubeId={token === "demo" ? (VIDEO_IDS.pflege || data.youtubeId) : (segment === "pv" ? VIDEO_IDS.pv : VIDEO_IDS.pflege)} screenshot={data.screenshot} company={data.company} /> : (
-            <div className={styles.staticShot} style={data.screenshot ? { backgroundImage: `url(${data.screenshot})` } : undefined} role="img" aria-label={`Website von ${data.company}`} />
-          )}
-          <p className={styles.videoCaption}>Raphael Hermann · Digitale Gewinner</p>
-          <div className={styles.takeaway}>
-            <span className={styles.cardKicker}>IHR MEHRWERT</span>
-            <h2>15 Minuten, die Klarheit bringen.</h2>
-            <p className={styles.bonus}>Wir sprechen darüber, was für Ihren Betrieb wirtschaftlich sinnvoll ist – oder eben nicht. <strong>Beides ist vollkommen in Ordnung.</strong></p>
-            <ul>{TAKEAWAYS[segment].map((item) => <li key={item}>{item}</li>)}</ul>
-            <p className={styles.takeNote}>Persönlich · unverbindlich · kein Verkaufsdruck</p>
+
+        {hasVertical&&(
+          <section className={styles.proof} aria-labelledby="proof-title">
+            <div className={styles.sectionTop}>
+              <div><span className={styles.smallEyebrow}>ERGEBNISSE AUS DER PRAXIS</span><h2 id="proof-title">{isPv?"Exklusive Anfragen. Echte Zahlen.":"Echte Einstellungen. Echte Ergebnisse."}</h2></div>
+            </div>
+            <div className={styles.metrics}>
+              {proofItems.map((item)=>(
+                <article className={styles.metric} key={item.name}>
+                  <strong>{item.big}</strong>
+                  <div><b>{item.name.replace(" · PV-Trust-Kunde","")}</b><span>{item.line}</span></div>
+                </article>
+              ))}
+            </div>
+            <div className={styles.changeLine}>
+              <span className={styles.changeOld}>{isPv?"Weg von Leadportalen und schwankenden Empfehlungen":"Weg von ständig neuen Recruiting-Kampagnen"}</span>
+              <span className={styles.changeArrow} aria-hidden="true">→</span>
+              <strong>{isPv?"Hin zu eigenen exklusiven Anfragen und strukturiertem Vertrieb":"Hin zu einer eigenen Karrierewelt, die bleibt"}</strong>
+            </div>
+            <p className={styles.proofNote}>Kundenbeispiele – keine Garantie für identische Ergebnisse.</p>
+          </section>
+        )}
+
+        {hasVertical&&(
+          <aside className={styles.funding} aria-label="Mögliche Förderung 2026">
+            <div className={styles.fundingMain}>
+              <span className={styles.fundingTag}>FÖRDERMÖGLICHKEIT · 2026</span>
+              <p><strong>50–80 % Zuschuss</strong> für förderfähige Unternehmensberatung möglich.</p>
+            </div>
+            <p className={styles.fundingNote}>BAFA-Programm für KMU, je nach Standort und Voraussetzungen, bis zu 1.750 € bzw. 2.800 €. Antrag nach aktueller Richtlinie bis 31.12.2026. Keine pauschale Förderung der PV-Trust-/Recruiting-Umsetzung, Website oder Werbekosten; keine Fördergarantie. <a href="https://www.bafa.de/SharedDocs/Downloads/DE/Wirtschaft/unb_flyer.pdf?__blob=publicationFile&v=2" target="_blank" rel="noopener noreferrer">Details beim BAFA</a>.</p>
+          </aside>
+        )}
+
+        <section id="termin" className={styles.booking} aria-labelledby="booking-title">
+          <span className={styles.smallEyebrow}>DER NÄCHSTE SCHRITT</span>
+          <h2 id="booking-title">15 Minuten. Eine klare Entscheidung.</h2>
+          <p>Hier können Sie direkt einen Termin bei Raphael auswählen.</p>
+          <div className={styles.calendar}>
+            <iframe src={CALENDAR_URL} title="Terminbuchung bei Raphael Hermann" loading="lazy"/>
           </div>
         </section>
-        <section id="termin" className={styles.calendar} aria-label="Termin buchen">
-          <span className={styles.cardKicker}>PERSÖNLICHES GESPRÄCH</span>
-          <h2>Passt das wirtschaftlich zu Ihrem Betrieb?</h2>
-          <p className={styles.calBonus}>15 Minuten mit Raphael Hermann · kostenlos und unverbindlich</p>
-          <iframe src={CALENDAR_URL} title="Terminbuchung bei Raphael Hermann" loading="lazy" />
-        </section>
+        <footer className={styles.legal}>
+          <span>Digitale Gewinner · Raphael Hermann</span>
+          <a href="https://digitalegewinner.de/impressum.html" target="_blank" rel="noopener noreferrer">Impressum</a>
+          <a href="https://digitalegewinner.de/datenschutz.html" target="_blank" rel="noopener noreferrer">Datenschutz</a>
+          <span>Wir messen Seitenbesuche und Videonutzung ohne Cookies. Details in der Datenschutzerklärung.</span>
+        </footer>
       </div>
-      {segment === "pflege" && (
-      <section className={styles.proof} aria-label="Fallstudien aus der Pflege">
-        <span className={styles.sectionKicker}>01 / NACHWEISBARE ERGEBNISSE</span>
-        <h2>Echte Pflegebetriebe. Echte Ergebnisse.</h2>
-        <ul>
-          {CASES.map((item) => (
-            <li key={item.name} className={styles.caseCard}>
-              <span className={styles.caseName}>{item.name}</span>
-              <strong>{item.big}</strong>
-              <span>{item.line}</span>
-            </li>
-          ))}
-        </ul>
-        <blockquote className={styles.quote}>
-          „Für uns als Pflegebetrieb ist es ein neues Gefühl, auch mal wieder selektieren zu dürfen! Das hatten wir die letzten 7 Jahre nicht mehr.“
-          <cite>Raik Radloff, Häusliche Krankenpflege</cite>
-        </blockquote>
-        <p className={styles.source}>Einzelergebnisse, keine Garantie.</p>
-      </section>
-      )}
-      {segment === "pv" && (
-        <section className={styles.proof} aria-label="Ergebnisse aus der Anfragegewinnung">
-          <span className={styles.sectionKicker}>01 / NACHWEISBARE ERGEBNISSE</span>
-          <h2>Exklusive Anfragen. Messbare Ergebnisse.</h2>
-          <p>Ergebnisse aus zwei PV-Trust-Kundenprojekten: exklusiv für den jeweiligen Auftraggeber generierte Anfragen.</p>
-          <ul>
-            {PV_CASES.map((item) => (
-              <li key={item.name} className={styles.caseCard}>
-                <span className={styles.caseName}>{item.name}</span>
-                <strong>{item.big}</strong>
-                <span>{item.line}</span>
-              </li>
-            ))}
-          </ul>
-          <div className={styles.comparisonIntro}><span className={styles.sectionKicker}>02 / DER ENTSCHEIDENDE UNTERSCHIED</span><h2>Weg von der Abhängigkeit. Hin zu Ihrem eigenen Anfragekanal.</h2></div>
-          <div className={styles.pvTransformation} aria-label="Vorher und nachher mit einem eigenen Anfragekanal">
-            <div className={styles.pvBefore}>
-              <span className={styles.pvTransformLabel}>VORHER</span>
-              <h3>Abhängig von Leadportalen und Empfehlungen.</h3>
-              <p>Schwankende Auftragslage, unberechenbare Umsätze und das ständige Hoffen auf die nächste Empfehlung. Oder teure Anfragen kaufen – und wieder in den Preiskampf geraten.</p>
-            </div>
-            <div className={styles.pvAfter}>
-              <span className={styles.pvTransformLabel}>MIT PV-TRUST</span>
-              <h3>Eigene, exklusive Kundenanfragen. Mehr Kontrolle.</h3>
-              <p>Ein strukturierter Vertriebsprozess, weniger manuelle Nacharbeit und ein eigener Anfragekanal, der Ihre Marke stärkt – statt die eines Leadportals.</p>
-            </div>
-          </div>
-          <p className={styles.pvTransformationFootnote}>Das Ziel: weg vom Vertriebschaos, hin zu besser planbarer Kundengewinnung und mehr Potenzial für profitables Wachstum.</p>
-          <p className={styles.source}>Kundenbeispiele mit den angegebenen durchschnittlichen Leadkosten im jeweiligen Projekt, keine Preis- oder Ergebnisgarantie. Aufwand und Profitabilität hängen vom einzelnen Betrieb und seinen Abschlüssen ab.</p>
-        </section>
-      )}
-      {segment === "pflege" && (
-        <section className={[styles.proof, styles.careComparison].join(" ")} aria-label="Vom Recruiting-Hamsterrad zum eigenen Bewerbersystem">
-          <span className={styles.sectionKicker}>02 / DER ENTSCHEIDENDE UNTERSCHIED</span>
-          <h2>Nicht die nächste Kampagne. Ein System, das bleibt.</h2>
-          <p>Ein Personalengpass sollte nicht jedes Mal bedeuten, wieder bei null anzufangen.</p>
-          <div className={styles.pvTransformation}>
-            <div className={styles.pvBefore}><span className={styles.pvTransformLabel}>BISHER</span><h3>Neue Stelle. Neues Recruiting. Neue Kosten.</h3><p>Eine Pflegekraft geht, das Team springt ein – und die Suche beginnt von vorn. Die letzte Kampagne hat oft wenig hinterlassen.</p></div>
-            <div className={styles.pvAfter}><span className={styles.pvTransformLabel}>MIT UNSEREM SYSTEM</span><h3>Eine eigene Karrierewelt für Ihren Betrieb.</h3><p>Ein fester digitaler Bewerberkanal, den Sie bei neuen Vakanzen erneut nutzen und gezielt erweitern können.</p></div>
-          </div>
-          <p className={styles.pvTransformationFootnote}>Das Ziel: mehr Unabhängigkeit und eine nachhaltige Basis für kommende Einstellungen.</p>
-        </section>
-      )}
-      {(segment === "pflege" || segment === "pv") && (
-        <section className={styles.funding} aria-label="Förderchance Unternehmensberatung 2026">
-          <div className={styles.fundingTopline}>03 / FÖRDERMÖGLICHKEIT · BIS 31.12.2026</div>
-          <h2>50–80 % Zuschuss für förderfähige Beratung möglich.</h2>
-          <p>
-            Für kleine und mittlere Unternehmen sind je nach Betriebsstätte 50 % oder 80 % Zuschuss
-            auf förderfähige Beratungskosten möglich – maximal 1.750 € bzw. 2.800 € pro Beratung.
-            Ob Ihr Betrieb die Voraussetzungen erfüllt, klären wir gerne im persönlichen Gespräch.
-          </p>
-          <div className={styles.fundingBottom}>
-            <a className={styles.fundingButton} href="#termin">Fördermöglichkeiten kostenlos prüfen</a>
-            <span>
-              Wichtig: Diese BAFA-Förderung betrifft ausschließlich förderfähige, eigenständige
-              Unternehmensberatung – nicht pauschal die Umsetzung unseres Systems, Website-Bau,
-              Werbung oder Anzeigenbudget. Förderfähigkeit, Beratereignung und Antragstellung
-              vor Beratungsbeginn sind Voraussetzung; ein Zuschuss ist nicht garantiert.
-              {" "}<a href="https://www.bafa.de/SharedDocs/Downloads/DE/Wirtschaft/unb_flyer.pdf?__blob=publicationFile&v=2" target="_blank" rel="noopener noreferrer">BAFA-Förderinformationen</a>
-            </span>
-          </div>
-        </section>
-      )}
-      {(segment === "pflege" || segment === "pv") && (
-        <section className={styles.finalCta} aria-label="Persönliches Beratungsgespräch">
-          <div><span>04 / DER NÄCHSTE SCHRITT</span><h2>Finden wir heraus, ob sich das für Sie lohnt.</h2><p>Eine ehrliche Einschätzung in 15 Minuten. Wenn es nicht passt, ist das genauso in Ordnung.</p></div>
-          <a href="#termin">Gespräch auswählen <span aria-hidden="true">↗</span></a>
-        </section>
-      )}
-      <footer className={styles.legal}>
-        <span>Digitale Gewinner · Raphael Hermann</span>
-        <a href="https://digitalegewinner.de/impressum.html" target="_blank" rel="noopener noreferrer">Impressum</a>
-        <a href="https://digitalegewinner.de/datenschutz.html" target="_blank" rel="noopener noreferrer">Datenschutz</a>
-        <span>Wir messen, ob und wie lange diese Seite und das Video angesehen werden (ohne Cookies). Details in der Datenschutzerklärung.</span>
-      </footer>
     </main>
   );
 }
