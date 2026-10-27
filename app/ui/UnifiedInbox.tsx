@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { classifyInboxMessage, currentReplyText, type InboxCategory, type InboxInsight } from "@/lib/inbox-classifier";
+import { classifyInboxMessage, currentReplyText, type InboxInsight } from "@/lib/inbox-classifier";
 import styles from "./unified-inbox.module.css";
 
 type Mailbox = { id: string; name: string; email: string; provider: string; configured: boolean };
