@@ -44,11 +44,15 @@ const PV_CASES = [
   },
 ];
 
-export default async function VideoPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function VideoPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ segment?: string }> }) {
   const { id } = await params;
   const token = decodeURIComponent(id);
   let data = DEMO;
   let segment: LeadSegment = "other";
+  if (token === "demo") {
+    const requested = (await searchParams).segment;
+    if (requested === "pflege" || requested === "pv") segment = requested;
+  }
   if (token !== "demo") {
     const leadId = verifyVideoToken(token);
     if (!leadId) notFound();
