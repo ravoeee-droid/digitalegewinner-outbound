@@ -46,8 +46,36 @@ const SEGMENTS: Array<{ key: Segment; label: string }> = [
 ];
 type Patch = Partial<{ stage: string; setupValue: number; monthlyValue: number; probability: number; nextAction: string; nextActionAt: string | null; notes: string; outcome: string }>;
 
-const FOCUS = ["Interesse", "Termin", "Angebot", "Verhandlung", "Gewonnen"];
-const OUTCOMES = ["Nicht erreicht", "Erreicht", "Interesse", "Termin", "Angebot", "Gewonnen", "Verloren"];
+const FOCUS = ["Info angefragt", "Info versendet", "Interesse", "Termin", "Angebot", "Verhandlung", "Gewonnen"];
+const OUTCOMES = ["Nicht erreicht", "Erreicht", "Info angefragt", "Interesse", "Termin", "Angebot", "Gewonnen", "Verloren"];
+
+// Nur ein Entwurf: Das Öffnen des E-Mail-Clients darf niemals als Versand gezählt werden.
+function infoMailDraft(o: Opp) {
+  const pv = o.segment === "pv";
+  const subject = pv ? "Wie Ihr Solarbetrieb eigene PV-Anfragen gewinnt" : "Informationen zu unserem Recruiting-System für Pflegebetriebe";
+  const body = pv
+    ? `Guten Tag,
+
+vielen Dank für unser Gespräch. Wie versprochen finden Sie hier einen kurzen Überblick über PV-Trust.
+
+Statt immer wieder Leads von Drittanbietern einzukaufen, bauen wir für Ihren Solarbetrieb ein eigenes System auf, über das regionale Interessenten direkt bei Ihnen anfragen. So profitieren langfristig Ihre eigene Marke, Ihr Vertrauen vor Ort und Ihre Unabhängigkeit.
+
+Gern zeige ich Ihnen in einem kurzen Gespräch, wie das konkret für Ihren Betrieb aussehen könnte.
+
+Viele Grüße
+Digitale Gewinner`
+    : `Guten Tag,
+
+vielen Dank für unser Gespräch. Wie versprochen erhalten Sie einen kurzen Überblick über unser Recruiting-System für Pflegebetriebe.
+
+Wir bauen eine langfristig nutzbare Karriere- und Bewerberstrecke für Ihren Betrieb auf. Anders als bei einer einzelnen Stellenanzeigen-Kampagne bleibt die Infrastruktur erhalten und kann bei zukünftigem Personalbedarf weiter genutzt und ausgebaut werden.
+
+Gern zeige ich Ihnen in einem kurzen Gespräch, wie das konkret für Ihren Betrieb aussehen könnte.
+
+Viele Grüße
+Digitale Gewinner`;
+  return `mailto:${o.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+}
 const euro = (v: number) => new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(v || 0);
 const when = (iso: string) => new Intl.DateTimeFormat("de-DE", { weekday: "short", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", timeZone: "Europe/Berlin" }).format(new Date(iso));
 const isDue = (o: Opp) => Boolean(o.next_action_at) && new Date(o.next_action_at as string).getTime() <= Date.now();
@@ -295,6 +323,21 @@ export default function CRMWorkspace({ embedded = false, initialSegment = "pfleg
           <div className={styles.outcomes} role="group" aria-label="Ergebnis eintragen">
             {OUTCOMES.map((o) => <button key={o} type="button" onClick={() => void save(selected.id, { outcome: o })}>{o}</button>)}
           </div>
+
+          {(selected.stage === "Info angefragt" || selected.stage === "Info versendet") && (
+            <div className={styles.infoMailActions}>
+              <strong>✉ Info-Mail</strong>
+              {selected.stage === "Info angefragt" ? (
+                <>
+                  {selected.email ? <a href={infoMailDraft(selected)}>Info-Mail-Entwurf öffnen</a> : <span className={styles.infoMailHint}>Noch keine E-Mail-Adresse hinterlegt – erst Adresse ermitteln.</span>}
+                  <button type="button" onClick={() => void save(selected.id, { outcome: "Info versendet" })}>✓ Versand bestätigen</button>
+                  <small>Nur nach tatsächlichem Versand bestätigen. Danach wird automatisch eine Wiedervorlage in 2 Werktagen gesetzt.</small>
+                </>
+              ) : (
+                <small>Versand manuell bestätigt. Die telefonische Wiedervorlage steht bei „Nächste Aktion“.</small>
+              )}
+            </div>
+          )}
 
           <label className={styles.field}>Nächste Aktion
             <input key={`a-${selected.id}-${selected.next_action}`} defaultValue={selected.next_action} onBlur={(e) => e.target.value !== selected.next_action && void save(selected.id, { nextAction: e.target.value }, { next_action: e.target.value })} />
