@@ -111,8 +111,22 @@ export default async function VideoPage({ params, searchParams }: { params: Prom
           </section>
           <aside className={styles.pitch} aria-label="Kostenloses Gespräch">
             <span className={styles.pitchTop}>PERSÖNLICHES GESPRÄCH · 15 MIN</span>
-            <h2>Passt das wirtschaftlich zu Ihrem Betrieb?</h2>
-            <p>Genau das schauen wir uns gemeinsam an. Ob sich eine Zusammenarbeit lohnt oder nicht – <strong>beides ist vollkommen in Ordnung.</strong></p>
+            {segment === "pflege" ? (
+              <>
+                <h2>Was sich für Ihren Betrieb verändern kann</h2>
+                <ul className={styles.careBenefits}>
+                  <li><span aria-hidden="true">✓</span><span>Das Ziel: <strong>2–3 passende Bewerbungen pro Woche</strong></span></li>
+                  <li><span aria-hidden="true">✓</span><span><strong>Entlastete und motivierte Teams</strong></span></li>
+                  <li><span aria-hidden="true">✓</span><span>Endlich den <strong>Personalschlüssel decken</strong></span></li>
+                </ul>
+                <p>Ob das bei Ihnen wirtschaftlich Sinn macht, prüfen wir persönlich. <strong>Beides ist vollkommen in Ordnung.</strong></p>
+              </>
+            ) : (
+              <>
+                <h2>Passt das wirtschaftlich zu Ihrem Betrieb?</h2>
+                <p>Genau das schauen wir uns gemeinsam an. Ob sich eine Zusammenarbeit lohnt oder nicht – <strong>beides ist vollkommen in Ordnung.</strong></p>
+              </>
+            )}
             <a href="#termin" className={styles.cta}>Kostenlosen Termin wählen <span aria-hidden="true">↗</span></a>
             <span className={styles.ctaNote}>Unverbindlich. Kein Verkaufsdruck.</span>
             <a href={whatsappUrl} className={styles.secondaryContact} target="_blank" rel="noopener noreferrer" data-secondary-action="whatsapp">Lieber kurz eine Frage stellen? WhatsApp ↗</a>
