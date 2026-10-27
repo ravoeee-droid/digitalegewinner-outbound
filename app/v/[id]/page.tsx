@@ -121,6 +121,16 @@ export default async function VideoPage({ params, searchParams }: { params: Prom
                 </ul>
                 <p>Ob das bei Ihnen wirtschaftlich Sinn macht, prüfen wir persönlich. <strong>Beides ist vollkommen in Ordnung.</strong></p>
               </>
+            ) : segment === "pv" ? (
+              <>
+                <h2>Was PV-Trust Ihrem Betrieb bringt</h2>
+                <ul className={styles.careBenefits}>
+                  <li><span aria-hidden="true">✓</span><span><strong>Eigene, exklusive PV-Anfragen</strong> direkt für Ihren Betrieb</span></li>
+                  <li><span aria-hidden="true">✓</span><span><strong>Weniger Abhängigkeit</strong> von Leadportalen und Empfehlungen</span></li>
+                  <li><span aria-hidden="true">✓</span><span><strong>Planbarer Vertrieb</strong>, weniger Aufwand und mehr Gewinnpotenzial</span></li>
+                </ul>
+                <p>Ob das bei Ihnen wirtschaftlich Sinn macht, prüfen wir persönlich. <strong>Beides ist vollkommen in Ordnung.</strong></p>
+              </>
             ) : (
               <>
                 <h2>Passt das wirtschaftlich zu Ihrem Betrieb?</h2>
