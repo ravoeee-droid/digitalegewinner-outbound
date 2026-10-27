@@ -22,7 +22,11 @@ export async function POST(request: Request) {
   const arm = String(body.a || "").toUpperCase() === "B" ? "B" : "A";
   // Sicherheits-Scanner öffnen Mail-Links Sekunden nach der Zustellung in einem echten Browser. Besuche kurz nach dem Versand zählen deshalb nicht als Mensch.
   const [sent] = await query<{ age: number | null }>("select extract(epoch from (now()-max(sent_at)))::int age from er_outbox where workspace='default' and lead_id=$1 and status='sent'", [leadId]).catch(() => []);
-  const bot = BOT.test(request.headers.get("user-agent") || "") || (sent?.age != null && sent.age < 600);
+  // Bots lesen direkt nach Zustellung; echte Menschen können aber sofort auf Play klicken.
+  // Aktive Signale dürfen deshalb auch in den ersten Minuten nicht pauschal als Bot gelten.
+  const passiveEvent = type === "view" || type === "scroll" || type === "dwell";
+  const likelyImmediateScanner = sent?.age != null && sent.age >= 0 && sent.age < 90 && passiveEvent;
+  const bot = BOT.test(request.headers.get("user-agent") || "") || likelyImmediateScanner;
   await query("insert into er_events(workspace,lead_id,type,meta) values('default',$1,$2,$3::jsonb)", [leadId, `video_${type}`, JSON.stringify({ v: value, bot, a: arm, p: String(body.p || "").replace(/[^a-zA-Z0-9/_.#:-]/g, "").slice(0, 80) })]).catch(() => null);
   if (!bot) {
     const [row] = await query<{ company: string }>(
