@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect } from "react";
-import { setTrackToken, track } from "./track";
+import { setTrackToken, setTrackVariant, track } from "./track";
 
 // Misst: Seite geöffnet, Scrolltiefe, Verweildauer (nur bei sichtbarem Tab), Klick auf "Termin buchen", Kalender angeklickt.
-export default function PageTracker({ token }: { token: string }) {
+export default function PageTracker({ token, variant = "A" }: { token: string; variant?: "A" | "B" }) {
   useEffect(() => {
     setTrackToken(token);
+    setTrackVariant(variant);
     track("view");
     let visible = 0;
     let sentScroll = 0;
@@ -22,6 +23,8 @@ export default function PageTracker({ token }: { token: string }) {
     const onClick = (event: MouseEvent) => {
       const link = (event.target as HTMLElement | null)?.closest?.('a[href="#termin"]');
       if (link) track("booking_click");
+      const whatsapp = (event.target as HTMLElement | null)?.closest?.('a[data-secondary-action="whatsapp"]');
+      if (whatsapp) track("whatsapp_click");
     };
     let focusSent = false;
     const onBlur = () => window.setTimeout(() => {
@@ -40,6 +43,6 @@ export default function PageTracker({ token }: { token: string }) {
       document.removeEventListener("visibilitychange", onHide);
       document.removeEventListener("click", onClick);
     };
-  }, [token]);
+  }, [token, variant]);
   return null;
 }
