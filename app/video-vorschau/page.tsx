@@ -1,23 +1,41 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 const clips = {
   pflege: {
     title: "Pflege-Recruiting",
-    url: "https://res.cloudinary.com/buttercreatives/video/upload/v1793092295/production/default/viydh7foakt70zqs71jv.mp4",
+    hls: "https://stream.mux.com/wcQEdyzanJcAqXoW01I00Sb02KKoPqnQSitcZ00lwNAHr01k.m3u8",
     filename: "Aufnahme 07:42",
     duration: "1:34",
   },
   pv: {
     title: "PV-Trust",
-    url: "https://res.cloudinary.com/buttercreatives/video/upload/v1793092348/production/default/qkypvyvo5n8upyiifbei.mp4",
+    hls: "https://stream.mux.com/dyqKoJcVQ15w00OYKJ7oda24e00s6zCubLCQYvREzVJ00Q.m3u8",
     filename: "Aufnahme 07:43",
     duration: "1:41",
   },
 } as const;
 
 type Segment = keyof typeof clips;
+type HlsInstance = { loadSource(url: string): void; attachMedia(media: HTMLMediaElement): void; destroy(): void };
+type HlsConstructor = { new (): HlsInstance; isSupported(): boolean };
+declare global { interface Window { Hls?: HlsConstructor } }
+
+function ensureHlsScript(onReady: () => void) {
+  if (window.Hls) { onReady(); return () => {}; }
+  let script = document.querySelector<HTMLScriptElement>("script[data-dg-hls]");
+  if (!script) {
+    script = document.createElement("script");
+    script.src = "https://cdn.jsdelivr.net/npm/hls.js@1.5.17/dist/hls.min.js";
+    script.async = true;
+    script.dataset.dgHls = "true";
+    document.head.appendChild(script);
+  }
+  script.addEventListener("load", onReady);
+  return () => script?.removeEventListener("load", onReady);
+}
+
 
 function PreviewPlayer({ segment }: { segment: Segment }) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -25,6 +43,24 @@ function PreviewPlayer({ segment }: { segment: Segment }) {
   const [seconds, setSeconds] = useState(0);
   const [duration, setDuration] = useState(0);
   const entry = clips[segment];
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    if (video.canPlayType("application/vnd.apple.mpegurl")) {
+      video.src = entry.hls;
+      return;
+    }
+    let disposed = false;
+    let hls: HlsInstance | null = null;
+    const cleanupScript = ensureHlsScript(() => {
+      if (disposed || !window.Hls?.isSupported()) return;
+      hls = new window.Hls();
+      hls.loadSource(entry.hls);
+      hls.attachMedia(video);
+    });
+    return () => { disposed = true; cleanupScript(); hls?.destroy(); };
+  }, [entry.hls]);
+
   const toggle = () => {
     const video = videoRef.current;
     if (!video) return;
@@ -38,7 +74,6 @@ function PreviewPlayer({ segment }: { segment: Segment }) {
       <div className="camera-circle">
         <video
           ref={videoRef}
-          src={entry.url}
           preload="metadata"
           playsInline
           onPlay={() => setPlaying(true)}
