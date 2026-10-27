@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import styles from "./page.module.css";
 import { track } from "./track";
 
-type YTPlayer = { playVideo(): void; pauseVideo(): void; seekTo(seconds: number, allowSeekAhead: boolean): void; getCurrentTime(): number; getDuration(): number; destroy(): void };
+type YTPlayer = { playVideo(): void; pauseVideo(): void; seekTo(seconds: number, allowSeekAhead: boolean): void; getCurrentTime(): number; getDuration(): number; mute(): void; unMute(): void; destroy(): void };
 type YTApi = { Player: new (el: HTMLElement, options: Record<string, unknown>) => YTPlayer };
 declare global { interface Window { YT?: YTApi; onYouTubeIframeAPIReady?: () => void } }
 
@@ -29,6 +29,9 @@ export default function VideoPlayer({ youtubeId, screenshot, company }: { youtub
   const player = useRef<YTPlayer | null>(null);
   const [ready, setReady] = useState(false);
   const [playing, setPlaying] = useState(false);
+  const [muted, setMuted] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const [finished, setFinished] = useState(false);
   const [started, setStarted] = useState(false);
   const [time, setTime] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -38,6 +41,10 @@ export default function VideoPlayer({ youtubeId, screenshot, company }: { youtub
 
   useEffect(() => {
     let cancelled = false;
+    let timeout: ReturnType<typeof setTimeout> | undefined;
+    timeout = setTimeout(() => {
+      if (!cancelled) { setFailed(true); track("player_error", 408); }
+    }, 15000);
     loadYouTube().then((yt) => {
       if (cancelled || !mount.current) return;
       player.current = new yt.Player(mount.current, {
@@ -45,20 +52,22 @@ export default function VideoPlayer({ youtubeId, screenshot, company }: { youtub
         host: "https://www.youtube-nocookie.com",
         playerVars: { controls: 0, rel: 0, modestbranding: 1, playsinline: 1, disablekb: 1, fs: 0, iv_load_policy: 3 },
         events: {
-          onReady: () => { setReady(true); setDuration(player.current?.getDuration() || 0); },
+          onReady: () => { clearTimeout(timeout); setFailed(false); setReady(true); setDuration(player.current?.getDuration() || 0); },
+          onError: (event: { data: number }) => { clearTimeout(timeout); setFailed(true); track("player_error", event.data); },
           onStateChange: (event: { data: number }) => {
             setPlaying(event.data === 1);
             if (event.data === 1) {
+              setFinished(false);
               setStarted(true); setDuration(player.current?.getDuration() || 0);
               if (!sentPlay.current) { sentPlay.current = true; track("play"); }
             }
             if (event.data === 2 || event.data === 0) track("watch", Math.round(watched.current));
-            if (event.data === 0) { setStarted(false); setTime(0); }
+            if (event.data === 0) { setFinished(true); setStarted(false); setTime(0); track("progress", 100); }
           },
         },
       });
-    });
-    return () => { cancelled = true; player.current?.destroy(); player.current = null; };
+    }).catch(() => { if (!cancelled) { clearTimeout(timeout); setFailed(true); track("player_error", 500); } });
+    return () => { cancelled = true; clearTimeout(timeout); player.current?.destroy(); player.current = null; };
   }, [youtubeId]);
 
   useEffect(() => {
@@ -83,7 +92,7 @@ export default function VideoPlayer({ youtubeId, screenshot, company }: { youtub
 
   const toggle = useCallback(() => {
     if (!player.current) return;
-    if (playing) player.current.pauseVideo(); else player.current.playVideo();
+    if (playing) player.current.pauseVideo(); else { track("play_intent"); player.current.playVideo(); }
   }, [playing]);
 
   const seek = (event: React.MouseEvent<HTMLDivElement>) => {
@@ -104,7 +113,19 @@ export default function VideoPlayer({ youtubeId, screenshot, company }: { youtub
           <img className={styles.poster} src={`https://i.ytimg.com/vi/${youtubeId}/mqdefault.jpg`} alt="" />
         )}
       </div>
-      {!playing && (
+      {failed && (
+        <a className={styles.playerFallback} href={"https://www.youtube.com/watch?v=" + encodeURIComponent(youtubeId)} target="_blank" rel="noopener noreferrer">
+          Video direkt auf YouTube ansehen ↗
+        </a>
+      )}
+      {finished && !failed && (
+        <div className={styles.videoFinish}>
+          <strong>Danke fürs Anschauen!</strong>
+          <a href="#termin">15-Minuten-Gespräch vereinbaren ↗</a>
+          <button type="button" onClick={toggle}>Video erneut ansehen</button>
+        </div>
+      )}
+      {!playing && !finished && !failed && (
         <button type="button" className={styles.bigPlay} onClick={toggle} disabled={!ready} aria-label={started ? "Video fortsetzen" : "Video abspielen"}>
           <span className={styles.bigIcon} aria-hidden="true">▶</span>
           {!started && <span className={styles.bigLabel}>Video abspielen · ca. {duration ? clock(duration) : "1:30"} Min</span>}
@@ -114,7 +135,14 @@ export default function VideoPlayer({ youtubeId, screenshot, company }: { youtub
       <div className={styles.bar}>
         <button type="button" className={styles.barButton} onClick={toggle} disabled={!ready} aria-label={playing ? "Pause" : "Wiedergabe"}>{playing ? "❚❚" : "▶"}</button>
         <span className={styles.time}>{clock(time)} / {duration ? clock(duration) : "–:––"}</span>
-        <div className={styles.track} onClick={seek} role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={duration ? Math.round((time / duration) * 100) : 0} aria-label="Fortschritt">
+        <button type="button" className={styles.barButton} onClick={() => { if (!player.current) return; if (muted) player.current.unMute(); else player.current.mute(); setMuted(!muted); }} disabled={!ready} aria-label={muted ? "Ton einschalten" : "Ton ausschalten"}>{muted ? "◩" : "♪"}</button>
+        <div className={styles.track} onClick={seek} role="slider" tabIndex={ready ? 0 : -1} onKeyDown={(event) => {
+          if (!player.current || !duration || !["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+          event.preventDefault();
+          const next = event.key === "Home" ? 0 : event.key === "End" ? duration : Math.min(duration, Math.max(0, time + (event.key === "ArrowRight" ? 5 : -5)));
+          player.current.seekTo(next, true);
+          setTime(next);
+        }} aria-valuemin={0} aria-valuemax={100} aria-valuenow={duration ? Math.round((time / duration) * 100) : 0} aria-label="Video-Fortschritt">
           <div className={styles.fill} style={{ width: duration ? `${(time / duration) * 100}%` : "0%" }} />
         </div>
       </div>
