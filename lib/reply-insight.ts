@@ -1,4 +1,5 @@
 import { heuristicClassification } from "@/lib/outbound-conversation-intelligence";
+import { classifyInboxMessage, currentReplyText } from "@/lib/inbox-classifier";
 
 // Auswertung einer Antwort: Einordnung, Empfehlung und Wiedervorlage-Datum (regelbasiert, ohne KI-Schlüssel).
 const LABEL: Record<string, string> = {
@@ -63,17 +64,24 @@ const NO_AGENCY = /(arbeiten wir nicht|arbeite ich nicht|keine zusammenarbeit)[^
 const LATER = /(noch\s?mal|erneut|wieder|später)\s+(schreiben|melden|anschreiben|kontaktieren|anrufen|nachfragen)|(schreiben|melden|kontaktieren|nachfragen)\s+sie\s+(\w+\s+){0,4}(noch\s?mal|erneut|wieder)/i;
 
 export function analyzeReply(subject: string, body: string, now = new Date()) {
-  const text = `${subject}\n${body}`;
-  const cls = heuristicClassification(subject, body);
+  const current = currentReplyText(body);
+  const text = `${subject}\n${current}`;
+  const inbox = classifyInboxMessage({ from: "", subject, bodyText: current });
+  const cls = heuristicClassification(subject, current);
   let klass = cls.replyClass as string;
-  if (COMPLAINT.test(text)) klass = "legal_complaint";
-  else if (OPT_OUT.test(text)) klass = "unsubscribe";
-  else if (NO_AGENCY.test(text)) klass = "not_interested";
-  else if (klass === "unknown" && (LATER.test(text) || parseFollowUpDate(text, now))) klass = "objection_timing";
+  // Only the actual new reply can cause a block: Outlook often quotes the
+  // unsubscribe link of our own previous message in the email history.
+  if (COMPLAINT.test(current)) klass = "legal_complaint";
+  else if (OPT_OUT.test(current)) klass = "unsubscribe";
+  else if (inbox.category === "rueckruf") klass = "meeting_intent";
+  else if (inbox.category === "information") klass = "needs_information";
+  else if (inbox.category === "vermittler") klass = "objection_existing_solution";
+  else if (NO_AGENCY.test(current)) klass = "not_interested";
+  else if (klass === "unknown" && (LATER.test(text) || parseFollowUpDate(current, now))) klass = "objection_timing";
   const action = ACTION[klass] || ACTION.unknown;
   let due: Date | null = null;
   if (action.days !== null) {
-    due = klass === "objection_timing" || klass === "out_of_office" ? parseFollowUpDate(`${subject}\n${body}`, now) : null;
+    due = klass === "objection_timing" || klass === "out_of_office" ? parseFollowUpDate(`${subject}\n${current}`, now) : null;
     if (!due) due = new Date(now.getTime() + action.days * 86400000);
   }
   return { replyClass: klass, label: LABEL[klass] || LABEL.unknown, action: action.text, due, confidence: cls.confidence, suppress: klass === "legal_complaint" || klass === "unsubscribe" };
