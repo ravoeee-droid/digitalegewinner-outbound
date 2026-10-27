@@ -30,7 +30,7 @@ const patchSchema = z.object({
   nextAction: z.string().max(600).optional(),
   nextActionAt: z.string().max(120).nullable().optional(),
   notes: z.string().max(12000).optional(),
-  outcome: z.enum(["Nicht erreicht", "Erreicht", "Interesse", "Termin", "Angebot", "Gewonnen", "Verloren"]).optional(),
+  outcome: z.enum(["Nicht erreicht", "Erreicht", "Info angefragt", "Info versendet", "Interesse", "Termin", "Angebot", "Gewonnen", "Verloren"]).optional(),
 });
 
 const actionSchema = z.discriminatedUnion("action", [
