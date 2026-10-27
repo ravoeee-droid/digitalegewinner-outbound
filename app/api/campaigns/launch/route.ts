@@ -31,7 +31,11 @@ export async function POST(request:Request){
   if(runtimeConfig.v3Mode==="active"){
     return Response.json({error:"Legacy campaign launch is disabled while Outbound OS V3 is active."},{status:409});
   }
-  const input=schema.parse(await request.json());const active=input.mailboxes.filter(m=>m.enabled&&m.dailyLimit>0);if(!active.length)return Response.json({error:"Keine aktive Mailbox."},{status:409});
+  const input=schema.parse(await request.json());
+  if(["pflege-starter-v2","pv-starter-v1"].includes(input.campaign.id)){
+    return Response.json({error:"Diese beiden Textkampagnen wurden beendet und dürfen nicht erneut gestartet werden."},{status:409});
+  }
+  const active=input.mailboxes.filter(m=>m.enabled&&m.dailyLimit>0);if(!active.length)return Response.json({error:"Keine aktive Mailbox."},{status:409});
   const suppressedRows=await query<{email:string}>("select email from er_suppressions where workspace='default'");const suppressed=new Set(suppressedRows.map(r=>r.email.toLowerCase()));const appUrl=input.appUrl||process.env.NEXT_PUBLIC_APP_URL||new URL(request.url).origin;
   const eligible=input.leads.filter(l=>matches(l,input.campaign.filters));const leadIds=eligible.map(l=>l.id);const enrolledRows=leadIds.length?await query<{lead_id:string}>("select distinct lead_id from er_outbox where workspace='default' and campaign_id=$1 and lead_id=any($2::text[]) and status not in ('failed','suppressed')",[input.campaign.id,leadIds]):[];const enrolled=new Set(enrolledRows.map(r=>r.lead_id));
   // Don't trust the client's snapshot of lead stage - it can be stale by the time this runs.
