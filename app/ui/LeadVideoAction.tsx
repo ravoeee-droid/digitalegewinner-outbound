@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import styles from "./LeadVideoAction.module.css";
 
-type Info = { ready: boolean; websiteAvailable: boolean; pageUrl: string; previewUrl: string; screenshotUrl: string };
+type Info = { ready: boolean; websiteAvailable: boolean; segment: "pflege" | "pv" | "other"; pageUrl: string; previewUrl: string; screenshotUrl: string };
 
 export default function LeadVideoAction({ leadId, blocked = false }: { leadId: string; blocked?: boolean }) {
   const [info, setInfo] = useState<Info | null>(null);
@@ -50,7 +50,7 @@ export default function LeadVideoAction({ leadId, blocked = false }: { leadId: s
   }
 
   async function copyLink() {
-    if (!info?.ready || blocked) return;
+    if (!info?.ready || blocked || info.segment === "other") return;
     try {
       await navigator.clipboard.writeText(new URL(info.pageUrl, window.location.origin).toString());
       setNotice("Persönlichen Link kopiert – bereit zum manuellen Versenden.");
@@ -81,11 +81,12 @@ export default function LeadVideoAction({ leadId, blocked = false }: { leadId: s
         {info?.ready && (
           <>
             <a href={info.previewUrl} target="_blank" rel="noopener noreferrer" className={styles.secondary}>Vorschau öffnen</a>
-            <button type="button" className={styles.secondary} onClick={() => void copyLink()} disabled={blocked}>Link kopieren</button>
+            <button type="button" className={styles.secondary} onClick={() => void copyLink()} disabled={blocked || info.segment === "other"}>Link kopieren</button>
           </>
         )}
       </div>
-      {info && !info.websiteAvailable && <p className={styles.warning}>Keine gültige Firmenwebsite vorhanden. Website im Lead ergänzen.</p>}
+      {info?.segment === "other" && <p className={styles.warning}>Geschäftsfeld unklar: erst als Pflege oder PV zuordnen, dann Seite erstellen.</p>}
+      {info && !info.websiteAvailable && info.segment !== "other" && <p className={styles.warning}>Keine gültige Firmenwebsite vorhanden. Website im Lead ergänzen.</p>}
       {blocked && <p className={styles.warning}>Kontakt gesperrt – keinen Link versenden.</p>}
       {error && <p className={styles.warning} role="alert">{error}</p>}
       {notice && <p className={styles.success} role="status">{notice}</p>}

@@ -1,4 +1,5 @@
 import { query } from "./db";
+import { leadSegmentSql } from "./lead-segment";
 import { ensureSalesOsSchema } from "./sales-os";
 
 // Tagesziel: 50 Cold Calls im Cockpit, 300 E-Mails (10 Postfächer x 30).
@@ -138,6 +139,7 @@ function insertCallChannelSql() {
       ${baseCandidateSql}
       and coalesce(ct.phone,c.phone,'')<>''
       and l.owner in ('Raphael','Mattias')
+      and ${leadSegmentSql("c")}='pflege'
       and (
         lower(coalesce(c.metadata->>'jobRole',''))='pflegefachkraft'
         or lower(coalesce(c.metadata->>'jobAdUrl','')) like '%/pflegefachkraft/%'

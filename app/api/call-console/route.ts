@@ -5,6 +5,7 @@ import { buildDailyOutboundPlan, getOutboundEngineSnapshot } from "@/lib/outboun
 import { query } from "@/lib/db";
 import { addProductOpportunity, updateRevenueOpportunity } from "@/lib/revenue-opportunities";
 import { createWebsiteProjectFromLead } from "@/lib/website-projects";
+import { leadSegmentSql } from "@/lib/lead-segment";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -41,15 +42,16 @@ function ownerTasks(tasks: Array<{ channel: string; lead_id: string; payload: Re
 async function hydrateContacts<T extends { lead_id: string; payload: Record<string, unknown> }>(tasks: T[]) {
   const leadIds = [...new Set(tasks.map((task) => task.lead_id).filter(Boolean))];
   if (!leadIds.length) return tasks;
-  const contacts = await query<{ lead_id: string; contact_name: string; contact_email: string; contact_phone: string; extreme_hot: boolean }>(`
+  const contacts = await query<{ lead_id: string; contact_name: string; contact_email: string; contact_phone: string; extreme_hot: boolean; segment: string }>(`
     select l.id lead_id,coalesce(ct.name,'') contact_name,coalesce(ct.email,'') contact_email,
-           coalesce(ct.phone,'') contact_phone,coalesce(l.extreme_hot,false) extreme_hot
+           coalesce(ct.phone,'') contact_phone,coalesce(l.extreme_hot,false) extreme_hot, ${leadSegmentSql("c")} segment
     from sales_leads l
+    join sales_companies c on c.id=l.company_id and c.workspace=l.workspace
     left join sales_contacts ct on ct.id=l.contact_id
     where l.id=any($1::text[])
   `, [leadIds]);
   const byLead = new Map(contacts.map((row) => [row.lead_id, row]));
-  return tasks.map((task) => {
+  return tasks.filter((task) => byLead.get(task.lead_id)?.segment === "pflege").map((task) => {
     const contact = byLead.get(task.lead_id);
     if (!contact) return task;
     return {
