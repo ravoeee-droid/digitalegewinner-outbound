@@ -73,3 +73,12 @@
 .field input,.field select,.field textarea{width:100%;min-width:0;box-sizing:border-box}
 .field input[type=range]{accent-color:#34c759;padding:0;min-height:28px}
 .quickRow a,.outcomes button,.presets button{white-space:nowrap}
+
+/* Eigenständige Bereichs-Pipelines ohne Vermischung von Pflege und PV. */
+.segmentBar{display:flex;align-items:center;gap:8px;margin:0 0 14px;flex-wrap:wrap}
+.segmentButton{display:inline-flex;align-items:center;gap:10px;min-height:42px;padding:0 15px;border:1px solid rgba(255,255,255,.14);border-radius:11px;background:rgba(255,255,255,.035);color:#c9d1d6;font-size:13px;font-weight:850;cursor:pointer}
+.segmentButton:hover{border-color:rgba(52,199,89,.55);color:#eef4f0}
+.segmentButton:focus-visible{outline:2px solid #34c759;outline-offset:2px}
+.segmentActive{background:rgba(52,199,89,.14);border-color:#34c759;color:#6aefa8}
+.segmentCount{display:inline-grid;place-items:center;min-width:25px;padding:2px 7px;border-radius:999px;background:rgba(255,255,255,.1);color:inherit;font-size:11px}
+.segmentActive .segmentCount{background:rgba(52,199,89,.19)}
