@@ -32,6 +32,9 @@ export async function POST(request:Request){
     return Response.json({error:"Legacy campaign launch is disabled while Outbound OS V3 is active."},{status:409});
   }
   const input=schema.parse(await request.json());
+  if(["pflege-loom-150-v1","pv-loom-150-v1"].includes(input.campaign.id)){
+    return Response.json({error:"Loom-Kampagnen werden ausschließlich über die kontrollierte 150er-Einplanung verwaltet."},{status:409});
+  }
   if(["pflege-starter-v2","pv-starter-v1"].includes(input.campaign.id)){
     return Response.json({error:"Diese beiden Textkampagnen wurden beendet und dürfen nicht erneut gestartet werden."},{status:409});
   }
