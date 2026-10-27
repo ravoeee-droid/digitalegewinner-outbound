@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
+import { createHash } from "node:crypto";
 import { notFound } from "next/navigation";
 import VideoPlayer from "./VideoBubble";
 import PageTracker from "./PageTracker";
-import ChatWidget from "./ChatWidget";
 import { WHATSAPP_NUMBER } from "@/lib/video-chat";
 import { VIDEO_IDS } from "@/lib/outreach-copy";
 import { query } from "@/lib/db";
@@ -49,12 +49,13 @@ export default async function VideoPage({ params, searchParams }: { params: Prom
   const token = decodeURIComponent(id);
   let data = DEMO;
   let segment: LeadSegment = "other";
+  let leadId = "";
   if (token === "demo") {
     const requested = (await searchParams).segment;
     if (requested === "pflege" || requested === "pv") segment = requested;
   }
   if (token !== "demo") {
-    const leadId = verifyVideoToken(token);
+    leadId = verifyVideoToken(token);
     if (!leadId) notFound();
     const [row] = await query<{ company: string; segment: LeadSegment }>(
       `select c.name company, ${leadSegmentSql("c")} segment from sales_leads l join sales_companies c on c.id=l.company_id and c.workspace=l.workspace where l.id::text=$1 limit 1`,
@@ -68,10 +69,18 @@ export default async function VideoPage({ params, searchParams }: { params: Prom
   const isPv=segment==="pv";
   const hasVertical=segment==="pflege"||segment==="pv";
   const proofItems=isPv?PV_CASES:[CASES[2],CASES[3]];
+  // A/B cohorts are assigned by signed lead ID. Disabled until both short clips are ready
+  // and LOOM_AB_TEST_ACTIVE=on is set explicitly (no automatic roll-over).
+  const shortVideoId = isPv ? process.env.VIDEO_ID_PV_SHORT : process.env.VIDEO_ID_PFLEGE_SHORT;
+  const testIsOn = process.env.LOOM_AB_TEST_ACTIVE === "on" && hasVertical && Boolean(shortVideoId);
+  const group: "A" | "B" = testIsOn && leadId && (createHash("sha256").update("loom-v1:"+leadId).digest()[0] & 1) === 1 ? "B" : "A";
+  const mainVideoId = isPv ? VIDEO_IDS.pv : VIDEO_IDS.pflege;
+  const videoId = group === "B" ? String(shortVideoId) : mainVideoId;
+  // The demo remains pinned to the current A version.
+  const whatsappUrl = "https://wa.me/" + WHATSAPP_NUMBER + "?text=" + encodeURIComponent("Hallo Raphael, ich habe Ihr Video gesehen (" + data.company + ").");
   return (
     <main className={styles.page}>
-      <PageTracker token={token}/>
-      <ChatWidget token={token} company={data.company} whatsapp={WHATSAPP_NUMBER}/>
+      <PageTracker token={token} variant={group}/>
       <div className={styles.wrap}>
         <header className={styles.header}>
           <a href="#start" className={styles.brand} aria-label="Digitale Gewinner">
@@ -89,9 +98,9 @@ export default async function VideoPage({ params, searchParams }: { params: Prom
 
         <div className={styles.heroGrid}>
           <section className={styles.videoFrame} aria-label="Persönliche Videonachricht">
-            {(hasVertical&&Boolean(VIDEO_IDS[isPv?"pv":"pflege"]))||token==="demo" ? (
+            {(hasVertical&&Boolean(videoId))||token==="demo" ? (
               <VideoPlayer
-                youtubeId={token==="demo"?(VIDEO_IDS.pflege||data.youtubeId):(isPv?VIDEO_IDS.pv:VIDEO_IDS.pflege)}
+                youtubeId={token==="demo"?(mainVideoId||data.youtubeId):videoId}
                 screenshot={data.screenshot}
                 company={data.company}
               />
@@ -106,6 +115,7 @@ export default async function VideoPage({ params, searchParams }: { params: Prom
             <p>Genau das schauen wir uns gemeinsam an. Ob sich eine Zusammenarbeit lohnt oder nicht – <strong>beides ist vollkommen in Ordnung.</strong></p>
             <a href="#termin" className={styles.cta}>Kostenlosen Termin wählen <span aria-hidden="true">↗</span></a>
             <span className={styles.ctaNote}>Unverbindlich. Kein Verkaufsdruck.</span>
+            <a href={whatsappUrl} className={styles.secondaryContact} target="_blank" rel="noopener noreferrer" data-secondary-action="whatsapp">Lieber kurz eine Frage stellen? WhatsApp ↗</a>
           </aside>
         </div>
 
@@ -132,13 +142,10 @@ export default async function VideoPage({ params, searchParams }: { params: Prom
         )}
 
         {hasVertical&&(
-          <aside className={styles.funding} aria-label="Mögliche Förderung 2026">
-            <div className={styles.fundingMain}>
-              <span className={styles.fundingTag}>FÖRDERMÖGLICHKEIT · 2026</span>
-              <p><strong>50–80 % Zuschuss</strong> für förderfähige Unternehmensberatung möglich.</p>
-            </div>
-            <p className={styles.fundingNote}>BAFA-Programm für KMU, je nach Standort und Voraussetzungen, bis zu 1.750 € bzw. 2.800 €. Antrag nach aktueller Richtlinie bis 31.12.2026. Keine pauschale Förderung der PV-Trust-/Recruiting-Umsetzung, Website oder Werbekosten; keine Fördergarantie. <a href="https://www.bafa.de/SharedDocs/Downloads/DE/Wirtschaft/unb_flyer.pdf?__blob=publicationFile&v=2" target="_blank" rel="noopener noreferrer">Details beim BAFA</a>.</p>
-          </aside>
+          <details className={styles.funding} aria-label="Mögliche Förderung 2026">
+            <summary>Fördermöglichkeit 2026: 50–80 % Zuschuss für förderfähige Beratung prüfen <span aria-hidden="true">+</span></summary>
+            <p className={styles.fundingNote}>Je nach KMU-Betriebsstätte und Voraussetzungen sind bis zu 1.750 € bzw. 2.800 € BAFA-Zuschuss für förderfähige, eigenständige Unternehmensberatung möglich. Anträge nach aktueller Richtlinie bis 31.12.2026. Website, Marketingumsetzung und Werbebudget sind nicht pauschal förderfähig. Antragstellung und Beraterzulassung müssen vor Beginn geprüft werden. Keine Fördergarantie. <a href="https://www.bafa.de/SharedDocs/Downloads/DE/Wirtschaft/unb_flyer.pdf?__blob=publicationFile&v=2" target="_blank" rel="noopener noreferrer">Offizielle BAFA-Informationen</a>.</p>
+          </details>
         )}
 
         <section id="termin" className={styles.booking} aria-labelledby="booking-title">
