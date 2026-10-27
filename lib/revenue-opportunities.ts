@@ -105,6 +105,7 @@ type OpportunityRow = {
   company: string;
   city: string;
   industry: string;
+  company_source: string;
   website: string;
   phone: string;
   email: string;
@@ -262,6 +263,20 @@ function signalSummary(row: OpportunityRow) {
   return "Telefonischer Servicebetrieb · Automationspotenzial im Erstgespräch qualifizieren";
 }
 
+export type RevenueSegment = "pflege" | "pv" | "other";
+
+// Geschäftsfeld ≠ verkauftes Produkt: PV-Betriebe können z.B. auch eine Website-Chance haben.
+// Daher die Zuordnung über die Firmenherkunft/Branche, niemals über die Angebotsart allein.
+function revenueSegment(row: OpportunityRow): RevenueSegment {
+  const source = (row.company_source || "").toLowerCase();
+  const identity = `${row.company} ${row.industry}`.toLowerCase();
+  if (source === "ba-pv" || /^(pv-|solar-|photovoltaik)/.test(source) ||
+      /photovoltaik|solartechnik|solaranlag|solarenergie|solarstrom|solar solutions|solar solutions|solarinstall|pv-anlag|\bpv\b/i.test(identity)) return "pv";
+  if (source.startsWith("pflege-") || row.product_key === "pflege_recruiting" ||
+      /pflege|pflegedienst|senior|altenheim|ambulatory_care|social_facility|healthcare|gesundheit|care home|nursing/i.test(identity)) return "pflege";
+  return "other";
+}
+
 function callScore(row: OpportunityRow) {
   let score = Number(row.score || 0) * 2 + Number(row.lead_priority || 0) * 2 + Number(row.lead_opportunity || 0);
   if (row.stage === "Interesse") score += 300;
@@ -415,7 +430,7 @@ async function loadOpportunityRows(workspace: string) {
     select o.id,o.workspace,o.lead_id,o.company_id,o.product_key,o.stage,o.status,o.source,
            o.setup_value::float8 setup_value,o.monthly_value::float8 monthly_value,
            o.probability,o.score,o.next_action,o.next_action_at,o.notes,o.created_at,o.updated_at,
-           c.name company,c.city,c.industry,c.website,coalesce(ct.phone,c.phone,'') phone,coalesce(ct.email,'') email,
+           c.name company,c.city,c.industry,c.source company_source,c.website,coalesce(ct.phone,c.phone,'') phone,coalesce(ct.email,'') email,
            l.priority_score lead_priority,l.opportunity_score lead_opportunity,l.extreme_hot,c.metadata company_metadata,
            coalesce(rr.website_score,0)::int website_score,
            ${seoScoreSql("rr")} seo_score
@@ -444,6 +459,7 @@ export async function getRevenueSnapshot(workspace = "default") {
     weighted_value: (Number(row.setup_value || 0) + Number(row.monthly_value || 0) * 12) * Number(row.probability || 0) / 100,
     call_score: callScore(row),
     signal_summary: signalSummary(row),
+    segment: revenueSegment(row),
   })).sort((a, b) => b.call_score - a.call_score);
 
   const active = opportunities.filter((item) => item.stage !== "Gewonnen" && item.stage !== "Verloren" && item.status === "open");
