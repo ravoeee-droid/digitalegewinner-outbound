@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import styles from "./CRMWorkspace.module.css";
+import LeadVideoAction from "./LeadVideoAction";
 
 type Contact = { id: string; company_id: string; name: string; role: string; phone: string; email: string; is_primary: boolean; source: string };
 type ContactDraft = { contactId?: string; name: string; role: string; phone: string; email: string; isPrimary: boolean };
@@ -367,6 +368,8 @@ export default function CRMWorkspace({ embedded = false, initialSegment = "pfleg
             {selected.website && <a href={selected.website.startsWith("http") ? selected.website : `https://${selected.website}`} target="_blank" rel="noreferrer">Website ↗</a>}
             <a href={`/a/${encodeURIComponent(selected.lead_id)}`} target="_blank" rel="noreferrer">Analyse ↗</a>
           </div>
+
+          {selected.lead_id && (selected.segment === "pv" || selected.segment === "pflege") && <LeadVideoAction key={selected.lead_id} leadId={selected.lead_id} blocked={selected.do_not_contact} />}
 
           <section className={styles.contactSection} aria-label="Ansprechpartner und Kontaktdaten">
             <div className={styles.contactHead}>

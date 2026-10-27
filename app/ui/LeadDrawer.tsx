@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import styles from "./LeadDrawer.module.css";
+import LeadVideoAction from "./LeadVideoAction";
 
 type Item = { at: string; kind: "mail" | "reply" | "event"; title: string; detail?: string; body?: string; status?: string };
 type Detail = { lead: { id: string; stage: string; do_not_contact: boolean; company: string; city: string; website: string; source: string; contact: string; email: string; phone: string; pageUrl: string; analyseUrl: string }; items: Item[] };
@@ -46,8 +47,8 @@ export default function LeadDrawer({ id, onClose }: { id: string; onClose: () =>
               <div><dt>Telefon</dt><dd>{lead.phone ? <a href={`tel:${lead.phone.replace(/\s+/g, "")}`}>{lead.phone}</a> : "–"}</dd></div>
               <div><dt>Website</dt><dd>{lead.website ? <a href={/^https?:/i.test(lead.website) ? lead.website : `https://${lead.website}`} target="_blank" rel="noopener noreferrer">{lead.website.replace(/^https?:\/\//, "")}</a> : "–"}</dd></div>
             </dl>
+            <LeadVideoAction leadId={lead.id} blocked={lead.do_not_contact} />
             <p className={styles.links}>
-              <a href={lead.pageUrl} target="_blank" rel="noopener noreferrer">Videoseite ansehen</a>
               <a href={lead.analyseUrl} target="_blank" rel="noopener noreferrer">Analyse (PDF)</a>
             </p>
             {lead.do_not_contact && <p className={styles.error}>Nicht kontaktieren (gesperrt oder abgemeldet).</p>}

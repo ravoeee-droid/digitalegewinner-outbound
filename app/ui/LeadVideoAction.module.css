@@ -1,0 +1,15 @@
+.card { display: grid; gap: 10px; background: #1d1814; border: 1px solid #ed8c34; border-radius: 14px; padding: 15px; color: #f5eee5; min-width: 0; }
+.header { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+.header strong { font-size: 15px; }
+.card p { margin: 0; font-size: 12.5px; line-height: 1.45; }
+.ready { color: #81e8a7; font-size: 12px; font-weight: 700; }
+.buttons { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.buttons button, .buttons a { border-radius: 8px; padding: 10px 12px; cursor: pointer; font: inherit; font-weight: 700; font-size: 12.5px; text-decoration: none; line-height: 1.2; }
+.primary { background: #f48a24; border: 1px solid #f48a24; color: #17110b; }
+.secondary { background: #29241f; border: 1px solid #7c7368; color: #f8eee4; }
+.buttons button:disabled { opacity: .5; cursor: not-allowed; }
+.thumb { max-width: 310px; width: 100%; aspect-ratio: 16 / 10; border-radius: 8px; overflow: hidden; background: #080808; border: 1px solid #554435; }
+.thumb img { width: 100%; height: 100%; display: block; object-fit: cover; object-position: top; }
+.card .warning { color: #ffad91; }
+.card .success { color: #81e8a7; }
+.card .subtle { color: #b9ada0; font-size: 11.5px; }

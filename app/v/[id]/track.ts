@@ -3,7 +3,7 @@ export function setTrackToken(value: string) { token = value; }
 
 // Sendet ein Ereignis an die Auswertung; läuft auch beim Schließen der Seite (sendBeacon).
 export function track(event: string, value = 0) {
-  if (!token || token === "demo") return;
+  if (!token || token === "demo" || new URLSearchParams(window.location.search).get("preview") === "1") return;
   try {
     const body = JSON.stringify({ t: token, e: event, v: value });
     if (navigator.sendBeacon) navigator.sendBeacon("/api/t/video", new Blob([body], { type: "application/json" }));
