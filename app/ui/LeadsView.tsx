@@ -5,7 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import styles from "./LeadsView.module.css";
 import LeadDrawer from "./LeadDrawer";
 
-type Row = { id: string; company: string; city: string; website: string; contact: string; email: string; phone: string; stage: string; score: number; mail_status: string | null; last_sent: string | null; do_not_contact: boolean; shot?: boolean | null; video_token?: string; views?: number; plays?: number; progress?: number; watch?: number; dwell?: number; calendar?: number; site_pages?: number; site_dwell?: number };
+type Row = { id: string; company: string; city: string; website: string; contact: string; email: string; phone: string; segment: "pflege" | "pv" | "other"; stage: string; score: number; mail_status: string | null; last_sent: string | null; do_not_contact: boolean; shot?: boolean | null; video_token?: string; views?: number; plays?: number; progress?: number; watch?: number; dwell?: number; calendar?: number; site_pages?: number; site_dwell?: number };
 type Data = { counts: { total: number; with_email: number; ready: number; contacted: number }; filter: string; page: number; pages: number; total: number; rows: Row[] };
 
 const FILTERS: Array<[string, string]> = [["alle", "Alle"], ["bereit", "Bereit zum Anschreiben"], ["email", "Mit E-Mail"], ["angeschrieben", "Angeschrieben"], ["ohne_email", "Ohne E-Mail"], ["screenshot", "Mit Screenshot"], ["video", "Video angesehen (anrufen)"]];
@@ -66,7 +66,7 @@ function Blocklist({ onChange }: { onChange: () => void }) {
 
 export default function LeadsView() {
   const [filter, setFilter] = useState("bereit");
-  const [segment, setSegment] = useState("");
+  const [segment, setSegment] = useState("pflege");
   const [q, setQ] = useState("");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
@@ -105,7 +105,7 @@ export default function LeadsView() {
         <div className="dg-head-copy">
           <span className="dg-eyebrow">Leads</span>
           <h1 className="dg-title">Ihre Leads</h1>
-          <p className="dg-lead">Alle Pflegedienste und Heime, ihr Ansprechpartner und ob schon eine Mail rausging.</p>
+          <p className="dg-lead">Getrennte Leads für Pflege-Recruiting, PV-Trust und ungeklärte Branchen. Keine automatische Vermischung.</p>
         </div>
         <div className="dg-actions">
           <Link href="/crm" className="dg-btn">Im CRM öffnen</Link>
@@ -125,7 +125,7 @@ export default function LeadsView() {
       <section className={`dg-panel ${styles.listPanel}`}>
         <div className={styles.toolbar}>
           <div className={styles.chips} role="group" aria-label="Kampagne">
-            {[["", "Alle Kampagnen"], ["pflege", "Pflege"], ["pv", "Photovoltaik"]].map(([key, label]) => (
+            {[["pflege", "Pflege"], ["pv", "Photovoltaik"], ["other", "Unzugeordnet"]].map(([key, label]) => (
               <button key={key} type="button" className={segment === key ? styles.chipOn : styles.chip} aria-pressed={segment === key} onClick={() => { setSegment(key); setPage(1); }}>{label}</button>
             ))}
           </div>

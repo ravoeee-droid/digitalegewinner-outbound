@@ -1,17 +1,18 @@
 import { query } from "@/lib/db";
 import { videoToken } from "@/lib/email-tracking";
+import { leadSegmentSql, type LeadSegment } from "@/lib/lead-segment";
 import { capture, ensureScreenshotTable, hasScreenshot, launch, websiteFor } from "@/lib/lead-screenshot";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 90;
 
-type Lead = { id: string; website: string; email: string };
+type Lead = { id: string; website: string; email: string; segment: LeadSegment };
 
 async function findLead(id: string): Promise<Lead | null> {
   if (!id || id.length > 180) return null;
   const [lead] = await query<Lead>(
-    "select l.id::text id, coalesce(nullif(c.website,''),c.domain,'') website, coalesce(ct.email,'') email " +
+    `select l.id::text id, coalesce(nullif(c.website,''),c.domain,'') website, coalesce(ct.email,'') email, ${leadSegmentSql("c")} segment ` +
     "from sales_leads l join sales_companies c on c.id=l.company_id and c.workspace=l.workspace " +
     "left join lateral (select email from sales_contacts k where k.company_id=c.id and k.workspace=l.workspace " +
     "order by k.is_primary desc, (coalesce(k.email,'')<>'') desc limit 1) ct on true " +
@@ -21,11 +22,12 @@ async function findLead(id: string): Promise<Lead | null> {
   return lead || null;
 }
 
-function pageInfo(id: string, ready: boolean, websiteAvailable: boolean) {
+function pageInfo(id: string, ready: boolean, websiteAvailable: boolean, segment: LeadSegment) {
   const token = videoToken(id);
   return {
     ready,
     websiteAvailable,
+    segment,
     pageUrl: "/v/" + encodeURIComponent(token),
     previewUrl: "/v/" + encodeURIComponent(token) + "?preview=1",
     screenshotUrl: "/api/t/shot/" + encodeURIComponent(token),
@@ -39,7 +41,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     const { id } = await params;
     const lead = await findLead(id);
     if (!lead) return Response.json({ error: "Lead nicht gefunden." }, { status: 404 });
-    return Response.json(pageInfo(id, await hasScreenshot(id), Boolean(websiteFor(lead.website, lead.email))), {
+    return Response.json(pageInfo(id, await hasScreenshot(id), Boolean(websiteFor(lead.website, lead.email)) && lead.segment !== "other", lead.segment), {
       headers: { "cache-control": "no-store" },
     });
   } catch {
@@ -52,6 +54,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
     const { id } = await params;
     const lead = await findLead(id);
     if (!lead) return Response.json({ error: "Lead nicht gefunden." }, { status: 404 });
+    if (lead.segment === "other") return Response.json({ error: "Branche nicht sicher zugeordnet. Bitte erst als PV oder Pflege klassifizieren." }, { status: 422 });
     const website = websiteFor(lead.website, lead.email);
     if (!website) return Response.json({ error: "Keine gültige Firmenwebsite hinterlegt. Bitte zuerst die Website ergänzen." }, { status: 422 });
 
@@ -70,7 +73,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
       "on conflict (lead_id) do update set url=excluded.url,status='ok',data=excluded.data,error=null,attempts=0,created_at=now()",
       [id, website, jpg],
     );
-    return Response.json(pageInfo(id, true, true), { headers: { "cache-control": "no-store" } });
+    return Response.json(pageInfo(id, true, true, lead.segment), { headers: { "cache-control": "no-store" } });
   } catch (error) {
     console.error("[lead-video-create]", error);
     return Response.json({ error: "Screenshot konnte nicht erstellt werden. Website oder Screenshot-Dienst prüfen." }, { status: 502 });

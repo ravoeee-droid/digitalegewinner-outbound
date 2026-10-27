@@ -2,6 +2,7 @@ import { query, queryIfTable, readStateFields } from "@/lib/db";
 import { resolveSlots, withSignatureLink } from "@/lib/outreach-copy";
 import { pvPageUrl } from "@/lib/pv-page";
 import { sendMail } from "@/lib/mailer";
+import { leadSegmentSql } from "@/lib/lead-segment";
 import { loadMailboxCredentials, type StoredMailboxCredential } from "@/lib/mailbox-credentials";
 import { recordOutboundEventByMode } from "@/lib/outbound-event-ledger";
 import { resolveOutboundRuntimeConfig } from "@/lib/outbound-runtime-config";
@@ -104,6 +105,14 @@ async function run(request: Request) {
     `select campaign_id,count(*)::text as count from er_outbox where workspace='default' and status='sent' and campaign_id is not null and (sent_at at time zone 'Europe/Berlin')::date=(now() at time zone 'Europe/Berlin')::date group by campaign_id`
   );
   const campaignToday = new Map(campaignTodayRows.map((r) => [r.campaign_id, Number(r.count)]));
+
+  // Harte Versand-Sperre: Die beiden Geschäftsfeldkampagnen dürfen ausschließlich
+  // an passend klassifizierte Leads gehen. Uneindeutige Leads bleiben für Prüfung liegen.
+  await query(`update er_outbox o set status='suppressed', error='Geschäftsfeld stimmt nicht zur Kampagne' 
+    where o.workspace='default' and o.status='queued' and o.campaign_id in ('pv-starter-v1','pflege-starter-v2')
+      and not exists (select 1 from sales_leads l join sales_companies c on c.id=l.company_id and c.workspace=l.workspace
+        where l.id::text=o.lead_id and l.workspace=o.workspace and ${leadSegmentSql("c")} =
+          case when o.campaign_id='pv-starter-v1' then 'pv' else 'pflege' end)`);
 
   // PV-Mails richten sich an die Geschäftsführung, nicht an Bewerbungs-/Personalpostfächer.
   await query("update er_outbox set status='suppressed',error='Personal-/Bewerbungsadresse (PV)' where workspace='default' and status='queued' and campaign_id='pv-starter-v1' and recipient ~* '^(bewerbung|bewerbungen|bewerber|karriere|jobs?|hr|personal|recruiting|career|careers|application|applications|stellen|ausbildung)[._-]?[a-z0-9]*@'");

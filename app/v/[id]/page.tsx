@@ -8,6 +8,7 @@ import { VIDEO_IDS } from "@/lib/outreach-copy";
 import { query } from "@/lib/db";
 import { verifyVideoToken } from "@/lib/email-tracking";
 import { hasScreenshot } from "@/lib/lead-screenshot";
+import { leadSegmentSql, type LeadSegment } from "@/lib/lead-segment";
 import styles from "./page.module.css";
 
 export const metadata: Metadata = {
@@ -28,6 +29,11 @@ const TAKEAWAYS = {
     "Welcher Weg zu Fachkräften wirtschaftlich passt (Vermittlung, Ausland, Portale, eigene Kampagnen) und ob eine Förderung infrage kommt.",
     "Zwei bis drei Sofortmaßnahmen, die Sie selbst umsetzen können.",
   ],
+  other: [
+    "Eine unverbindliche Einschätzung Ihres aktuellen Online-Auftritts.",
+    "Konkrete Verbesserungsmöglichkeiten für Ihr Unternehmen.",
+    "Die nächsten sinnvollen Schritte für Ihre digitale Sichtbarkeit.",
+  ],
   pv: [
     "Eine ehrliche Einschätzung, was Leadportale Sie aktuell an Marge und Aufträgen kosten.",
     "Welcher Weg zu Kunden wirtschaftlich passt (Empfehlungen, Portale, Agenturen, eigene exklusive Anfragen) und ob eine Förderung infrage kommt.",
@@ -47,16 +53,16 @@ export default async function VideoPage({ params }: { params: Promise<{ id: stri
   const { id } = await params;
   const token = decodeURIComponent(id);
   let data = DEMO;
-  let segment: "pflege" | "pv" = "pflege";
+  let segment: LeadSegment = "other";
   if (token !== "demo") {
     const leadId = verifyVideoToken(token);
     if (!leadId) notFound();
-    const [row] = await query<{ company: string; source: string }>(
-      "select c.name company, coalesce(c.source,'') source from sales_leads l join sales_companies c on c.id=l.company_id and c.workspace=l.workspace where l.id::text=$1 limit 1",
+    const [row] = await query<{ company: string; segment: LeadSegment }>(
+      `select c.name company, ${leadSegmentSql("c")} segment from sales_leads l join sales_companies c on c.id=l.company_id and c.workspace=l.workspace where l.id::text=$1 limit 1`,
       [leadId],
     ).catch(() => []);
     if (!row) notFound();
-    segment = row.source === "ba-pv" ? "pv" : "pflege";
+    segment = row.segment;
     data = { ...DEMO, company: row.company, screenshot: (await hasScreenshot(leadId)) ? `/api/t/shot/${encodeURIComponent(token)}` : "" };
   }
   return (

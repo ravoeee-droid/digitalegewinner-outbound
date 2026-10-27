@@ -1,4 +1,5 @@
 import { query } from "./db";
+import { classifyLeadSegment } from "./lead-segment";
 import { ensureSalesOsSchema } from "./sales-os";
 
 export const REVENUE_STAGES = [
@@ -300,13 +301,7 @@ export type RevenueSegment = "pflege" | "pv" | "other";
 // Geschäftsfeld ≠ verkauftes Produkt: PV-Betriebe können z.B. auch eine Website-Chance haben.
 // Daher die Zuordnung über die Firmenherkunft/Branche, niemals über die Angebotsart allein.
 function revenueSegment(row: OpportunityRow): RevenueSegment {
-  const source = (row.company_source || "").toLowerCase();
-  const identity = `${row.company} ${row.industry}`.toLowerCase();
-  if (source === "ba-pv" || /^(pv-|solar-|photovoltaik)/.test(source) ||
-      /photovoltaik|solartechnik|solaranlag|solarenergie|solarstrom|solar solutions|solar solutions|solarinstall|pv-anlag|\bpv\b/i.test(identity)) return "pv";
-  if (source.startsWith("pflege-") || row.product_key === "pflege_recruiting" ||
-      /pflege|pflegedienst|senior|altenheim|ambulatory_care|social_facility|healthcare|gesundheit|care home|nursing/i.test(identity)) return "pflege";
-  return "other";
+  return classifyLeadSegment({ company: row.company, industry: row.industry, source: row.company_source, metadata: row.company_metadata });
 }
 
 function callScore(row: OpportunityRow) {

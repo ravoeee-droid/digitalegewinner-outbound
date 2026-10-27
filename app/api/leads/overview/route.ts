@@ -2,6 +2,7 @@ import { query } from "@/lib/db";
 import { cleanPersonName } from "@/lib/outreach-copy";
 import { videoToken } from "@/lib/email-tracking";
 import { ensureScreenshotTable } from "@/lib/lead-screenshot";
+import { leadSegmentSql } from "@/lib/lead-segment";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -26,7 +27,7 @@ export async function GET(request: Request) {
   const filter = q ? "alle" : FILTERS[url.searchParams.get("filter") || ""] ? String(url.searchParams.get("filter")) : "alle";
   const page = Math.max(1, Number(url.searchParams.get("page")) || 1);
   const segment = url.searchParams.get("segment");
-  const segmentSql = segment === "pv" ? " and c.source='ba-pv'" : segment === "pflege" ? " and c.source<>'ba-pv'" : "";
+  const segmentSql = segment === "pv" || segment === "pflege" || segment === "other" ? " and " + leadSegmentSql("c") + "='" + segment + "'" : "";
 
   const from = `
     from sales_leads l
@@ -56,6 +57,7 @@ export async function GET(request: Request) {
 
     const rows = await query<{ id: string; company: string; city: string; website: string; contact: string; email: string; phone: string; stage: string; score: number; mail_status: string | null; last_sent: string | null; do_not_contact: boolean; shot: boolean | null; views: number; plays: number; progress: number; watch: number; dwell: number; calendar: number; site_pages: number; site_dwell: number }>(`
       select l.id, c.name company, c.city, coalesce(nullif(c.website,''),c.domain) website, coalesce(ct.name,'') contact, coalesce(ct.email,'') email, c.phone,
+        ${leadSegmentSql("c")} segment,
         l.stage, coalesce(l.priority_score,0)::int score, o.status mail_status, o.sent_at::text last_sent, l.do_not_contact,
         (s.status='ok') shot, coalesce(ev.views,0)::int views, coalesce(ev.plays,0)::int plays, coalesce(ev.progress,0)::int progress,
         coalesce(ev.watch,0)::int watch, coalesce(ev.dwell,0)::int dwell, coalesce(ev.calendar,0)::int calendar, coalesce(ev.site_pages,0)::int site_pages, coalesce(ev.site_dwell,0)::int site_dwell

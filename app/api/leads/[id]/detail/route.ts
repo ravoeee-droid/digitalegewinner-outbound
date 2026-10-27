@@ -1,6 +1,7 @@
 import { query } from "@/lib/db";
 import { videoPageUrl, videoToken } from "@/lib/email-tracking";
 import { resolveSlots } from "@/lib/outreach-copy";
+import { leadSegmentSql } from "@/lib/lead-segment";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -17,9 +18,9 @@ const EVENT_LABELS: Record<string, string> = {
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const origin = new URL(request.url).origin;
-  const [lead] = await query<{ id: string; stage: string; do_not_contact: boolean; next_action: string | null; company: string; city: string; website: string; source: string; contact: string; email: string; phone: string }>(
+  const [lead] = await query<{ id: string; stage: string; do_not_contact: boolean; next_action: string | null; company: string; city: string; website: string; source: string; segment: string; contact: string; email: string; phone: string }>(
     `select l.id::text id, l.stage, coalesce(l.do_not_contact,false) do_not_contact, l.next_action, c.name company, coalesce(c.city,'') city,
-            coalesce(nullif(c.website,''),c.domain,'') website, coalesce(c.source,'') source,
+            coalesce(nullif(c.website,''),c.domain,'') website, coalesce(c.source,'') source, ${leadSegmentSql("c")} segment,
             coalesce(k.name,'') contact, coalesce(k.email,'') email, coalesce(nullif(k.phone,''),c.phone,'') phone
      from sales_leads l join sales_companies c on c.id=l.company_id and c.workspace=l.workspace
      left join lateral (select * from sales_contacts k where k.company_id=c.id and k.workspace=l.workspace order by (coalesce(k.email,'')<>'') desc, k.is_primary desc limit 1) k on true
