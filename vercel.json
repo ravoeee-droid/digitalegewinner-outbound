@@ -59,7 +59,7 @@
     },
     {
       "path": "/api/cron/pv-whatsapp",
-      "schedule": "30 7 * * 1-5"
+      "schedule": "30 7 * * *"
     }
   ],
   "regions": [
