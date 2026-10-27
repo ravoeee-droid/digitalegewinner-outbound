@@ -65,7 +65,7 @@ async function writeCampaignDashboard(pending:Record<Segment,number>) {
 async function candidatePool(segment:Segment,limit:number) {
   const segmentSql=leadSegmentSql("c");
   return query<Candidate>(
-    `select distinct on (lower(ct.email)) l.id::text id,trim(ct.email) email,c.name company,
+    `select distinct on (l.company_id) l.id::text id,trim(ct.email) email,c.name company,
        coalesce(ct.name,'') contact,l.priority_score
      from sales_leads l
      join sales_companies c on c.id=l.company_id and c.workspace=l.workspace
@@ -83,13 +83,9 @@ async function candidatePool(segment:Segment,limit:number) {
              (o.lead_id=l.id::text or lower(o.recipient)=lower(ct.email))
              and (o.status='sent' or (o.status in ('queued','sending') and o.campaign_id not in ('pflege-starter-v2','pv-starter-v1'))))
        and not exists(select 1 from er_events e where e.workspace='default' and e.lead_id=l.id::text and e.type in ('reply','positive_reply','appointment','bounce'))
-       and exists(select 1 from outbound_contact_permissions p
-         where p.workspace='default' and p.channel='email' and p.status='verified'
-           and (p.contact_id=l.contact_id or p.company_id=l.company_id)
-           and (p.valid_from is null or p.valid_from<=now())
-           and (p.valid_until is null or p.valid_until>=now())
-           and p.revoked_at is null)
-     order by lower(ct.email), l.priority_score desc,l.updated_at desc
+       and not exists(select 1 from er_outbox d where d.workspace='default'
+         and d.lead_id=l.id::text and d.campaign_id in ('pflege-loom-150-v1','pv-loom-150-v1'))
+     order by l.company_id, l.priority_score desc,l.updated_at desc
      limit $2`, [segment,limit],
   );
 }
@@ -144,9 +140,9 @@ export async function ensureLoomCampaigns() {
   const oldState=(await readState())?.payload as {mailboxes?:Array<{email?:string;enabled?:boolean}>}|undefined;
   const enabledByEmail=new Map((oldState?.mailboxes||[]).map(m=>[m.email?.toLowerCase(),m.enabled!==false]));
   const mailboxes=creds.filter(c=>c.provider==="smtp"&&enabledByEmail.get(c.email?.toLowerCase())!==false);
-  const result:Record<Segment,{already:number;queued:number;rejected:number;scanned:number;reason?:string}>={
-    pflege:{already:0,queued:0,rejected:0,scanned:0},
-    pv:{already:0,queued:0,rejected:0,scanned:0},
+  const result:Record<Segment,{already:number;prepared:number;queued:number;rejected:number;scanned:number;reason?:string}>={
+    pflege:{already:0,prepared:0,queued:0,rejected:0,scanned:0},
+    pv:{already:0,prepared:0,queued:0,rejected:0,scanned:0},
   };
   for(const segment of ["pflege","pv"] as const) {
     const id=LOOM_CAMPAIGNS[segment];
@@ -162,28 +158,29 @@ export async function ensureLoomCampaigns() {
     pool.sort((a,b)=>b.priority_score-a.priority_score);
     result[segment].scanned=pool.length;
     for(const lead of pool) {
-      if(result[segment].queued>=remaining)break;
+      if(result[segment].prepared>=remaining)break;
       if(segment==="pv"&&PV_CAREER_RECIPIENT.test(lead.email)){result[segment].rejected++;continue;}
+      // Drafting a personalized video message is not permission to send it.
+      // Only records explicitly cleared by the compliance engine enter the actual queue.
       let allowed=false;
-      try{
-        allowed=(await evaluateEmailSendCompliance(lead.id,lead.email)).decision.allowed;
-      }catch{return {...result,oldSuppressed:Number(old?.n||0),error:"Compliance-Prüfung nicht erreichbar: Versand sicherheitshalber gestoppt."};}
-      if(!allowed){result[segment].rejected++;continue;}
-      const mailbox=mailboxes[(already+result[segment].queued)%mailboxes.length];
+      try { allowed=(await evaluateEmailSendCompliance(lead.id,lead.email)).decision.allowed; }
+      catch { allowed=false; }
+      const mailbox=mailboxes[(already+result[segment].prepared)%mailboxes.length];
       const body=emailBody(segment,lead.company,lead.contact);
       const subject=`Persönliche Videonachricht für ${lead.company}`.slice(0,125);
       await query(
-        `insert into er_outbox(id,workspace,campaign_id,lead_id,mailbox_id,recipient,subject,body,variant,scheduled_at)
-         values(gen_random_uuid(),'default',$1,$2,$3,$4,$5,$6,'V',greatest(now(),$7::timestamptz))`,
-        [id,lead.id,mailbox.id,lead.email,subject,body,"2026-10-28T08:30:00+01:00"],
+        `insert into er_outbox(id,workspace,campaign_id,lead_id,mailbox_id,recipient,subject,body,variant,status,scheduled_at)
+         values(gen_random_uuid(),'default',$1,$2,$3,$4,$5,$6,'V',$7,greatest(now(),$8::timestamptz))`,
+        [id,lead.id,mailbox.id,lead.email,subject,body,allowed?"queued":"draft","2026-10-28T08:30:00+01:00"],
       );
-      result[segment].queued++;
+      result[segment].prepared++;
+      if(allowed)result[segment].queued++;
     }
-    result[segment].reason=result[segment].queued>0?"queued":"no_verified_unsent_screenshot_ready_recipients";
+    result[segment].reason=result[segment].queued>0?"queued":result[segment].prepared>0?"drafts_prepared_awaiting_legal_permission":"no_screenshot_ready_unsent_recipients";
   }
   await writeCampaignDashboard({
-    pflege:result.pflege.already+result.pflege.queued,
-    pv:result.pv.already+result.pv.queued,
+    pflege:result.pflege.queued,
+    pv:result.pv.queued,
   });
   const readiness=await diagnoseLoomReadiness().catch((err:unknown)=>({error:String(err instanceof Error?err.message:err)}));
   return {ok:true,oldSuppressed:Number(old?.n||0),maxPerSegment:MAX_PER_SEGMENT,campaigns:result,readiness};
