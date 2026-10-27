@@ -39,6 +39,17 @@
 .track { flex: 1; height: 6px; border-radius: 3px; background: rgba(255, 255, 255, 0.3); cursor: pointer; }
 .fill { height: 100%; border-radius: 3px; background: #ffa44d; }
 
+.funding { max-width: 1320px; margin: 28px auto 0; padding: 26px 30px; background: #fff; border: 1px solid #e4ded7; border-left: 5px solid #e8791a; border-radius: 14px; }
+.fundingTopline { color: #ad5209; font-size: 12px; letter-spacing: .06em; font-weight: 800; }
+.funding h2 { font-size: clamp(20px, 2.1vw, 27px); line-height: 1.25; margin: 9px 0 12px; max-width: 1000px; }
+.funding p { margin: 0 0 16px; font-size: 15px; line-height: 1.55; max-width: 1080px; color: #50473e; }
+.fundingBottom { display: flex; align-items: center; gap: 20px; }
+.fundingButton { display: inline-flex; flex: none; justify-content: center; align-items: center; min-height: 46px; padding: 0 19px; background: #1c1815; color: white; border-radius: 30px; font-size: 14px; font-weight: 700; text-decoration: none; }
+.fundingButton:focus-visible { outline: 3px solid #c8620a; outline-offset: 3px; }
+.fundingBottom span { color: #696058; line-height: 1.45; font-size: 12px; }
+.fundingBottom span a { color: #36281d; font-weight: 700; text-decoration: underline; }
+@media (max-width: 640px) { .funding { padding: 20px 18px; } .fundingBottom { flex-direction: column; align-items: stretch; } }
+
 .proof { max-width: 1320px; margin: 36px auto 0; }
 .proof h2 { margin: 0 0 8px; font-size: 20px; }
 .proof p { margin: 0 0 16px; max-width: 760px; color: #5a5149; font-size: 14px; line-height: 1.5; }
