@@ -94,27 +94,48 @@ async function candidatePool(segment:Segment,limit:number) {
   );
 }
 
-export type LoomReadiness = {
-  segment: Segment;
-  inPipeline: number;
-  withEmail: number;
-  notSuppressed: number;
-  neverSent: number;
-  verifiedPermission: number;
-  screenshotReady: number;
-  fullyReady: number;
-  waitingScreenshots: number;
-};
-export async function diagnoseLoomReadiness():Promise<LoomReadiness[]> {
-  const result:LoomReadiness[]=[];
-  for(const segment of ["pflege","pv"] as const) {
-    const [row]=await query<{
-      in_pipeline:number;with_email:number;not_suppressed:number;never_sent:number;
-      verified_permission:number;screenshot_ready:number;fully_ready:number;waiting_screenshots:number;
-    }>(`
-      with base as (
-        select l.id::text lead_id, ct.email,
-          (ct.email ~* '^[^[:space:]@]+@[^[:space:]@]+\\.[^[:space:]@]+
+export async function diagnoseLoomReadiness() {
+  const out: Record<string, unknown>[] = [];
+  for (const segment of ["pflege", "pv"] as const) {
+    const sql = [
+      "with base as (select l.id, ct.email,",
+      "(position('@' in coalesce(ct.email,''))>1) as valid_email,",
+      "not exists(select 1 from er_suppressions s where s.workspace='default' and lower(s.email)=lower(ct.email))",
+      "and not exists(select 1 from outbound_compliance_suppressions s where s.workspace='default'",
+      "and s.channel='email' and s.status='active' and lower(s.identifier)=lower(ct.email)) as unsuppressed,",
+      "not exists(select 1 from er_outbox o where o.workspace='default'",
+      "and (o.lead_id=l.id::text or lower(o.recipient)=lower(ct.email))",
+      "and (o.status='sent' or (o.status in ('queued','sending')",
+      "and coalesce(o.campaign_id,'') not in ('pflege-starter-v2','pv-starter-v1')))) as untouched,",
+      "exists(select 1 from outbound_contact_permissions p where p.workspace='default'",
+      "and p.channel='email' and p.status='verified'",
+      "and (p.contact_id=l.contact_id or p.company_id=l.company_id)",
+      "and p.revoked_at is null and (p.valid_from is null or p.valid_from<=now())",
+      "and (p.valid_until is null or p.valid_until>=now())) as permitted,",
+      "exists(select 1 from lead_screenshots s where s.lead_id=l.id::text and s.status='ok') as screenshot",
+      "from sales_leads l",
+      "join sales_companies c on c.id=l.company_id and c.workspace=l.workspace",
+      "join sales_contacts ct on ct.id=l.contact_id and ct.workspace=l.workspace",
+      "where l.workspace='default' and l.status='active'",
+      "and l.stage in ('Neu','Research','Bereit')",
+      "and coalesce(l.do_not_contact,false)=false",
+      "and " + leadSegmentSql("c") + "=$1)",
+      "select count(*)::int in_pipeline,",
+      "count(*) filter(where valid_email)::int with_email,",
+      "count(*) filter(where valid_email and unsuppressed and untouched)::int unsent_not_blocked,",
+      "count(*) filter(where valid_email and unsuppressed and untouched and permitted)::int verified_email_permission,",
+      "count(*) filter(where valid_email and unsuppressed and untouched and screenshot)::int with_screenshot,",
+      "count(*) filter(where valid_email and unsuppressed and untouched and permitted and screenshot)::int ready,",
+      "count(*) filter(where valid_email and unsuppressed and untouched and permitted and not screenshot)::int needs_screenshot",
+      "from base",
+    ].join(" ");
+    const [row] = await query<Record<string, number>>(sql, [segment]);
+    out.push({segment, ...row});
+  }
+  return out;
+}
+
+export async function ensureLoomCampaigns() {
   // Old sequences must not survive the switch.
   const [old] = await query<{n:string}>(
     "with affected as (update er_outbox set status='suppressed',error='Alte Kampagne durch Loom ersetzt' where workspace='default' and status='queued' and campaign_id in ('pflege-starter-v2','pv-starter-v1') returning id) select count(*)::text n from affected",
