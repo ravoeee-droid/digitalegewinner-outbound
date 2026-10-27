@@ -143,6 +143,7 @@ type ConsentRow = {
 };
 async function hasDocumentedConsent(row: { contact_id: string | null; phone: string; workspace: string; lead_id: string; company_id: string }) {
   if (!row.contact_id) return false;
+  try {
   const permissions = await query<ConsentRow>(
     "select p.status,p.basis,p.valid_until,p.valid_from,p.evidence,sc.phone contact_phone " +
     "from outbound_contact_permissions p join sales_contacts sc on sc.id=p.contact_id and sc.workspace=p.workspace " +
@@ -164,6 +165,7 @@ async function hasDocumentedConsent(row: { contact_id: string | null; phone: str
     [row.workspace, row.phone, row.contact_id, row.company_id, row.lead_id],
   );
   return !suppressions[0]?.blocked;
+  } catch { return false; /* Missing compliance tables or DB errors must fail closed. */ }
 }
 export async function pvWhatsAppDashboard(workspace = "default") {
   await ensurePVWhatsAppSchema();
