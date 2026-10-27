@@ -82,3 +82,10 @@
 .segmentActive{background:rgba(52,199,89,.14);border-color:#34c759;color:#6aefa8}
 .segmentCount{display:inline-grid;place-items:center;min-width:25px;padding:2px 7px;border-radius:999px;background:rgba(255,255,255,.1);color:inherit;font-size:11px}
 .segmentActive .segmentCount{background:rgba(52,199,89,.19)}
+
+/* Nach Erstgespraech: Info-Mail vorbereiten, Versand bestaetigen, Wiedervorlage sichern. */
+.infoMailActions{display:flex;flex-wrap:wrap;gap:9px;align-items:center;padding:12px;border:1px solid rgba(52,199,89,.38);border-radius:10px;background:rgba(52,199,89,.06)}
+.infoMailActions strong{flex-basis:100%;font-size:13px}
+.infoMailActions a,.infoMailActions button{display:inline-flex;align-items:center;justify-content:center;padding:8px 10px;border:1px solid rgba(52,199,89,.5);border-radius:8px;background:rgba(52,199,89,.14);color:#83f2ad;font-size:12px;font-weight:800;text-decoration:none;cursor:pointer}
+.infoMailActions a:hover,.infoMailActions button:hover{background:rgba(52,199,89,.25)}
+.infoMailActions small,.infoMailHint{flex-basis:100%;font-size:11px;color:#aeb9b2;line-height:1.5}
