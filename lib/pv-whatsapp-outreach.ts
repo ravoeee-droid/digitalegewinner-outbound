@@ -41,6 +41,7 @@ function knownWhatsApp(row: Prospect) {
 function safeWebsite(website: string): URL | null {
   try {
     const url = new URL(/^https?:\/\//i.test(website) ? website : "https://" + website);
+    if (url.protocol === "http:") url.protocol = "https:";
     const host = url.hostname.toLowerCase();
     if (url.protocol !== "https:" || url.username || url.password || url.port ||
         !host.includes(".") || /(?:^|\.)localhost$|(?:^|\.)local$|(?:^|\.)internal$|(?:^|\.)test$/.test(host) ||
@@ -49,22 +50,34 @@ function safeWebsite(website: string): URL | null {
   } catch { return null; }
 }
 async function findPublicWhatsApp(website: string): Promise<{ phone: string; source: string } | null> {
-  const url = safeWebsite(website);
-  if (!url) return null;
+  const initial = safeWebsite(website);
+  if (!initial) return null;
+  let current = initial;
   try {
-    const response = await fetch(url.toString(), {
-      redirect: "manual",
-      signal: AbortSignal.timeout(4500),
-      headers: { "user-agent": "DG-Outbound-Research/1.0" },
-      cache: "no-store",
-    });
-    if (!response.ok || Number(response.headers.get("content-length") || 0) > 1_500_000 ||
-        !(response.headers.get("content-type") || "").includes("text/html")) return null;
-    const html = (await response.text()).slice(0, 1_500_000).replace(/&amp;/g, "&");
-    const link = html.match(/(?:https?:\/\/)?(?:wa\.me\/|(?:api|web)\.whatsapp\.com\/send\?phone=|whatsapp:\/\/send\?phone=)(?:%2b|\+)?[0-9+(). -]{9,24}/i);
-    if (!link) return null;
-    const phone = phoneFromWhatsApp(link[0]);
-    return phone ? { phone, source: url.toString() } : null;
+    for (let redirectCount = 0; redirectCount < 3; redirectCount++) {
+      const response = await fetch(current.toString(), {
+        redirect: "manual",
+        signal: AbortSignal.timeout(3500),
+        headers: { "user-agent": "DG-Outbound-Research/1.0" },
+        cache: "no-store",
+      });
+      if (response.status >= 300 && response.status < 400) {
+        const location = response.headers.get("location");
+        if (!location) return null;
+        const next = safeWebsite(new URL(location, current).toString());
+        if (!next || next.hostname.replace(/^www\./i, "") !== initial.hostname.replace(/^www\./i, "")) return null;
+        current = next;
+        continue;
+      }
+      if (!response.ok || Number(response.headers.get("content-length") || 0) > 1_500_000 ||
+          !(response.headers.get("content-type") || "").includes("text/html")) return null;
+      const html = (await response.text()).slice(0, 1_500_000).replace(/&amp;/g, "&");
+      const link = html.match(/(?:https?:\/\/)?(?:wa\.me\/|(?:api|web)\.whatsapp\.com\/send\?phone=|whatsapp:\/\/send\?phone=)(?:%2b|\+)?[0-9+(). -]{9,24}/i);
+      if (!link) return null;
+      const phone = phoneFromWhatsApp(link[0]);
+      return phone ? { phone, source: current.toString() } : null;
+    }
+    return null;
   } catch { return null; }
 }
 function greeting(company: string) {
