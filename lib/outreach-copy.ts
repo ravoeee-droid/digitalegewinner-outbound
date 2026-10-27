@@ -13,7 +13,7 @@ export function withSignatureLink(body: string) {
 // Videomail (Variante V): enthält {{video_link}} (persönliche Videoseite, wird beim Versand eingesetzt). Nur aktiv mit VIDEO_MAIL=on.
 export const VIDEO_MAIL_ENABLED = process.env.VIDEO_MAIL === "on";
 // YouTube-ID des Talking-Head-Videos je Zielgruppe. Ist keins hinterlegt, bekommt diese Zielgruppe keine Videomail.
-export const VIDEO_IDS: Record<"pflege" | "pv", string> = { pflege: process.env.VIDEO_ID_PFLEGE || "iYU1SEsBusI", pv: process.env.VIDEO_ID_PV || "" };
+export const VIDEO_IDS: Record<"pflege" | "pv", string> = { pflege: process.env.VIDEO_ID_PFLEGE || "rRGXVr0Oygg", pv: process.env.VIDEO_ID_PV || "" };
 
 // Aufteilung der Leads auf vier Textvarianten (A = bisheriger Text, B = Videocall-Link bzw. kurz, D = neuer Text, E = emotionaler Einstieg).
 export function textBucketFor(leadId: string): "A" | "B" | "D" | "E" {
