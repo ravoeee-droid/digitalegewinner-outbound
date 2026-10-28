@@ -67,7 +67,7 @@ export async function GET(request:NextRequest,{params}:{params:Promise<{token:st
     cache:"no-store",signal:AbortSignal.timeout(12000)
   }).catch(()=>null);
   const size=Number(mediaHead?.headers.get("content-length")||0);
-  if(!request.nextUrl.searchParams.has("original") && mediaHead?.ok && size>0 && size<600_000_000) {
+  if(!url.includes("-optimized") && !request.nextUrl.searchParams.has("original") && mediaHead?.ok && size>0 && size<600_000_000) {
     const meta=await prepareFaststart(url,secret,size);
     if(meta) {
       const parsed=parseRange(request.headers.get("range"),size);
