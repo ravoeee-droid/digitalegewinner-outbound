@@ -63,15 +63,24 @@ const OPT_OUT = /(aus (ihrem|dem|ihrer) (verteiler|liste|mailingliste)|keine wei
 const NO_AGENCY = /(arbeiten wir nicht|arbeite ich nicht|keine zusammenarbeit)[^.]{0,60}(zusammen|personaldienst|vermittl|agentur)/i;
 const LATER = /(noch\s?mal|erneut|wieder|später)\s+(schreiben|melden|anschreiben|kontaktieren|anrufen|nachfragen)|(schreiben|melden|kontaktieren|nachfragen)\s+sie\s+(\w+\s+){0,4}(noch\s?mal|erneut|wieder)/i;
 
+// Automatic acknowledgements (especially applicant/privacy notices) are not
+// complaints merely because their standard boilerplate mentions GDPR or revocation.
+export function isAutomaticAcknowledgement(subject:string,body:string):boolean {
+  const automaticSubject=/^(?:aw:|re:|fw:|wg:)?\\s*(?:automatische antwort|automatic reply|auto(?:matic)?[ -]?response|eingangsbestätigung|bestätigung des eingangs|abwesenheitsnotiz|out of office)/i.test(subject.trim());
+  const acknowledgement=/\\b(?:bestätigen (?:wir )?(?:ihnen )?den eingang|eingang (?:ihrer|ihrer nachricht|ihrer bewerbung)|vielen dank für ihre (?:bewerbung|nachricht)|your message has been received|we have received your message)\\b/i.test(body);
+  return automaticSubject || acknowledgement;
+}
 export function analyzeReply(subject: string, body: string, now = new Date()) {
   const current = currentReplyText(body);
   const text = `${subject}\n${current}`;
   const inbox = classifyInboxMessage({ from: "", subject, bodyText: current });
   const cls = heuristicClassification(subject, current);
+  const autoAcknowledgement=isAutomaticAcknowledgement(subject,current);
   let klass = cls.replyClass as string;
   // Only the actual new reply can cause a block: Outlook often quotes the
   // unsubscribe link of our own previous message in the email history.
-  if (COMPLAINT.test(current)) klass = "legal_complaint";
+  if (autoAcknowledgement && !/(?:bitte|please)\\s+(?:nicht mehr|keine weiteren|stop|remove|löschen sie|unterlassen sie)|(?:unerwünschte|unerlaubte)\\s+werbung|abmahnung|rechtliche schritte/i.test(current)) klass = "out_of_office";
+  else if (COMPLAINT.test(current)) klass = "legal_complaint";
   else if (OPT_OUT.test(current)) klass = "unsubscribe";
   else if (inbox.category === "rueckruf") klass = "meeting_intent";
   else if (inbox.category === "information") klass = "needs_information";
