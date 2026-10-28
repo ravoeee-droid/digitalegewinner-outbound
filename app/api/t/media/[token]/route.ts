@@ -3,6 +3,7 @@ import { verifyVideoToken } from "@/lib/email-tracking";
 import { query } from "@/lib/db";
 import { leadSegmentSql } from "@/lib/lead-segment";
 import { getLoomVideoUrl } from "@/lib/loom-assets";
+import { prepareFaststart, virtualParts, parseRange, streamVirtualParts } from "@/lib/mp4-faststart";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -60,6 +61,36 @@ export async function GET(request:NextRequest,{params}:{params:Promise<{token:st
     const sample=await test.arrayBuffer().catch(()=>new ArrayBuffer(0));
     return Response.json({ok:test.status===206,status:test.status,bytes:sample.byteLength,
       contentRange:test.headers.get("content-range"),mime:test.headers.get("content-type")});
+  }
+  const mediaHead=await fetch(url,{
+    method:"HEAD",headers:{authorization:`Bearer ${secret}`},
+    cache:"no-store",signal:AbortSignal.timeout(12000)
+  }).catch(()=>null);
+  const size=Number(mediaHead?.headers.get("content-length")||0);
+  if(mediaHead?.ok && size>0 && size<600_000_000) {
+    const meta=await prepareFaststart(url,secret,size);
+    if(meta) {
+      const parsed=parseRange(request.headers.get("range"),size);
+      if(!parsed)return new Response("Range not satisfiable",{status:416,headers:{"content-range":`bytes */${size}`}});
+      const parts=virtualParts(meta,parsed.start,parsed.end);
+      const bytes=parts.reduce((n,p)=>n+(p.data?.length ?? ((p.end??0)-(p.start??0)+1)),0);
+      if(bytes!==parsed.end-parsed.start+1){
+        console.error("[loom-faststart] incorrect response segment",{segment,bytes,range:parsed});
+        return new Response("MP4 byte mapping failed",{status:502});
+      }
+      console.info("[loom-faststart] stream",{segment,start:parsed.start,end:parsed.end,parts:parts.length});
+      return new Response(streamVirtualParts(url,secret,parts,request.signal),{
+        status:206,
+        headers:{
+          "content-type":"video/mp4",
+          "content-length":String(bytes),
+          "content-range":`bytes ${parsed.start}-${parsed.end}/${size}`,
+          "accept-ranges":"bytes",
+          "cache-control":"private, max-age=900",
+          "x-content-type-options":"nosniff"
+        }
+      });
+    }
   }
   const range=request.headers.get("range");
   if(range && !/^bytes=\\d*-\\d*$/.test(range))return new Response("Invalid range",{status:416});
