@@ -25,6 +25,7 @@ export async function GET(request: Request) {
       ), cohort as (
         select o.lead_id,o.campaign_id,g.segment,
           bool_or(o.status='sent') sent_any,
+          min(o.sent_at) filter(where o.status='sent') first_sent_at,
           bool_or(o.status='sent' and (o.sent_at at time zone 'Europe/Berlin')::date=(now() at time zone 'Europe/Berlin')::date) sent_today,
           bool_or(o.status='sent' and o.sent_at>=now()-interval '7 days') sent7,
           bool_or(o.status='queued') queued,
@@ -46,7 +47,7 @@ export async function GET(request: Request) {
           bool_or(e.type in ('video_booking_click','video_calendar_focus','video_whatsapp_click') and coalesce((e.meta->>'bot')::boolean,false)=false) booking,
           bool_or(e.type in ('reply','positive_reply')) replied,
           bool_or(e.type in ('appointment','appointment_attended')) meetings
-        from cohort c left join er_events e on e.workspace='default' and e.lead_id=c.lead_id
+        from cohort c left join er_events e on e.workspace='default' and e.lead_id=c.lead_id and c.first_sent_at is not null and e.created_at>=c.first_sent_at
         group by c.lead_id,c.segment
       )
       select c.segment,
@@ -67,13 +68,16 @@ export async function GET(request: Request) {
         count(*) filter(where c.sent_any and e.replied)::int replied,
         count(*) filter(where c.sent_any and e.meetings)::int meetings
       from cohort c left join events e on e.lead_id=c.lead_id and e.segment=c.segment
+       where not exists(select 1 from outbound_tracking_exclusions x where x.workspace='default' and x.lead_id=c.lead_id)
       group by c.segment order by c.segment
     `,[selected]);
 
     const hot = await query<{lead_id:string;segment:Segment;company:string;city:string|null;phone:string|null;score:number;plays:number;progress:number;booking:boolean;replied:boolean;last_signal:string}>(`
       with sent_cohort as (
-        select distinct o.lead_id,case when o.campaign_id='pv-loom-150-v1' then 'pv' else 'pflege' end segment
+        select o.lead_id,case when o.campaign_id='pv-loom-150-v1' then 'pv' else 'pflege' end segment,min(o.sent_at) first_sent_at
         from er_outbox o where o.workspace='default' and o.campaign_id=any($1::text[]) and o.status='sent'
+        and not exists(select 1 from outbound_tracking_exclusions x where x.workspace='default' and x.lead_id=o.lead_id)
+        group by o.lead_id,case when o.campaign_id='pv-loom-150-v1' then 'pv' else 'pflege' end
       ), signals as (
         select s.lead_id,s.segment,
           count(*) filter(where e.type='video_play' and coalesce((e.meta->>'bot')::boolean,false)=false)::int plays,
@@ -86,7 +90,7 @@ export async function GET(request: Request) {
           bool_or(e.type='email_click' and coalesce((e.meta->>'bot')::boolean,false)=false) clicked,
           max(e.created_at) filter(where e.type in ('video_play','video_progress','video_booking_click','video_calendar_focus','video_whatsapp_click','reply','positive_reply'))::text last_signal
         from sent_cohort s
-        left join er_events e on e.workspace='default' and e.lead_id=s.lead_id and e.created_at>=now()-interval '30 days'
+        left join er_events e on e.workspace='default' and e.lead_id=s.lead_id and e.created_at>=s.first_sent_at and e.created_at>=now()-interval '30 days'
         group by s.lead_id,s.segment
       )
       select sig.lead_id,sig.segment,coalesce(c.name,'Unbekannter Betrieb') company,c.city,c.phone,
