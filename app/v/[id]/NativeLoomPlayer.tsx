@@ -35,6 +35,7 @@ export default function NativeLoomPlayer({src,screenshot,company,posterId}:{
   function onTime() {
     const el=video.current;
     if(!el||!el.duration)return;
+    if(el.currentTime>=3 && !confirmedTrack.current){confirmedTrack.current=true;track("play_confirmed",3);}
     const percent=Math.floor(el.currentTime/el.duration*100);
     for(const value of [25,50,75,100]) {
       if(percent>=value && !milestones.current.has(value)) {
