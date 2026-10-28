@@ -337,17 +337,19 @@ export default function MailWorkspace() {
             {folder === "inbox" && <button className={styles.reply} onClick={() => reply(selected)}>↩ Antworten</button>}
           </div>
           {folder === "sent" && selected.bodyHtml ? (
-            <div style={{padding:16}}>
-              <p style={{fontSize:12,color:"#777",margin:"0 0 10px"}}>Gesendetes E-Mail-Layout · Vorschau ohne aktives Klick- und Öffnungstracking</p>
+            <div className={styles.readerContent} key={selected.uid}>
+              <p className={styles.previewNote}>Gesendetes E-Mail-Layout · Vorschau ohne aktives Klick- und Öffnungstracking</p>
               <iframe
                 title="Gesendete E-Mail als HTML-Vorschau"
                 srcDoc={selected.bodyHtml}
                 sandbox=""
-                style={{width:"100%",height:540,border:"1px solid #e5e5e5",borderRadius:10,background:"#fff"}}
+                scrolling="yes"
+                className={styles.emailPreview}
               />
+              <p className={styles.previewNote}>Innerhalb der Vorschau scrollen, um die gesamte E-Mail zu lesen.</p>
             </div>
           ) : (
-            <div className={styles.body}>{selected.bodyText}</div>
+            <div className={styles.body} key={selected.uid}>{selected.bodyText}</div>
           )}
           <div className={styles.replyBar}><button className={styles.primary} onClick={() => reply(selected)}>↩ Antworten</button><span>Antwort wird über {activeMailbox?.email} gesendet</span></div>
         </> : <div className={styles.readerEmpty}><div>✉</div><h2>Wähle eine Nachricht</h2><p>Hier kannst du die vollständige E-Mail lesen und direkt antworten.</p></div>}
