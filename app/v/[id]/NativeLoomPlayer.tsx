@@ -17,6 +17,9 @@ export default function NativeLoomPlayer({src,screenshot,company,posterId}:{
   const milestones=useRef(new Set<number>());
   const startedTrack=useRef(false);
   const confirmedTrack=useRef(false);
+  // Accumulate real media progression; a seek to 3s is not 3s watched.
+  const watchedSeconds=useRef(0);
+  const lastPlaybackPosition=useRef(0);
   const errorTrack=useRef(false);
   const watchdogTimer=useRef<ReturnType<typeof setTimeout>|null>(null);
   const watchdogPosition=useRef(0);
@@ -31,10 +34,9 @@ export default function NativeLoomPlayer({src,screenshot,company,posterId}:{
     watchdogTimer.current=setTimeout(()=>{
       watchdogTimer.current=null;
       const current=video.current;
-      // Do not count a stalled/failed play as a confirmed video start.
-      // A pending play() promise may still report paused=true, so also check
-      // whether playback ever actually started.
-      if(current && current.currentTime < watchdogPosition.current+0.5 && (!current.paused || !startedTrack.current)){
+      // A user-initiated play that made no progress is stalled even when
+      // the browser unexpectedly reports paused=true. Manual pause clears this timer.
+      if(current && current.currentTime < watchdogPosition.current+0.5){
         reportPlayerError(408);
         setError("Video lädt zu lange. Alternative Wiedergabe wird geöffnet.");
         if(validYoutube)setYoutubeFallback(true);
@@ -71,7 +73,10 @@ export default function NativeLoomPlayer({src,screenshot,company,posterId}:{
     const el=video.current;
     if(!el||!el.duration)return;
     if(el.currentTime>=watchdogPosition.current+0.5)clearWatchdog();
-    if(el.currentTime>=3 && !confirmedTrack.current){confirmedTrack.current=true;track("play_confirmed",3);}
+    const delta=el.currentTime-lastPlaybackPosition.current;
+    if(delta>0 && delta<=1.5 && !el.paused && !el.seeking) watchedSeconds.current+=delta;
+    lastPlaybackPosition.current=el.currentTime;
+    if(watchedSeconds.current>=3 && !confirmedTrack.current){confirmedTrack.current=true;track("play_confirmed",3);}
     const percent=Math.floor(el.currentTime/el.duration*100);
     for(const value of [25,50,75,100]) {
       if(percent>=value && !milestones.current.has(value)) {
@@ -96,6 +101,7 @@ export default function NativeLoomPlayer({src,screenshot,company,posterId}:{
           style={{width:"100%",height:"100%",objectFit:"cover",background:"#171717"}}
           onPlay={()=>{
             setPlaying(true);setStarted(true);setError("");
+            lastPlaybackPosition.current=video.current?.currentTime??0;
             if(!startedTrack.current){startedTrack.current=true;track("play");}
           }}
           onPause={()=>{setPlaying(false);clearWatchdog();}}
