@@ -247,7 +247,7 @@ export default function DashboardView() {
             const count = (type: string) => data.video?.find((item) => item.type === type)?.leads ?? 0;
             return (
               <p className={styles.abLine}>
-                Video-Seite: Geöffnet {count("video_view")} · Abgespielt {count("video_play")} · mind. 50 % gesehen {count("video_progress")} · Kalender angeklickt {count("video_calendar_focus") + count("video_booking_click")} · Website besucht {count("site_view")}
+                Video-Seite: Geöffnet {count("video_view")} · Abgespielt {count("video_play_confirmed")} · mind. 50 % gesehen {count("video_progress")} · Kalender angeklickt {count("video_calendar_focus") + count("video_booking_click")} · Website besucht {count("site_view")}
               </p>
             );
           })()}
