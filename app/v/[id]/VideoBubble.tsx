@@ -114,9 +114,13 @@ export default function VideoPlayer({ youtubeId, screenshot, company }: { youtub
         )}
       </div>
       {failed && (
-        <a className={styles.playerFallback} href={"https://www.youtube.com/watch?v=" + encodeURIComponent(youtubeId)} target="_blank" rel="noopener noreferrer">
-          Video direkt auf YouTube ansehen ↗
-        </a>
+        <div className={styles.playerFallback} style={{flexDirection:"column",gap:14,display:"flex"}}>
+          <strong>Video hier nicht verfügbar?</strong>
+          <a href={"https://www.youtube.com/watch?v=" + encodeURIComponent(youtubeId)} target="_blank" rel="noopener noreferrer"
+             style={{display:"inline-block",padding:"14px 20px",borderRadius:8,background:"#ff8745",color:"#1a1a1a",fontWeight:850,textDecoration:"none"}}>
+            ▶ Videonachricht auf YouTube ansehen ↗
+          </a>
+        </div>
       )}
       {finished && !failed && (
         <div className={styles.videoFinish}>
@@ -126,7 +130,16 @@ export default function VideoPlayer({ youtubeId, screenshot, company }: { youtub
         </div>
       )}
       {!playing && !finished && !failed && (
-        <button type="button" className={styles.bigPlay} onClick={toggle} disabled={!ready} aria-label={started ? "Video fortsetzen" : "Video abspielen"}>
+        <button type="button" className={styles.bigPlay} onClick={() => {
+          if (!ready) {
+            // Browser privacy settings can block the IFrame API indefinitely.
+            // Do not strand visitors behind a disabled play button.
+            track("play_intent");
+            setFailed(true);
+            return;
+          }
+          toggle();
+        }} aria-label={started ? "Video fortsetzen" : "Video abspielen"}>
           <span className={styles.bigIcon} aria-hidden="true">▶</span>
           {!started && <span className={styles.bigLabel}>Video abspielen · ca. {duration ? clock(duration) : "1:30"} Min</span>}
         </button>
