@@ -273,7 +273,7 @@ async function run(request: Request) {
     // Historical owner approval of a batch is not a per-contact legal permission.
     // Never allow an off/shadow runtime setting to bypass this final send-time gate.
     const sendComplianceMode="enforce" as const;
-    if(sendComplianceMode!=="off"){
+    {
       try{
         const compliance=await evaluateEmailSendCompliance(row.lead_id,row.recipient);
         await recordOutboundEventByMode({
