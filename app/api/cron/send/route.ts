@@ -260,7 +260,7 @@ async function run(request: Request) {
     // In the 28 Oct batch, info@heat.de%20 caused three avoidable 501 retries.
     const recipient=String(row.recipient||"");
     if(recipient!==recipient.trim() || /%(?:20|09|0a|0d)/i.test(recipient)
-      || !/^[^\\s@,<>]+@[^\\s@,<>]+\\.[^\\s@,<>]+$/.test(recipient)) {
+      || !/^[^\s@,<>]+@[^\s@,<>]+\.[^\s@,<>]+$/.test(recipient)) {
       await query(
         "update er_outbox set status='suppressed',error='Invalid recipient address syntax; requires manual correction and permission review' where id=$1 and status='sending'",
         [row.id],
