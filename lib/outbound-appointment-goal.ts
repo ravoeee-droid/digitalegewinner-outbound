@@ -268,7 +268,7 @@ async function ensureCampaignQueue(workspace:string,def:CampaignDef) {
         and l.stage in ('Neu','Research','Bereit')
         and coalesce(l.do_not_contact,false)=false
         and not exists(select 1 from er_suppressions s where s.workspace=$1 and lower(s.email)=lower(q.email))
-        and not exists(select 1 from er_outbox o where o.workspace=$1 and o.campaign_id=$2 and o.lead_id=l.id and o.status not in ('failed','suppressed'))
+        and not exists(select 1 from er_outbox o where o.workspace=$1 and o.campaign_id=$2 and o.lead_id=l.id)
       order by
         case when q.lead_date=(now() at time zone 'Europe/Berlin')::date then 0 else 1 end,
         q.lead_date desc,
@@ -302,7 +302,7 @@ async function ensureCampaignQueue(workspace:string,def:CampaignDef) {
         and coalesce(ct.email,'')<>''
         and lower(coalesce(c.source,''))=any($3::text[])
         and not exists(select 1 from er_suppressions s where s.workspace=$1 and lower(s.email)=lower(ct.email))
-        and not exists(select 1 from er_outbox o where o.workspace=$1 and o.campaign_id=$2 and o.lead_id=l.id and o.status not in ('failed','suppressed'))
+        and not exists(select 1 from er_outbox o where o.workspace=$1 and o.campaign_id=$2 and o.lead_id=l.id)
       order by l.priority_score desc,l.updated_at desc
       limit 250
     `, [workspace,campaign.id,def.sources]);
@@ -365,7 +365,7 @@ async function ensureCampaignQueue(workspace:string,def:CampaignDef) {
     }
     await query(
       "insert into er_events(workspace,lead_id,type,meta) values($1,$2,'experiment_assignment',$3::jsonb)",
-      [workspace,lead.lead_id,JSON.stringify({campaignId:campaign.id,variant:firstTouch.variant,experiment:"pflege-personalized-2sentence-v1",source:"appointment_goal_queue"})],
+      [workspace,lead.lead_id,JSON.stringify({campaignId:campaign.id,variant:firstTouch.variant,experiment:def.key==="pflege"?"pflege-personalized-2sentence-v1":"pv-personalized-2sentence-v1",source:"appointment_goal_queue"})],
     );
 
     if(queueSource==="pflege_email_outreach") await query("update pflege_email_outreach set status='approved',updated_at=now() where id=$1::uuid",[lead.queue_id]);
