@@ -17,6 +17,7 @@ export type RadarCandidate = {
   lat?: number;
   lng?: number;
   source?: string;
+  metadata?: Record<string, unknown>;
 };
 
 export type ResearchScores = {
@@ -235,7 +236,7 @@ export async function persistRadarLead(candidate: RadarCandidate, contact: Parti
     `insert into sales_companies(id,workspace,name,domain,website,city,industry,phone,source,source_id,lat,lng,research_status,latest_score,metadata)
      values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,'complete',$13,$14::jsonb)
      on conflict(id) do update set name=excluded.name,domain=excluded.domain,website=excluded.website,city=excluded.city,industry=excluded.industry,phone=excluded.phone,research_status='complete',latest_score=excluded.latest_score,metadata=excluded.metadata,updated_at=now()`,
-    [companyId, workspace, candidate.company, domain, website, candidate.city || "", candidate.industry || "", contact.phone || candidate.phone || "", candidate.source || "google-places", candidate.id || "", candidate.lat ?? null, candidate.lng ?? null, scores.priorityScore, JSON.stringify({ signals })],
+    [companyId, workspace, candidate.company, domain, website, candidate.city || "", candidate.industry || "", contact.phone || candidate.phone || "", candidate.source || "google-places", candidate.id || "", candidate.lat ?? null, candidate.lng ?? null, scores.priorityScore, JSON.stringify({ signals, ...(candidate.metadata || {}) })],
   );
 
   const contactEmail = contact.email || candidate.email || "";
@@ -310,3 +311,4 @@ export async function getSalesOverview(workspace = "default") {
   );
   return { stats: stats || { companies: 0, leads: 0, hot: 0, avg_priority: 0 }, leads, activities };
 }
+

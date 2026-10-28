@@ -16,6 +16,7 @@ const GROUPS: Group[] = [
     { href: "/heute", label: "Heute", icon: "today", hint: "Was ist heute zu tun", sales: true },
     { href: "/leads", label: "Leads", icon: "care", hint: "Alle Leads, bereit zum Anschreiben", sales: true },
     { href: "/pflege?view=campaigns", label: "Kampagnen", icon: "send", hint: "Mails und Limits" },
+    { href: "/us-pv-pilot", label: "US-PV Pilot", icon: "send", hint: "Leads prüfen und vorbereiten" },
     { href: "/inbox", label: "Sales-Posteingang", icon: "mail", hint: "Alle Antworten zusammen", sales: true },
     { href: "/mail", label: "Postfächer", icon: "mail", hint: "Einzelne Postfächer" },
     { href: "/call", label: "Anrufe", icon: "call", hint: "Nächster Anruf", sales: true },
@@ -157,3 +158,4 @@ export default function AppFrame({ children }: { children: ReactNode }) {
     </div>
   );
 }
+
