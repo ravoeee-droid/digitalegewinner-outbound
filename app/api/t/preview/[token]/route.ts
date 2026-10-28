@@ -25,7 +25,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ tok
 
   const W=640,H=360, faceSize=146,faceLeft=468,faceTop=15;
   const background=await sharp(screenshot).resize(W,H,{fit:"cover",position:"north"}).jpeg({quality:76}).toBuffer();
-  const layers: sharp.OverlayOptions[] = [];
+  const layers: Array<{ input: Buffer; left: number; top: number }> = [];
   const videoId=VIDEO_IDS[lead.segment as "pflege"|"pv"];
   if (videoId && /^[a-zA-Z0-9_-]{11}$/.test(videoId)) {
     try {
