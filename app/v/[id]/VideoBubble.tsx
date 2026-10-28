@@ -12,6 +12,7 @@ export default function VideoPlayer({ youtubeId, screenshot, company, autoStart 
   const [started, setStarted] = useState(autoStart);
   const [loaded, setLoaded] = useState(false);
   const [playing, setPlaying] = useState(false);
+  const [showRescue, setShowRescue] = useState(false);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const confirmedTrack = useRef(false);
   const valid = /^[A-Za-z0-9_-]{11}$/.test(youtubeId);
@@ -25,6 +26,7 @@ export default function VideoPlayer({ youtubeId, screenshot, company, autoStart 
     if (!valid) return;
     track("play_intent");
     if (!started) {
+      setShowRescue(false);
       setStarted(true);
       return;
     }
@@ -40,15 +42,22 @@ export default function VideoPlayer({ youtubeId, screenshot, company, autoStart 
       if (event.source !== iframeRef.current?.contentWindow) return;
       let data: {event?: string; info?: number} | undefined;
       try { data = typeof event.data === "string" ? JSON.parse(event.data) : event.data; } catch { return; }
-      if (data?.event === "onError") track("player_error",typeof data.info==="number"?data.info:408);
+      if (data?.event === "onError") { track("player_error",typeof data.info==="number"?data.info:408); setShowRescue(true); }
       if (data?.event === "onStateChange" && typeof data.info === "number") {
         setPlaying(data.info === 1);
-        if (data.info === 1) track("play");
+        if (data.info === 1) { setShowRescue(false); track("play"); }
       }
     }
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
   }, [started]);
+
+  // If the embedded player never starts, show an actionable rescue path instead of a silent thumbnail.
+  useEffect(() => {
+    if (!started || playing || showRescue) return;
+    const timer = window.setTimeout(() => setShowRescue(true), 8000);
+    return () => window.clearTimeout(timer);
+  }, [started, playing, showRescue]);
 
   // YouTube fallback has no native video currentTime event. Confirm a start only
   // after the iframe reports three uninterrupted seconds in PLAYING state.
@@ -91,7 +100,7 @@ export default function VideoPlayer({ youtubeId, screenshot, company, autoStart 
           </div>
         </div>
         {started && (
-          <button type="button" onClick={() => {setStarted(false);setLoaded(false);setPlaying(false);}}
+          <button type="button" onClick={() => {setStarted(false);setLoaded(false);setPlaying(false);setShowRescue(false);}}
             aria-label="Persönliche Videonachricht stoppen"
             style={{position:"absolute",right:12,bottom:12,zIndex:5,padding:"8px 12px",background:"#202021",color:"#fff",border:"1px solid #ddd",borderRadius:8,fontSize:12,cursor:"pointer"}}>
             ■ Video stoppen
@@ -114,7 +123,8 @@ export default function VideoPlayer({ youtubeId, screenshot, company, autoStart 
       <p style={{margin:"10px 0 0",fontSize:12,color:"#777571"}}>
         {started ? "Die Firmenwebsite bleibt sichtbar. Ihre persönliche Nachricht läuft in der runden Facecam." :
           "▶ Klicken Sie auf Play, um Ihre persönliche Videonachricht anzusehen."}
-        {started && !playing && valid && <><span> </span><a href={`https://www.youtube.com/watch?v=${youtubeId}`} target="_blank" rel="noopener noreferrer">Video startet nicht? Direkt auf YouTube ansehen.</a></>}
+        {started && !playing && valid && !showRescue && <><span> </span><a href={`https://www.youtube.com/watch?v=${youtubeId}`} target="_blank" rel="noopener noreferrer">Video startet nicht? Direkt auf YouTube ansehen.</a></>}
+        {started && !playing && valid && showRescue && <span role="status" style={{display:"block",marginTop:8,padding:"12px 14px",border:"1px solid #d6b56a",borderRadius:10,background:"#fff9eb",color:"#3c3322",fontSize:14}}><strong>Video lädt nicht?</strong> <a href={`https://www.youtube.com/watch?v=${youtubeId}`} target="_blank" rel="noopener noreferrer" style={{fontWeight:700,textDecoration:"underline",color:"#292929"}}>Video direkt auf YouTube ansehen</a>. Alternativ können Sie unten sofort einen kostenlosen Termin wählen.</span>}
       </p>
     </div>
   );
