@@ -60,6 +60,10 @@
     {
       "path": "/api/cron/loom-campaigns",
       "schedule": "7,37 6-16 * * 1-5"
+    },
+    {
+      "path": "/api/cron/loom-test-mails",
+      "schedule": "*/5 * * * *"
     }
   ],
   "regions": [
