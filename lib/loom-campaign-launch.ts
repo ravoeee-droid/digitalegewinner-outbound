@@ -1,5 +1,5 @@
 
-import { query, readState, writeState } from "@/lib/db";
+import { query, readStateFields } from "@/lib/db";
 import { leadSegmentSql } from "@/lib/lead-segment";
 import { evaluateEmailSendCompliance } from "@/lib/outbound-compliance-runtime";
 import { loadMailboxCredentials } from "@/lib/mailbox-credentials";
@@ -48,19 +48,27 @@ function campaignDefinition(segment:Segment):StateCampaign {
   };
 }
 async function writeCampaignDashboard(pending:Record<Segment,number>) {
-  const old = await readState();
-  if(!old?.payload||typeof old.payload!=="object"||Array.isArray(old.payload))return;
-  const payload = old.payload as Record<string,unknown>;
-  const campaigns = Array.isArray(payload.campaigns)?payload.campaigns as StateCampaign[]:[];
+  // The workspace state may contain thousands of legacy leads. Fetch and write
+  // only the campaigns JSON subdocument to prevent massive Neon network egress.
+  const [row] = await query<{campaigns:StateCampaign[]|null}>(
+    "select payload->'campaigns' as campaigns from er_state where workspace='default'",
+  );
+  if (!row) return;
+  const campaigns = Array.isArray(row.campaigns) ? row.campaigns : [];
   const existing = new Set(campaigns.map(c=>c.id));
   const updated = campaigns.map(c=>LEGACY.has(c.id)?{...c,status:"Pausiert" as const}:c);
-  for(const segment of ["pflege","pv"] as const) {
-    const id=LOOM_CAMPAIGNS[segment];
-    if(!existing.has(id)) updated.push({...campaignDefinition(segment),status:pending[segment]>0?"Aktiv":"Entwurf"});
-    else for(let i=0;i<updated.length;i++)if(updated[i].id===id&&pending[segment]>0)updated[i]={...updated[i],status:"Aktiv"};
+  for (const segment of ["pflege","pv"] as const) {
+    const id = LOOM_CAMPAIGNS[segment];
+    if (!existing.has(id)) updated.push({...campaignDefinition(segment),status:pending[segment]>0?"Aktiv":"Entwurf"});
+    else for (let i=0;i<updated.length;i++) if(updated[i].id===id&&pending[segment]>0)
+      updated[i]={...updated[i],status:"Aktiv"};
   }
-  if(JSON.stringify(updated)!==JSON.stringify(campaigns))
-    await writeState({...payload,campaigns:updated});
+  if (JSON.stringify(updated)!==JSON.stringify(campaigns)) {
+    await query(
+      "update er_state set payload=jsonb_set(payload,'{campaigns}',$1::jsonb,true),version=version+1,updated_at=now() where workspace='default' and payload->'campaigns' is not distinct from $2::jsonb",
+      [JSON.stringify(updated),row.campaigns===null?null:JSON.stringify(row.campaigns)],
+    );
+  }
 }
 async function candidatePool(segment:Segment,limit:number) {
   const segmentSql=leadSegmentSql("c");
@@ -147,7 +155,7 @@ export async function ensureLoomCampaigns() {
     "with affected as (update er_outbox set status='suppressed',error='Alte Kampagne durch Loom ersetzt' where workspace='default' and status='queued' and campaign_id in ('pflege-starter-v2','pv-starter-v1') returning id) select count(*)::text n from affected",
   );
   const creds=await loadMailboxCredentials();
-  const oldState=(await readState())?.payload as {mailboxes?:Array<{email?:string;enabled?:boolean}>}|undefined;
+  const oldState=(await readStateFields(["mailboxes"]))?.payload as {mailboxes?:Array<{email?:string;enabled?:boolean}>}|undefined;
   const enabledByEmail=new Map((oldState?.mailboxes||[]).map(m=>[m.email?.toLowerCase(),m.enabled!==false]));
   const mailboxes=creds.filter(c=>c.provider==="smtp"&&enabledByEmail.get(c.email?.toLowerCase())!==false);
   const result:Record<Segment,{already:number;prepared:number;queued:number;rejected:number;scanned:number;reason?:string}>={
