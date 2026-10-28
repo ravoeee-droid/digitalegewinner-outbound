@@ -128,6 +128,7 @@ export function streamVirtualParts(
             headers:{authorization:`Bearer ${token}`,range:`bytes=${part.start}-${part.end}`},
             cache:"no-store",signal:aborted.signal
           });
+          console.info("[loom-faststart] upstream chunk",{start:part.start,end:part.end,status:response.status,length:response.headers.get("content-length")});
           if(response.status!==206||!response.body)throw new Error("Streaming Range failed: "+response.status);
           const reader=response.body.getReader();
           while(true){
@@ -137,7 +138,7 @@ export function streamVirtualParts(
           }
         }
         if(!aborted.signal.aborted)controller.close();
-      }catch(err){if(!aborted.signal.aborted)controller.error(err);}
+      }catch(err){console.error("[loom-faststart] stream failure",err instanceof Error?err.message:String(err));if(!aborted.signal.aborted)controller.error(err);}
     },
     cancel(){aborted.abort();}
   });
