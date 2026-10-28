@@ -29,6 +29,7 @@ type Message = {
   unread: boolean;
   bodyText: string;
   bodyHtml?: string;
+  videoUrl?: string;
 };
 
 type ComposeState = { open: boolean; to: string; subject: string };
@@ -338,7 +339,12 @@ export default function MailWorkspace() {
           </div>
           {folder === "sent" && selected.bodyHtml ? (
             <div className={styles.readerContent} key={selected.uid}>
-              <p className={styles.previewNote}>Gesendetes E-Mail-Layout · Vorschau ohne aktives Klick- und Öffnungstracking</p>
+              <p className={styles.previewNote}>Gesendetes E-Mail-Layout · Links sind in der Vorschau deaktiviert.</p>
+              {selected.videoUrl && (
+                <a href={selected.videoUrl} target="_blank" rel="noopener noreferrer" className={styles.previewVideoLink}>
+                  ▶ Die personalisierte Videoseite in neuem Tab öffnen ↗
+                </a>
+              )}
               <iframe
                 title="Gesendete E-Mail als HTML-Vorschau"
                 srcDoc={selected.bodyHtml}
@@ -346,7 +352,7 @@ export default function MailWorkspace() {
                 scrolling="yes"
                 className={styles.emailPreview}
               />
-              <p className={styles.previewNote}>Innerhalb der Vorschau scrollen, um die gesamte E-Mail zu lesen.</p>
+              <p className={styles.previewNote}>Innerhalb der Vorschau scrollen. Zum Testen der echten Videoseite den Link oberhalb verwenden.</p>
             </div>
           ) : (
             <div className={styles.body} key={selected.uid}>{selected.bodyText}</div>
