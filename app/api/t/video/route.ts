@@ -40,7 +40,6 @@ export async function POST(request: Request) {
     ).catch(() => []);
     const name = row?.company || `Lead ${leadId}`;
     const message =
-      type === "view" ? "" :
       type === "play" ? `▶️ Video gestartet: ${name}` :
       type === "progress" && value >= 50 ? `🔥 Video zu ${value} % gesehen: ${name}` :
       type === "booking_click" ? `📅 Klick auf "Termin buchen": ${name}` :
@@ -48,7 +47,6 @@ export async function POST(request: Request) {
       type === "calendar_open" ? `🗓️ Externer Kalender geöffnet: ${name}` :
       type === "whatsapp_click" ? `💬 WhatsApp-Button geklickt: ${name}` :
       type === "chat_open" ? `🤖 Chat geöffnet: ${name}` :
-      type === "site_view" ? "" :
       type === "site_dwell" && value >= 10 ? `🌐 ${name} war mindestens ${value} Sekunden auf der Website: ${String(body.p || "/").slice(0, 60)}` :
       type === "site_click" ? `🖱️ ${name} hat auf der Website geklickt: ${String(body.p || "").slice(0, 60)}` : "";
     if (message) await sendAlertOnce(`video:${type}${type === "progress" ? value : ""}${type.startsWith("site_") ? String(body.p || "") : ""}:${leadId}`, message, type.startsWith("site_") ? 12 : 24 * 30).catch(() => null);
