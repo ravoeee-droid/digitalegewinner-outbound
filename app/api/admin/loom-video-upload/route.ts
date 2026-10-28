@@ -64,7 +64,7 @@ export async function POST(request: NextRequest) {
         console.info("[loom-video-upload] token request", {pathname});
         if (sessionRole(request.cookies.get(adminCookieName())?.value) !== "admin")
           throw new Error("Admin-Anmeldung erforderlich.");
-        const match = /^loom-videos\/(pv|pflege)\.mp4$/.exec(pathname);
+        const match = /^loom-videos\/(pv|pflege|probe)\.mp4$/.exec(pathname);
         if (!match) throw new Error("Nur PV und Pflege MP4 sind zugelassen.");
         if (!process.env.BLOB_READ_WRITE_TOKEN) throw new Error("Blob-Speicher ist nicht verbunden.");
         return {
@@ -76,6 +76,7 @@ export async function POST(request: NextRequest) {
       },
       onUploadCompleted: async ({blob,tokenPayload}) => {
         const data = JSON.parse(tokenPayload || "{}") as {segment?:string};
+        if (data.segment === "probe") return;
         if (!["pv","pflege"].includes(data.segment || "")) throw new Error("Ungültiges Segment");
         if (blob.contentType !== "video/mp4" || !blob.url.startsWith("https://")) throw new Error("Ungültige Videodatei");
         await ensureTable();
