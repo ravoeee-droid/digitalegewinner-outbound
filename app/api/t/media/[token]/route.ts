@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { get } from "@vercel/blob";
 import { verifyVideoToken } from "@/lib/email-tracking";
 import { query } from "@/lib/db";
 import { leadSegmentSql } from "@/lib/lead-segment";
@@ -33,23 +34,41 @@ export async function GET(request:NextRequest,{params}:{params:Promise<{token:st
     return new Response("Video not available",{status:404});
   const secret=process.env.BLOB_READ_WRITE_TOKEN;
   if(!secret)return new Response("Video storage unavailable",{status:503});
+
   const range=request.headers.get("range");
-  if(range && !/^bytes=\d*-\d*$/.test(range))return new Response("Invalid range",{status:416});
+  if(range && !/^bytes=\\d*-\\d*$/.test(range))return new Response("Invalid range",{status:416});
+  const result = range ? null : await get(url,{access:"private"}).catch((error)=>{
+    console.error("[loom-media] SDK error",segment,error instanceof Error?error.message:"unknown");
+    return null;
+  });
+  if(result?.statusCode===200 && result.stream) {
+    return new Response(result.stream,{
+      status:200,
+      headers:{
+        "content-type":"video/mp4",
+        "content-length":String(result.blob.size),
+        "accept-ranges":"bytes",
+        "cache-control":"private, max-age=1800",
+        "x-content-type-options":"nosniff",
+      }
+    });
+  }
   const upstream=await fetch(url,{
-    headers:{
-      authorization:`Bearer ${secret}`,
-      ...(range?{range}:{}),
-    },
+    headers:{authorization:`Bearer ${secret}`,...(range?{range}:{})},
     cache:"no-store",
     signal:request.signal
-  }).catch(()=>null);
-  if(!upstream || !upstream.ok || !upstream.body){
-    console.error("[loom-media] private Blob fetch failed",{segment,status:upstream?.status,hasRange:Boolean(range)});
-    return new Response("Video temporarily unavailable",{status:502});
-  }
+  }).catch((error)=>{
+    console.error("[loom-media] upstream network error",segment,error instanceof Error?error.message:"unknown");
+    return null;
+  });
+  console.info("[loom-media] response",{
+    segment, range, status:upstream?.status, length:upstream?.headers.get("content-length"),
+    contentRange:upstream?.headers.get("content-range")
+  });
+  if(!upstream || !upstream.ok || !upstream.body)return new Response("Video temporarily unavailable",{status:502});
   const headers=new Headers({
     "content-type":"video/mp4",
-    "cache-control":"public, max-age=1800",
+    "cache-control":"private, max-age=1800",
     "x-content-type-options":"nosniff",
     "accept-ranges":"bytes",
   });
