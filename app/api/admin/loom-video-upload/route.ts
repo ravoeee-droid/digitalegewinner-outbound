@@ -28,6 +28,14 @@ export async function POST(request: NextRequest) {
   // Verify the actual operator session before issuing *any* upload token.
   try {
     const body = await request.json();
+    if (body?.action === "diagnose") {
+      const signedIn = sessionRole(request.cookies.get(adminCookieName())?.value) === "admin";
+      const storeReady = Boolean(process.env.BLOB_READ_WRITE_TOKEN);
+      console.info("[loom-video-upload] preflight", { signedIn, storeReady });
+      if (!signedIn) return Response.json({error:"Bitte erneut als Admin anmelden. Die Sitzung ist abgelaufen.",stage:"auth"},{status:401});
+      if (!storeReady) return Response.json({error:"BLOB_READ_WRITE_TOKEN fehlt in der Vercel-Produktion.",stage:"storage"},{status:503});
+      return Response.json({ok:true,stage:"ready",maxFileBytes:500000000});
+    }
     // Authenticated browser confirmation prevents a delayed completion webhook
     // from leaving a successfully uploaded video stuck in "not active".
     if (body?.action === "activate") {
@@ -53,6 +61,7 @@ export async function POST(request: NextRequest) {
       body,
       request,
       onBeforeGenerateToken: async (pathname) => {
+        console.info("[loom-video-upload] token request", {pathname});
         if (sessionRole(request.cookies.get(adminCookieName())?.value) !== "admin")
           throw new Error("Admin-Anmeldung erforderlich.");
         const match = /^loom-videos\/(pv|pflege)\.mp4$/.exec(pathname);
