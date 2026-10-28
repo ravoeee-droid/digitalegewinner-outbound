@@ -56,7 +56,7 @@ export default function NativeLoomPlayer({src,screenshot,company,posterId}:{
   // Never leave prospects stranded on a broken MP4: retain the existing
   // YouTube facecam as an explicit fallback, with its own 3-second tracking.
   if(youtubeFallback && validYoutube)
-    return <VideoPlayer youtubeId={posterId} screenshot={screenshot} company={company}/>;
+    return <VideoPlayer youtubeId={posterId} screenshot={screenshot} company={company} autoStart/>;
 
   return <div role="group" aria-label={`Persönliches Video für ${company}`}>
     <div className={styles.player}>
