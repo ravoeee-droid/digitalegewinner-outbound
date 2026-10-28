@@ -256,6 +256,19 @@ async function run(request: Request) {
       limited++; return;
     }
 
+    // Reject malformed or URL-encoded addresses before any SMTP attempt.
+    // In the 28 Oct batch, info@heat.de%20 caused three avoidable 501 retries.
+    const recipient=String(row.recipient||"");
+    if(recipient!==recipient.trim() || /%(?:20|09|0a|0d)/i.test(recipient)
+      || !/^[^\\s@,<>]+@[^\\s@,<>]+\\.[^\\s@,<>]+$/.test(recipient)) {
+      await query(
+        "update er_outbox set status='suppressed',error='Invalid recipient address syntax; requires manual correction and permission review' where id=$1 and status='sending'",
+        [row.id],
+      );
+      skipped++;
+      return;
+    }
+
     // Every actual email send must have a documented, verified contact permission.
     // Historical owner approval of a batch is not a per-contact legal permission.
     // Never allow an off/shadow runtime setting to bypass this final send-time gate.
