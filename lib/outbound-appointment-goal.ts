@@ -20,7 +20,6 @@ export const CAMPAIGN_DEFS:CampaignDef[]=[
   {key:"pflege",id:"pflege-starter-v2",name:"Pflege Recruiting",audience:"Ambulante Pflegedienste mit offener Stelle",sources:["pflegedienstjobs24","ba-jobboerse"],dailyCap:150},
   {key:"pv",id:"pv-starter-v1",name:"PV Kundengewinnung",audience:"Photovoltaik-Betriebe",sources:["ba-pv"],dailyCap:150},
 ];
-let ACTIVE_DEF:CampaignDef=CAMPAIGN_DEFS[0];
 
 type CampaignStep = { waitDays:number; subject:string; body:string };
 type Campaign = {
@@ -72,8 +71,8 @@ function cleanFinding(value:string) {
   return value.replace(/[–—]/g,",").replace(/\s+/g," ").replace(/[.!?]+$/,"").trim();
 }
 
-function personalizedFirstTouch(lead:{lead_id:string;company:string;contact:string;city:string;lead_payload:PflegeLeadPayload|null;video?:boolean}) {
-  if(ACTIVE_DEF.key==="pv")return pvFirstTouch({contact:lead.contact,lead_id:lead.lead_id,video:lead.video,company:lead.company});
+function personalizedFirstTouch(lead:{lead_id:string;company:string;contact:string;city:string;lead_payload:PflegeLeadPayload|null;video?:boolean},def:CampaignDef) {
+  if(def.key==="pv")return pvFirstTouch({contact:lead.contact,lead_id:lead.lead_id,video:lead.video,company:lead.company});
   const payload=lead.lead_payload||{};
   return firstTouch({
     lead_id:lead.lead_id,company:lead.company,contact:lead.contact,city:lead.city,
@@ -82,8 +81,8 @@ function personalizedFirstTouch(lead:{lead_id:string;company:string;contact:stri
   });
 }
 
-function conciseFollowUp(lead:{company:string;contact:string;lead_payload:PflegeLeadPayload|null;video?:boolean},stepIndex:number) {
-  if(ACTIVE_DEF.key==="pv")return pvFollowUp({contact:lead.contact,video:lead.video},stepIndex);
+function conciseFollowUp(lead:{company:string;contact:string;lead_payload:PflegeLeadPayload|null;video?:boolean},stepIndex:number,def:CampaignDef) {
+  if(def.key==="pv")return pvFollowUp({contact:lead.contact,video:lead.video},stepIndex);
   const payload=lead.lead_payload||{};
   return followUp({company:lead.company,contact:lead.contact,general:Boolean(payload.general),video:lead.video,title:String(payload.jobReferences?.[0]?.title||payload.signals?.jobTitles?.[0]||"")},stepIndex);
 }
@@ -162,7 +161,6 @@ export async function getAppointmentGoalSnapshot(workspace="default") {
 }
 
 async function ensureCampaignQueue(workspace:string,def:CampaignDef) {
-  ACTIVE_DEF=def;
   const runtime = await resolveOutboundRuntimeConfig();
   if (runtime.v3Mode === "active") {
     return { ok:false, skipped:true, reason:"legacy_worker_disabled", snapshot:await getAppointmentGoalSnapshot(workspace) };
@@ -347,12 +345,12 @@ async function ensureCampaignQueue(workspace:string,def:CampaignDef) {
     const spreadMinutes=enrollmentCapacity<=1?0:Math.floor((queuedLeads*90)/Math.max(1,enrollmentCapacity-1));
     const firstTouchAt=Date.now()+spreadMinutes*60_000;
     // Videomail nur, wenn der Website-Screenshot für die persönliche Videoseite bereits fertig ist.
-    const video=VIDEO_MAIL_ENABLED&&Boolean(VIDEO_IDS[ACTIVE_DEF.key])&&screenshotsReady.has(String(lead.lead_id))&&videoVariantFor(String(lead.lead_id));
-    const firstTouch=personalizedFirstTouch({...lead,video});
+    const video=VIDEO_MAIL_ENABLED&&Boolean(VIDEO_IDS[def.key])&&screenshotsReady.has(String(lead.lead_id))&&videoVariantFor(String(lead.lead_id));
+    const firstTouch=personalizedFirstTouch({...lead,video},def);
     for (let stepIndex=0;stepIndex<campaign.steps.length;stepIndex++) {
       const step=campaign.steps[stepIndex];
       const scheduled = new Date(firstTouchAt+Math.max(0,step.waitDays)*86400000);
-      const copy=stepIndex===0?firstTouch:conciseFollowUp({...lead,video},stepIndex);
+      const copy=stepIndex===0?firstTouch:conciseFollowUp({...lead,video},stepIndex,def);
       await query(`
         insert into er_outbox(
           id,workspace,campaign_id,lead_id,mailbox_id,recipient,subject,body,variant,scheduled_at,campaign_version_id
