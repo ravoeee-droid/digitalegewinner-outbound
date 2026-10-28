@@ -146,6 +146,11 @@ async function run(request: Request) {
              )
          )
          and (sl.id is null or (sl.stage not in ('Gewonnen','Verloren') and not sl.do_not_contact))
+         -- Safeguard: no new personalized Loom emails until the corresponding native MP4 is live.
+         and (o.campaign_id not in ('pflege-loom-150-v1','pv-loom-150-v1')
+              or exists (select 1 from loom_video_assets a where a.segment =
+                case when o.campaign_id='pv-loom-150-v1' then 'pv' else 'pflege' end
+                and a.video_url like 'https://%'))
        order by o.scheduled_at asc
        for update of o skip locked
        limit 100
