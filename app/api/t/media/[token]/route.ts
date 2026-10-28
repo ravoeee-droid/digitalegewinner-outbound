@@ -96,7 +96,11 @@ export async function GET(request:NextRequest,{params}:{params:Promise<{token:st
   if(range && !/^bytes=\d*-\d*$/.test(range))return new Response("Invalid range",{status:416});
   // Always request a partial-content stream, including initial browser loads.
   // A 200 full-blob stream (300 MB) stalls until enough metadata arrives.
-  const requestedRange = range || "bytes=0-";
+  // Keep each response bounded: the browser can request consecutive chunks,
+  // without a serverless stream that must remain open for the full MP4.
+  const requested = parseRange(range,size,512*1024);
+  if(!requested)return new Response("Range not satisfiable",{status:416,headers:{"content-range":`bytes */${size}`}});
+  const requestedRange = `bytes=${requested.start}-${requested.end}`;
   const upstream=await fetch(url,{
     headers:{authorization:`Bearer ${secret}`,range:requestedRange},
     cache:"no-store",
