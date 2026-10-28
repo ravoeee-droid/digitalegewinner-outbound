@@ -82,10 +82,10 @@ export default async function VideoPage({ params, searchParams }: { params: Prom
   // once its real hosting URL is verified; do not substitute the personal video.
   const explainerVideoUrl = isPv
     ? "https://www.youtube.com/embed/h7e0izR5fn0?rel=0&playsinline=1"
-    : (process.env.PFLEGE_EXPLAINER_VIDEO_URL || "");
+    : "https://www.youtube.com/embed/S1Yc5U5_0YY?rel=0&playsinline=1";
   const explainerPosterUrl = isPv
     ? "https://i.ytimg.com/vi/h7e0izR5fn0/hqdefault.jpg"
-    : (process.env.PFLEGE_EXPLAINER_POSTER_URL || "");
+    : "https://i.ytimg.com/vi/S1Yc5U5_0YY/hqdefault.jpg";
   const whatsappUrl = "https://wa.me/" + WHATSAPP_NUMBER + "?text=" + encodeURIComponent("Hallo Raphael, ich habe Ihr Video gesehen (" + data.company + ").");
   return (
     <main className={styles.page}>
@@ -174,14 +174,7 @@ export default async function VideoPage({ params, searchParams }: { params: Prom
                 <span aria-hidden="true" className={styles.explainerChevron}>⌄</span>
               </summary>
               <div className={styles.explainerPlayback}>
-                {isPv ? (
-                  <iframe src={explainerVideoUrl} title="PV-Trust – Das System in 3 Minuten erklärt" loading="lazy" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerPolicy="strict-origin-when-cross-origin" allowFullScreen />
-                ) : (
-                  <video controls preload="none" playsInline poster={explainerPosterUrl || undefined} aria-label="Pflege-Recruiting Erklärvideo">
-                    <source src={explainerVideoUrl} type="video/mp4"/>
-                    Ihr Browser unterstützt dieses Video nicht.
-                  </video>
-                )}
+                <iframe src={explainerVideoUrl} title={isPv ? "PV-Trust – Das System in 3 Minuten erklärt" : "Pflege-Recruiting – Das System erklärt"} loading="lazy" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerPolicy="strict-origin-when-cross-origin" allowFullScreen />
                 <a href="#termin" className={styles.explainerBottomCta}>Kostenloses 15-Minuten-Gespräch vereinbaren ↗</a>
               </div>
             </details>
