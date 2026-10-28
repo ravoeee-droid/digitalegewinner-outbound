@@ -1,5 +1,5 @@
 import { handleUpload } from "@vercel/blob/client";
-import { head } from "@vercel/blob";
+import { head, put } from "@vercel/blob";
 import { NextRequest } from "next/server";
 import { adminCookieName, sessionRole } from "@/lib/admin-auth";
 import { query } from "@/lib/db";
@@ -28,6 +28,14 @@ export async function POST(request: NextRequest) {
   // Verify the actual operator session before issuing *any* upload token.
   try {
     const body = await request.json();
+    if(body?.action === "server-probe"){
+      if(sessionRole(request.cookies.get(adminCookieName())?.value)!=="admin")
+        return Response.json({error:"Admin-Anmeldung erforderlich"},{status:403});
+      const blob=await put("loom-videos/connection-check.txt","DG blob test",{
+        access:"public",addRandomSuffix:true,contentType:"text/plain"
+      });
+      return Response.json({ok:true,host:new URL(blob.url).hostname});
+    }
     if (body?.action === "diagnose") {
       const signedIn = sessionRole(request.cookies.get(adminCookieName())?.value) === "admin";
       const storeReady = Boolean(process.env.BLOB_READ_WRITE_TOKEN);
@@ -43,9 +51,10 @@ export async function POST(request: NextRequest) {
         return Response.json({error:"Forbidden"},{status:403});
       const segment = String(body.segment||"");
       const url = String(body.url||"");
-      if (!["pv","pflege"].includes(segment) || !/^https:\/\/[^/]+\.public\.blob\.vercel-storage\.com\/loom-videos\/(pv|pflege)(?:[^/]*)\.mp4$/.test(url))
+      if (!["pv","pflege"].includes(segment) || !/^https:\/\/[^/]+\.public\.blob\.vercel-storage\.com\/[^?#]+\.mp4(?:\?[^#]*)?$/.test(url))
         return Response.json({error:"Ungültige Datei-Adresse"},{status:400});
-      if (!url.includes("/loom-videos/"+segment)) return Response.json({error:"Segment stimmt nicht"},{status:400});
+      // The operator can use a Blob URL uploaded through the Vercel dashboard.
+      // The Vercel SDK head() below validates that it belongs to our configured store.
       const blob = await head(url);
       if (!blob || blob.size > 500_000_000 || blob.contentType !== "video/mp4")
         return Response.json({error:"MP4 konnte im Videospeicher nicht bestätigt werden"},{status:400});
