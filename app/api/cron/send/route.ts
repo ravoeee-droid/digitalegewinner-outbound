@@ -211,7 +211,13 @@ async function run(request: Request) {
       last_reason?:string|null;
     }|undefined;
 
-    let mailboxLimit=configuredMailboxLimit;
+    // Owner-requested one-day catch-up for the 250 paused Loom messages.
+    // This cap is *only* for 28 October 2026; other campaigns and dates retain
+    // their existing mailbox settings. All suppression, health and sector gates
+    // below remain effective.
+    const berlinDate=new Intl.DateTimeFormat("en-CA",{timeZone:"Europe/Berlin",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date());
+    const catchupLoom=berlinDate==="2026-10-28" && (row.campaign_id==="pflege-loom-150-v1"||row.campaign_id==="pv-loom-150-v1");
+    let mailboxLimit=catchupLoom?Math.max(configuredMailboxLimit,30):configuredMailboxLimit;
     if(runtimeConfig.deliverabilityMode==="enforce"){
       const observedAt=health?.observed_at?new Date(health.observed_at).getTime():0;
       const stale=!observedAt||(Date.now()-observedAt)>3*60*60*1000;
