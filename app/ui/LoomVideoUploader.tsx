@@ -16,6 +16,25 @@ export default function LoomVideoUploader() {
   const [pct,setPct]=useState<Record<string,number>>({});
   const [message,setMessage]=useState<Record<string,string>>({});
   const [stage,setStage]=useState<Record<string,string>>({});
+  const [manualUrls,setManualUrls]=useState<Record<string,string>>({});
+  const [activating,setActivating]=useState<Record<string,boolean>>({});
+  async function activateExternal(segment:Segment) {
+    setActivating(x=>({...x,[segment]:true}));
+    setMessage(x=>({...x,[segment]:"Prüfe MP4 im verbundenen Vercel-Speicher …"}));
+    try {
+      const response=await fetch("/api/admin/loom-video-upload",{
+        method:"POST",headers:{"content-type":"application/json"},
+        credentials:"same-origin",
+        body:JSON.stringify({action:"activate",segment,url:(manualUrls[segment]||"").trim()})
+      });
+      const json=await response.json() as {ok?:boolean;error?:string};
+      if(!response.ok||!json.ok)throw new Error(json.error||"Aktivierung fehlgeschlagen.");
+      await refresh();
+      setMessage(x=>({...x,[segment]:"✓ MP4 aktiv. Alle bisherigen Videolinks nutzen jetzt diese Datei."}));
+    } catch(error) {
+      setMessage(x=>({...x,[segment]:error instanceof Error?error.message:"Aktivierung fehlgeschlagen."}));
+    } finally {setActivating(x=>({...x,[segment]:false}));}
+  }
   const [probeBusy,setProbeBusy]=useState(false);
   const [probeStatus,setProbeStatus]=useState("");
   async function testUpload() {
@@ -156,6 +175,19 @@ export default function LoomVideoUploader() {
           <span style={{fontSize:12,marginLeft:12,color:"#a7bdaf"}}>{!pct[key] ? "Verbindung wird hergestellt – noch kein Uploadfortschritt bestätigt." : "Übertragung läuft."}</span>
         </div>}
         <p role="status" style={{fontSize:13,overflowWrap:"anywhere",color:"#b5cbbd"}}>{message[key] || ""}</p>
+        <div style={{marginTop:20,borderTop:"1px solid #345847",paddingTop:16}}>
+          <p style={{fontWeight:800,fontSize:13,margin:"0 0 8px"}}>Alternative ohne festhängenden Browser-Upload</p>
+          <p style={{fontSize:12,color:"#a7bdaf",lineHeight:1.5}}>MP4 im vorhandenen Vercel-Blob-Speicher direkt hochladen, anschließend den öffentlichen MP4-Link hier einfügen.</p>
+          <input type="url" placeholder="https://…public.blob.vercel-storage.com/…mp4"
+            value={manualUrls[key]||""}
+            onChange={event=>setManualUrls(x=>({...x,[key]:event.target.value}))}
+            style={{display:"block",boxSizing:"border-box",width:"100%",padding:12,background:"#06120c",color:"#f0fff4",border:"1px solid #345847",borderRadius:9}}/>
+          <button type="button" disabled={Boolean(activating[key])||!manualUrls[key]?.trim()}
+            onClick={()=>void activateExternal(key)}
+            style={{marginTop:10,padding:"12px 17px",border:0,borderRadius:9,background:"#5eeaa0",color:"#08170e",fontWeight:800,cursor:"pointer"}}>
+            {activating[key]?"Verifiziere MP4 …":"Vorhandene MP4 sofort aktivieren"}
+          </button>
+        </div>
         {urls[key]&&<a href={urls[key]} target="_blank" rel="noopener noreferrer" style={{color:"#72f0ab",fontSize:13}}>Videodatei prüfen ↗</a>}
       </section>)}
     </div>
