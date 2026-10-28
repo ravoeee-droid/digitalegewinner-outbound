@@ -14,6 +14,10 @@ export default function NativeLoomPlayer({src,screenshot,company,posterId}:{
   const milestones=useRef(new Set<number>());
   const startedTrack=useRef(false);
   const confirmedTrack=useRef(false);
+  const errorTrack=useRef(false);
+  function reportPlayerError(code:number) {
+    if(!errorTrack.current) { errorTrack.current=true; track("player_error",code); }
+  }
 
   async function play() {
     const el=video.current;
@@ -28,6 +32,7 @@ export default function NativeLoomPlayer({src,screenshot,company,posterId}:{
       const reason=err instanceof Error?`${err.name}: ${err.message}`:String(err);
       const details=`code=${el.error?.code||0}, ready=${el.readyState}, network=${el.networkState}`;
       console.error("[loom-player] play rejected",reason,details);
+      reportPlayerError(el.error?.code||408);
       setError(`Wiedergabefehler: ${reason} (${details})`);
     }
   }
@@ -59,8 +64,8 @@ export default function NativeLoomPlayer({src,screenshot,company,posterId}:{
           }}
           onPause={()=>setPlaying(false)}
           onTimeUpdate={onTime}
-          onEnded={()=>{setPlaying(false);track("watch",Math.round(video.current?.duration||0));}}
-          onError={()=>{const el=video.current;setPlaying(false);setError(`Video-Ladefehler: ${el?.error?.message||"Unbekannt"} (Code ${el?.error?.code||0}, Netzwerk ${el?.networkState||0})`);}}
+          onEnded={()=>{setPlaying(false);if(!milestones.current.has(100)){milestones.current.add(100);track("progress",100);}track("watch",Math.round(video.current?.duration||0));}}
+          onError={()=>{const el=video.current;setPlaying(false);reportPlayerError(el?.error?.code||408);setError(`Video-Ladefehler: ${el?.error?.message||"Unbekannt"} (Code ${el?.error?.code||0}, Netzwerk ${el?.networkState||0})`);}}
         />
       </div>
       {!playing&&<button className={styles.bigPlay} type="button" onClick={play}
