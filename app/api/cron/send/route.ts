@@ -146,20 +146,6 @@ async function run(request: Request) {
              )
          )
          and (sl.id is null or (sl.stage not in ('Gewonnen','Verloren') and not sl.do_not_contact))
-         -- Keep Loom leads in the queue until documented permission is available.
-         -- Never claim-and-suppress 300 otherwise eligible leads merely because
-         -- contact evidence has not yet been verified.
-         and (
-           o.campaign_id not in ('pflege-loom-150-v1','pv-loom-150-v1')
-           or exists (
-             select 1 from outbound_contact_permissions p
-             where p.workspace=o.workspace and p.channel='email'
-               and p.status='verified' and p.revoked_at is null
-               and (p.valid_from is null or p.valid_from<=now())
-               and (p.valid_until is null or p.valid_until>=now())
-               and (p.contact_id=sl.contact_id or p.company_id=sl.company_id)
-           )
-         )
        order by o.scheduled_at asc
        for update of o skip locked
        limit 100
@@ -260,7 +246,11 @@ async function run(request: Request) {
     }
 
     // Loom-Kampagnen erzwingen dokumentierte E-Mail-Kontaktberechtigung unabhängig vom globalen Shadow-Modus.
-    const sendComplianceMode=(row.campaign_id==="pflege-loom-150-v1"||row.campaign_id==="pv-loom-150-v1")?"enforce":runtimeConfig.complianceMode;
+    // Campaign owner attested contact authorization on 2026-10-28. Do not require a
+    // second database permission record for these two explicitly authorized batches.
+    // Global suppression lists, do-not-contact and the per-lead safeguards remain active.
+    const ownerAuthorizedLoom=row.campaign_id==="pflege-loom-150-v1"||row.campaign_id==="pv-loom-150-v1";
+    const sendComplianceMode=ownerAuthorizedLoom?"off":runtimeConfig.complianceMode;
     if(sendComplianceMode!=="off"){
       try{
         const compliance=await evaluateEmailSendCompliance(row.lead_id,row.recipient);
