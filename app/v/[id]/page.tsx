@@ -116,7 +116,7 @@ export default async function VideoPage({ params, searchParams }: { params: Prom
         <div className={styles.heroGrid}>
           <section className={styles.videoFrame} aria-label="Persönliche Videonachricht">
             {(hasVertical&&Boolean(videoId))||token==="demo" ? (
-              {mp4Url ? (
+              mp4Url ? (
                 <NativeLoomPlayer src={mp4Url} screenshot={data.screenshot} company={data.company}
                   posterId={token==="demo"?(mainVideoId||data.youtubeId):videoId}/>
               ) : (
@@ -125,7 +125,7 @@ export default async function VideoPage({ params, searchParams }: { params: Prom
                   screenshot={data.screenshot}
                   company={data.company}
                 />
-              )}
+              )
             ):(
               <div className={styles.staticShot} style={data.screenshot?{backgroundImage:"url("+data.screenshot+")"}:undefined} role="img" aria-label={"Website von "+data.company}/>
             )}
