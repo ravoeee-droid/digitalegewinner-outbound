@@ -77,6 +77,15 @@ export default async function VideoPage({ params, searchParams }: { params: Prom
   const mainVideoId = isPv ? VIDEO_IDS.pv : VIDEO_IDS.pflege;
   const videoId = group === "B" ? String(shortVideoId) : mainVideoId;
   // The demo remains pinned to the current A version.
+  // Independent explanation video, never the personalized talking-head clip.
+  // PV asset is published on the main website. Pflege asset may be configured separately
+  // once its real hosting URL is verified; do not substitute the personal video.
+  const explainerVideoUrl = isPv
+    ? "https://digitalegewinner.de/assets/video/pv-trust-erklaervideo.mp4"
+    : (process.env.PFLEGE_EXPLAINER_VIDEO_URL || "");
+  const explainerPosterUrl = isPv
+    ? "https://digitalegewinner.de/assets/video/pv-trust-erklaervideo-poster.webp"
+    : (process.env.PFLEGE_EXPLAINER_POSTER_URL || "");
   const whatsappUrl = "https://wa.me/" + WHATSAPP_NUMBER + "?text=" + encodeURIComponent("Hallo Raphael, ich habe Ihr Video gesehen (" + data.company + ").");
   return (
     <main className={styles.page}>
@@ -142,6 +151,38 @@ export default async function VideoPage({ params, searchParams }: { params: Prom
             <a href={whatsappUrl} className={styles.secondaryContact} target="_blank" rel="noopener noreferrer" data-secondary-action="whatsapp">Lieber kurz eine Frage stellen? WhatsApp ↗</a>
           </aside>
         </div>
+
+        {hasVertical && explainerVideoUrl && (
+          <section className={styles.explainer} aria-label="Optionales Erklärvideo">
+            <div className={styles.explainerIntro}>
+              <div>
+                <span className={styles.smallEyebrow}>WENN SIE MEHR ERFAHREN MÖCHTEN</span>
+                <h2>{isPv ? "Wie gewinnen PV-Betriebe eigene Projektanfragen?" : "Wie gewinnen Pflegebetriebe wieder passende Bewerbungen?"}</h2>
+                <p>Unser System kurz erklärt – freiwillig, ohne Umweg zur Terminbuchung.</p>
+              </div>
+              <a href="#termin" className={styles.explainerBooking}>Direkt Termin wählen ↗</a>
+            </div>
+            <details className={styles.explainerDisclosure}>
+              <summary className={styles.explainerToggle}>
+                <span className={styles.explainerThumb} style={explainerPosterUrl ? { backgroundImage: `url("${explainerPosterUrl}")` } : undefined}>
+                  <span aria-hidden="true" className={styles.explainerPlay}>▶</span>
+                </span>
+                <span className={styles.explainerToggleText}>
+                  <strong>{isPv ? "PV-Trust in 3 Minuten erklärt" : "Das Pflege-Recruiting-System erklärt"}</strong>
+                  <small>Optional ansehen · Video öffnen</small>
+                </span>
+                <span aria-hidden="true" className={styles.explainerChevron}>⌄</span>
+              </summary>
+              <div className={styles.explainerPlayback}>
+                <video controls preload="none" playsInline poster={explainerPosterUrl || undefined} aria-label={isPv ? "PV-Trust Erklärvideo" : "Pflege-Recruiting Erklärvideo"}>
+                  <source src={explainerVideoUrl} type="video/mp4"/>
+                  Ihr Browser unterstützt dieses Video nicht.
+                </video>
+                <a href="#termin" className={styles.explainerBottomCta}>Kostenloses 15-Minuten-Gespräch vereinbaren ↗</a>
+              </div>
+            </details>
+          </section>
+        )}
 
         {hasVertical&&(
           <section className={styles.proof} aria-labelledby="proof-title">
