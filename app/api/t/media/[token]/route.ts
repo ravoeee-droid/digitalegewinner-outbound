@@ -1,5 +1,4 @@
 import { NextRequest } from "next/server";
-import { get } from "@vercel/blob";
 import { verifyVideoToken } from "@/lib/email-tracking";
 import { query } from "@/lib/db";
 import { leadSegmentSql } from "@/lib/lead-segment";
@@ -48,24 +47,11 @@ export async function GET(request:NextRequest,{params}:{params:Promise<{token:st
   }
   const range=request.headers.get("range");
   if(range && !/^bytes=\\d*-\\d*$/.test(range))return new Response("Invalid range",{status:416});
-  const result = range ? null : await get(url,{access:"private"}).catch((error)=>{
-    console.error("[loom-media] SDK error",segment,error instanceof Error?error.message:"unknown");
-    return null;
-  });
-  if(result?.statusCode===200 && result.stream) {
-    return new Response(result.stream,{
-      status:200,
-      headers:{
-        "content-type":"video/mp4",
-        "content-length":String(result.blob.size),
-        "accept-ranges":"bytes",
-        "cache-control":"private, max-age=1800",
-        "x-content-type-options":"nosniff",
-      }
-    });
-  }
+  // Always request a partial-content stream, including initial browser loads.
+  // A 200 full-blob stream (300 MB) stalls until enough metadata arrives.
+  const requestedRange = range || "bytes=0-";
   const upstream=await fetch(url,{
-    headers:{authorization:`Bearer ${secret}`,...(range?{range}:{})},
+    headers:{authorization:`Bearer ${secret}`,range:requestedRange},
     cache:"no-store",
     signal:request.signal
   }).catch((error)=>{
@@ -73,7 +59,7 @@ export async function GET(request:NextRequest,{params}:{params:Promise<{token:st
     return null;
   });
   console.info("[loom-media] response",{
-    segment, range, status:upstream?.status, length:upstream?.headers.get("content-length"),
+    segment, range:requestedRange, status:upstream?.status, length:upstream?.headers.get("content-length"),
     contentRange:upstream?.headers.get("content-range")
   });
   if(!upstream || !upstream.ok || !upstream.body)return new Response("Video temporarily unavailable",{status:502});
