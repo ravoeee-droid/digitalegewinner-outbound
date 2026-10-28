@@ -48,7 +48,6 @@ export async function GET(_request: Request, { params }: { params: Promise<{ tok
     '<svg width="640" height="360" xmlns="http://www.w3.org/2000/svg">'+
     '<rect width="640" height="360" fill="none" stroke="#ffffff" stroke-width="5"/>'+
     '<rect x="0" y="298" width="640" height="62" fill="#101216" opacity=".89"/>'+
-    '<text x="24" y="336" fill="white" font-family="Arial,sans-serif" font-size="22" font-weight="bold">PERSÖNLICHE VIDEONACHRICHT</text>'+
     '<circle cx="320" cy="171" r="39" fill="#ec6500" stroke="#ffffff" stroke-width="4"/>'+
     '<polygon points="309,148 309,194 344,171" fill="#ffffff"/>'+
     '</svg>'
