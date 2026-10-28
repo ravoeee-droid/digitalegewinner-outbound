@@ -248,10 +248,11 @@ export default async function VideoPage({ params, searchParams }: { params: Prom
           <span className={styles.smallEyebrow}>DER NÄCHSTE SCHRITT</span>
           <h2 id="booking-title">15 Minuten. Eine klare Entscheidung.</h2>
           <p>Hier können Sie direkt einen Termin bei Raphael auswählen.</p>
+          <a className={styles.explainerBottomCta} href={CALENDAR_URL} data-calendar-open="true" target="_blank" rel="noopener noreferrer">15-Minuten-Termin im Kalender auswählen ↗</a>
+          <p>Oder wählen Sie Ihren Termin direkt hier:</p>
           <div className={styles.calendar}>
             <iframe src={CALENDAR_URL} title="Terminbuchung bei Raphael Hermann" loading="lazy"/>
           </div>
-          <p><a href={CALENDAR_URL} data-calendar-open="true" target="_blank" rel="noopener noreferrer">Kalender direkt öffnen – falls die Einbettung auf Ihrem Gerät nicht funktioniert ↗</a></p>
         </section>
         <footer className={styles.legal}>
           <span>Digitale Gewinner · Raphael Hermann</span>
