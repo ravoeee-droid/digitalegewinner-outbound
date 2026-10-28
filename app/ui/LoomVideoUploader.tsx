@@ -32,26 +32,44 @@ export default function LoomVideoUploader() {
     if(file.size>500_000_000){setMessage(x=>({...x,[segment]:"Die Datei darf maximal 500 MB groß sein."}));return;}
     setBusy(x=>({...x,[segment]:true}));
     setPct(x=>({...x,[segment]:0}));
-    setMessage(x=>({...x,[segment]:"Übertrage direkt in den Videospeicher …"}));
+    setMessage(x=>({...x,[segment]:`Verbindung zum Videospeicher wird aufgebaut · ${Math.round(file.size/1048576)} MB …`}));
+    let lastProgress=Date.now();
+    const controller = new AbortController();
+    // Keep the operator informed while Vercel negotiates multipart tokens.
+    const heartbeat = window.setInterval(() => {
+      if(Date.now()-lastProgress>30000){
+        setMessage(x=>({...x,[segment]:"Noch keine Datenübertragung bestätigt. Bitte Internetverbindung und Browser-Netzwerk prüfen. Nicht erneut starten, solange dieser Upload läuft."}));
+      }
+    },5000);
     try {
       const blob = await upload(`loom-videos/${segment}.mp4`,file,{
         access:"public",
         handleUploadUrl:"/api/admin/loom-video-upload",
         multipart:true,
+        contentType:"video/mp4",
+        abortSignal:controller.signal,
         clientPayload:segment,
-        onUploadProgress:({percentage})=>setPct(x=>({...x,[segment]:Math.round(percentage)})),
+        onUploadProgress:({loaded,total,percentage})=>{
+          lastProgress=Date.now();
+          setPct(x=>({...x,[segment]:Math.round(percentage)}));
+          setMessage(x=>({...x,[segment]:`Hochladen: ${(loaded/1048576).toFixed(1)} von ${(total/1048576).toFixed(1)} MB · ${Math.round(percentage)} %`}));
+        },
       });
-      setMessage(x=>({...x,[segment]:"Hochgeladen. Verknüpfung wird aktiviert …"}));
-      // Webhook is async. The source URL is immediately available and playback
-      // activates as soon as the server callback registers it.
-      for(let n=0;n<5;n++) {
-        await new Promise(resolve=>setTimeout(resolve,1100));
-        await refresh();
-      }
-      setMessage(x=>({...x,[segment]:`Upload abgeschlossen: ${blob.url}`}));
+      setPct(x=>({...x,[segment]:100}));
+      setMessage(x=>({...x,[segment]:"100 % übertragen. Video wird geprüft und aktiviert …"}));
+      const response=await fetch("/api/admin/loom-video-upload",{
+        method:"POST",
+        headers:{"content-type":"application/json"},
+        body:JSON.stringify({action:"activate",segment,url:blob.url})
+      });
+      const result=await response.json() as {ok?:boolean;error?:string};
+      if(!response.ok||!result.ok)throw new Error(result.error||"Datei übertragen, aber Aktivierung fehlgeschlagen.");
+      await refresh();
+      setMessage(x=>({...x,[segment]:"✓ Video aktiv – persönliche Links benutzen jetzt die neue MP4."}));
     } catch(error) {
       setMessage(x=>({...x,[segment]:error instanceof Error?error.message:"Upload fehlgeschlagen"}));
     } finally {
+      window.clearInterval(heartbeat);
       setBusy(x=>({...x,[segment]:false}));
     }
   }
@@ -71,7 +89,11 @@ export default function LoomVideoUploader() {
         </p>
         <input aria-label={title} type="file" accept="video/mp4,.mp4" disabled={Boolean(busy[key])}
           onChange={event=>{void uploadFile(key,event.target.files?.[0]);}} />
-        {busy[key]&&<progress value={pct[key]||0} max={100} style={{display:"block",width:"100%",marginTop:14}}/>}
+        {busy[key]&&<div style={{marginTop:14}}>
+          <progress value={pct[key]||0} max={100} style={{display:"block",width:"100%",height:16,accentColor:"#34c759"}}/>
+          <strong style={{fontSize:14,color:"#72f0ab"}}>{pct[key]||0} %</strong>
+          <span style={{fontSize:12,marginLeft:12,color:"#a7bdaf"}}>{!pct[key] ? "Verbindung wird hergestellt – noch kein Uploadfortschritt bestätigt." : "Übertragung läuft."}</span>
+        </div>}
         <p style={{fontSize:13,overflowWrap:"anywhere",color:"#b5cbbd"}}>{message[key] || ""}</p>
         {urls[key]&&<a href={urls[key]} target="_blank" rel="noopener noreferrer" style={{color:"#72f0ab",fontSize:13}}>Videodatei prüfen ↗</a>}
       </section>)}
