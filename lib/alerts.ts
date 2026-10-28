@@ -26,18 +26,44 @@ export async function sendAlert(text: string) {
   }
 }
 
-// Gleiche Störung höchstens einmal pro Zeitfenster melden, damit der Chat nicht zugespammt wird.
-export async function sendAlertOnce(key: string, text: string, hours = 6) {
+// Atomic de-duplication: concurrent serverless invocations must never both
+// send the same notification. A single insert/upsert claims the key before
+// contacting Telegram. If the DB is unavailable, fail closed, not spam.
+let claimTableReady: Promise<unknown> | null = null;
+async function ensureClaimsTable() {
+  claimTableReady ||= query(`create table if not exists outbound_alert_claims (
+    workspace text not null,
+    alert_key text not null,
+    claimed_at timestamptz not null default now(),
+    primary key (workspace, alert_key)
+  )`).catch(error => {
+    claimTableReady = null;
+    throw error;
+  });
+  await claimTableReady;
+}
+
+// Same alert key may be sent again only after its requested cooldown.
+export async function sendAlertOnce(key: string, message: string, hours = 6) {
   try {
-    const recent = await query<{ id: number }>(
-      "select id from er_events where workspace='default' and type='alert' and meta->>'key'=$1 and created_at>now()-($2::text||' hours')::interval limit 1",
-      [key, String(hours)],
+    await ensureClaimsTable();
+    const claims = await query<{ alert_key: string }>(
+      `insert into outbound_alert_claims(workspace,alert_key,claimed_at)
+       values('default',$1,now())
+       on conflict(workspace,alert_key) do update
+       set claimed_at=excluded.claimed_at
+       where outbound_alert_claims.claimed_at < now()-($2::double precision * interval '1 hour')
+       returning alert_key`,
+      [key, hours],
     );
-    if (recent.length) return false;
-    const sent = await sendAlert(text);
-    await query("insert into er_events(workspace,type,meta) values('default','alert',$1::jsonb)", [JSON.stringify({ key, sent })]);
+    if (!claims.length) return false;
+    const sent = await sendAlert(message);
+    await query("insert into er_events(workspace,type,meta) values('default','alert',$1::jsonb)", [
+      JSON.stringify({ key, sent, atomic: true }),
+    ]).catch(() => null);
     return sent;
-  } catch {
+  } catch (error) {
+    console.error("[alerts] atomic claim failed", error instanceof Error ? error.message : "unknown");
     return false;
   }
 }
