@@ -13,7 +13,7 @@ const BOT = /(bot|crawl|spider|scan|proofpoint|mimecast|barracuda|safelinks|defe
 export async function OPTIONS() { return new Response(null, { status: 204, headers: CORS }); }
 
 export async function POST(request: Request) {
-  let body: { t?: string; e?: string; v?: number; p?: string; a?: string } = {};
+  let body: { t?: string; e?: string; v?: number; p?: string; a?: string; sid?: string; ts?: number } = {};
   try { body = JSON.parse(await request.text()); } catch { return new Response(null, { status: 204, headers: CORS }); }
   const leadId = verifyVideoToken(String(body.t || ""));
   const type = String(body.e || "");
@@ -27,7 +27,7 @@ export async function POST(request: Request) {
   const passiveEvent = type === "view" || type === "scroll" || type === "dwell";
   const likelyImmediateScanner = sent?.age != null && sent.age >= 0 && sent.age < 90 && passiveEvent;
   const bot = BOT.test(request.headers.get("user-agent") || "") || likelyImmediateScanner;
-  await query("insert into er_events(workspace,lead_id,type,meta) values('default',$1,$2,$3::jsonb)", [leadId, `video_${type}`, JSON.stringify({ v: value, bot, a: arm, p: String(body.p || "").replace(/[^a-zA-Z0-9/_.#:-]/g, "").slice(0, 80) })]).catch(() => null);
+  await query("insert into er_events(workspace,lead_id,type,meta) values('default',$1,$2,$3::jsonb)", [leadId, `video_${type}`, JSON.stringify({ v: value, bot, a: arm, p: String(body.p || "").replace(/[^a-zA-Z0-9/_.#:-]/g, "").slice(0, 80), session: /^[0-9a-f-]{36}$/i.test(String(body.sid||"")) ? body.sid : null, clientTs: Number.isFinite(Number(body.ts)) && Math.abs(Date.now()-Number(body.ts)) < 86400000 ? Math.floor(Number(body.ts)) : null })]).catch(() => null);
   if (!bot) {
     const [row] = await query<{ company: string }>(
       "select c.name company from sales_leads l join sales_companies c on c.id=l.company_id and c.workspace=l.workspace where l.id::text=$1 limit 1",
