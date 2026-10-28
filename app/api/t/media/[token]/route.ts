@@ -34,6 +34,22 @@ export async function GET(request:NextRequest,{params}:{params:Promise<{token:st
   const secret=process.env.BLOB_READ_WRITE_TOKEN;
   if(!secret)return new Response("Video storage unavailable",{status:503});
 
+  if(request.nextUrl.searchParams.get("diagnose")==="codec") {
+    const inspect=async(range:string)=>{
+      const response=await fetch(url,{headers:{authorization:`Bearer ${secret}`,range},cache:"no-store",signal:AbortSignal.timeout(15000)});
+      const bytes=Buffer.from(await response.arrayBuffer());
+      const snippet=bytes.toString("latin1");
+      return {
+        status:response.status, bytes:bytes.length,
+        moov:snippet.indexOf("moov"),mdat:snippet.indexOf("mdat"),
+        avc1:snippet.includes("avc1"),hvc1:snippet.includes("hvc1"),
+        hev1:snippet.includes("hev1"),av01:snippet.includes("av01"),
+        mp4a:snippet.includes("mp4a"),vp09:snippet.includes("vp09")
+      };
+    };
+    const [first,last]=await Promise.all([inspect("bytes=0-65535"),inspect("bytes=-4194304")]);
+    return Response.json({segment,first,last});
+  }
   if(request.nextUrl.searchParams.get("diagnose")==="1") {
     const test=await fetch(url,{
       headers:{authorization:`Bearer ${secret}`,range:"bytes=0-1023"},
