@@ -15,11 +15,11 @@ const OWNER_INBOX = "digitalegewinner@gmail.com";
 type Candidate = { lead_id:string; company:string; contact:string; email:string; segment:"pflege"|"pv" };
 function escapeHtml(s:string) {return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");}
 function originFor(request:Request) {
-  const configured=(process.env.NEXT_PUBLIC_APP_URL||"").trim().replace(/\\/+$/,"");
-  return /^https:\\/\\/[^\\s/]+$/i.test(configured) ? configured : new URL(request.url).origin;
+  const configured=(process.env.NEXT_PUBLIC_APP_URL||"").trim().replace(/\/+$/,"");
+  return /^https:\/\/[^\s/]+$/i.test(configured) ? configured : new URL(request.url).origin;
 }
 function safeGreeting(raw:string) {
-  const name=String(raw||"").trim().replace(/\\s+/g," ");
+  const name=String(raw||"").trim().replace(/\s+/g," ");
   return /^[A-ZÄÖÜ][a-zäöüß]+(?:[ -][A-ZÄÖÜ][a-zäöüß]+){1,2}$/.test(name) ? "Guten Tag "+name+"," : "Guten Tag,";
 }
 async function candidates():Promise<Candidate[]> {
@@ -80,12 +80,12 @@ export async function GET(request:Request) {
     if(Number(already?.n||0)>0)continue;
     const link=videoPageUrl(baseUrl,lead.lead_id);
     const body=[safeGreeting(lead.contact),`ich habe eine kurze Videonachricht für ${lead.company} vorbereitet:`,link,
-      `Beste Grüße\\nRaphael Hermann\\nDigitale Gewinner\\n${lead.segment==="pflege"?"https://digitalegewinner.de/pflege":"https://digitalegewinner.de/pv-trust"}`].join("\\n\\n");
+      `Beste Grüße\nRaphael Hermann\nDigitale Gewinner\n${lead.segment==="pflege"?"https://digitalegewinner.de/pflege":"https://digitalegewinner.de/pv-trust"}`].join("\n\n");
     const subject=`[LOOM-TEST ${i+1}/10 · ${lead.segment.toUpperCase()}] Persönliche Videonachricht für ${lead.company}`.slice(0,175);
-    const header=`NUR INTERNE TESTMAIL – kein Lead wurde angeschrieben.\\nGeplanter Empfänger: ${lead.email}\\nSegment: ${lead.segment}\\nFirmen-Screenshot: ${link}\\n\\n--- VORSCHAU DER KUNDENMAIL ---\\n\\n`;
+    const header=`NUR INTERNE TESTMAIL – kein Lead wurde angeschrieben.\nGeplanter Empfänger: ${lead.email}\nSegment: ${lead.segment}\nFirmen-Screenshot: ${link}\n\n--- VORSCHAU DER KUNDENMAIL ---\n\n`;
     try {
       const text=header+body;
-      const html=`<div style="font:14px Arial,sans-serif;line-height:1.6"><p style="background:#fff6dc;padding:12px"><strong>INTERNE TESTMAIL ${i+1}/10 · ${escapeHtml(lead.segment)}</strong><br>Geplanter Empfänger: ${escapeHtml(lead.email)}</p><hr><p>${escapeHtml(body).replace(/\\n/g,"<br>").replace(escapeHtml(link),`<a href="${escapeHtml(link)}">${escapeHtml(link)}</a>`)}</p></div>`;
+      const html=`<div style="font:14px Arial,sans-serif;line-height:1.6"><p style="background:#fff6dc;padding:12px"><strong>INTERNE TESTMAIL ${i+1}/10 · ${escapeHtml(lead.segment)}</strong><br>Geplanter Empfänger: ${escapeHtml(lead.email)}</p><hr><p>${escapeHtml(body).replace(/\n/g,"<br>").replace(escapeHtml(link),`<a href="${escapeHtml(link)}">${escapeHtml(link)}</a>`)}</p></div>`;
       await sendMail({...mailbox,to:OWNER_INBOX,subject,text,html});
       await query("insert into er_events(workspace,lead_id,type,meta) values('default',$1,'loom_test_sent',$2::jsonb)",
         [lead.lead_id,JSON.stringify({batch:BATCH,lead_id:lead.lead_id,segment:lead.segment,recipient:OWNER_INBOX})]);
