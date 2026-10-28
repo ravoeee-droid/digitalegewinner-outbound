@@ -16,6 +16,7 @@ type LeadRecord = {
 
 export default function UsPvPilotPage() {
   const [records, setRecords] = useState<LeadRecord[]>([]);
+  const [rawJson, setRawJson] = useState("");
   const [limit, setLimit] = useState(10);
   const [fileName, setFileName] = useState("");
   const [busy, setBusy] = useState(false);
@@ -34,6 +35,18 @@ export default function UsPvPilotPage() {
       setRecords(next); setFileName(file.name); setLimit(Math.min(10, next.length));
     } catch (cause) {
       setRecords([]); setFileName(""); setError(cause instanceof Error ? cause.message : "Datei konnte nicht gelesen werden.");
+    }
+  }
+
+  function readJsonText() {
+    setError(""); setResult("");
+    try {
+      const parsed = JSON.parse(rawJson) as { records?: LeadRecord[] } | LeadRecord[];
+      const next = Array.isArray(parsed) ? parsed : parsed.records;
+      if (!Array.isArray(next) || !next.length) throw new Error("Keine Leads im JSON gefunden.");
+      setRecords(next); setFileName("Direkte JSON-Eingabe"); setLimit(Math.min(10, next.length));
+    } catch (cause) {
+      setRecords([]); setFileName(""); setError(cause instanceof Error ? cause.message : "JSON konnte nicht gelesen werden.");
     }
   }
 
@@ -67,6 +80,11 @@ export default function UsPvPilotPage() {
           <input type="file" accept="application/json,.json" onChange={chooseFile} />
           <span>{fileName || "JSON-Datei auswählen"}</span>
         </label>
+        <details className={styles.fallback}>
+          <summary>Oder JSON direkt einfügen</summary>
+          <textarea aria-label="Lead-JSON" value={rawJson} onChange={(event) => setRawJson(event.target.value)} placeholder='{"records":[…]}' />
+          <button type="button" onClick={readJsonText} disabled={!rawJson.trim()}>JSON prüfen</button>
+        </details>
 
         {records.length > 0 && <>
           <div className={styles.controls}>
@@ -84,4 +102,5 @@ export default function UsPvPilotPage() {
     </main>
   );
 }
+
 
