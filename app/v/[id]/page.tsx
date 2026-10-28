@@ -81,10 +81,10 @@ export default async function VideoPage({ params, searchParams }: { params: Prom
   // PV asset is published on the main website. Pflege asset may be configured separately
   // once its real hosting URL is verified; do not substitute the personal video.
   const explainerVideoUrl = isPv
-    ? "https://digitalegewinner.de/assets/video/pv-trust-erklaervideo.mp4"
+    ? "https://www.youtube.com/embed/h7e0izR5fn0?rel=0&playsinline=1"
     : (process.env.PFLEGE_EXPLAINER_VIDEO_URL || "");
   const explainerPosterUrl = isPv
-    ? "https://digitalegewinner.de/assets/video/pv-trust-erklaervideo-poster.webp"
+    ? "https://i.ytimg.com/vi/h7e0izR5fn0/hqdefault.jpg"
     : (process.env.PFLEGE_EXPLAINER_POSTER_URL || "");
   const whatsappUrl = "https://wa.me/" + WHATSAPP_NUMBER + "?text=" + encodeURIComponent("Hallo Raphael, ich habe Ihr Video gesehen (" + data.company + ").");
   return (
@@ -174,10 +174,14 @@ export default async function VideoPage({ params, searchParams }: { params: Prom
                 <span aria-hidden="true" className={styles.explainerChevron}>⌄</span>
               </summary>
               <div className={styles.explainerPlayback}>
-                <video controls preload="none" playsInline poster={explainerPosterUrl || undefined} aria-label={isPv ? "PV-Trust Erklärvideo" : "Pflege-Recruiting Erklärvideo"}>
-                  <source src={explainerVideoUrl} type="video/mp4"/>
-                  Ihr Browser unterstützt dieses Video nicht.
-                </video>
+                {isPv ? (
+                  <iframe src={explainerVideoUrl} title="PV-Trust – Das System in 3 Minuten erklärt" loading="lazy" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerPolicy="strict-origin-when-cross-origin" allowFullScreen />
+                ) : (
+                  <video controls preload="none" playsInline poster={explainerPosterUrl || undefined} aria-label="Pflege-Recruiting Erklärvideo">
+                    <source src={explainerVideoUrl} type="video/mp4"/>
+                    Ihr Browser unterstützt dieses Video nicht.
+                  </video>
+                )}
                 <a href="#termin" className={styles.explainerBottomCta}>Kostenloses 15-Minuten-Gespräch vereinbaren ↗</a>
               </div>
             </details>
