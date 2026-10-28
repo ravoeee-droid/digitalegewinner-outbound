@@ -83,12 +83,12 @@ export async function GET(request: Request) {
           count(*) filter(where e.type='video_play_confirmed' and coalesce((e.meta->>'bot')::boolean,false)=false)::int plays,
           max(coalesce((e.meta->>'v')::int,0)) filter(where e.type='video_progress' and coalesce((e.meta->>'bot')::boolean,false)=false)::int progress,
           bool_or(e.type in ('video_booking_click','video_calendar_focus','video_whatsapp_click') and coalesce((e.meta->>'bot')::boolean,false)=false) booking,
-          bool_or(e.type in ('reply','positive_reply')) replied,
+          bool_or(e.type in ('reply','positive_reply') and coalesce(e.meta->>'subject','') !~* '^Automatische Antwort:') replied,
           bool_or(e.type='positive_reply') positive,
           bool_or(e.type in ('appointment','appointment_attended')) meeting,
           bool_or(e.type='video_view' and coalesce((e.meta->>'bot')::boolean,false)=false) viewed,
           bool_or(e.type='email_click' and coalesce((e.meta->>'bot')::boolean,false)=false) clicked,
-          max(e.created_at) filter(where e.type in ('video_play','video_progress','video_booking_click','video_calendar_focus','video_whatsapp_click','reply','positive_reply'))::text last_signal
+          max(e.created_at) filter(where e.type in ('video_play','video_progress','video_booking_click','video_calendar_focus','video_whatsapp_click','positive_reply') or (e.type='reply' and coalesce(e.meta->>'subject','') !~* '^Automatische Antwort:'))::text last_signal
         from sent_cohort s
         left join er_events e on e.workspace='default' and e.lead_id=s.lead_id and e.created_at>=s.first_sent_at and e.created_at>=now()-interval '30 days'
         group by s.lead_id,s.segment
