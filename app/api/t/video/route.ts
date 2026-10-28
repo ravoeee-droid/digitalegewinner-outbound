@@ -13,7 +13,7 @@ const BOT = /(bot|crawl|spider|scan|proofpoint|mimecast|barracuda|safelinks|defe
 export async function OPTIONS() { return new Response(null, { status: 204, headers: CORS }); }
 
 export async function POST(request: Request) {
-  let body: { t?: string; e?: string; v?: number; p?: string; a?: string; sid?: string; ts?: number } = {};
+  let body: { t?: string; e?: string; v?: number; p?: string; a?: string; sid?: string; ts?: number; d?: {source?: string; ready?: number; network?: number; position?: number; visibility?: string} } = {};
   try { body = JSON.parse(await request.text()); } catch { return new Response(null, { status: 204, headers: CORS }); }
   const leadId = verifyVideoToken(String(body.t || ""));
   const type = String(body.e || "");
@@ -34,7 +34,16 @@ export async function POST(request: Request) {
     likelyImmediateScanner = sent?.age != null && sent.age >= 0 && sent.age < 90;
   }
   const bot = knownBot || likelyImmediateScanner;
-  await query("insert into er_events(workspace,lead_id,type,meta) values('default',$1,$2,$3::jsonb)", [leadId, `video_${type}`, JSON.stringify({ v: value, bot, a: arm, p: String(body.p || "").replace(/[^a-zA-Z0-9/_.#:-]/g, "").slice(0, 80), session: /^[0-9a-f-]{36}$/i.test(String(body.sid||"")) ? body.sid : null, clientTs: Number.isFinite(Number(body.ts)) && Math.abs(Date.now()-Number(body.ts)) < 86400000 ? Math.floor(Number(body.ts)) : null })]).catch(() => null);
+  // Minimal, allowlisted player diagnostics: no user agent, URL, or personal identifiers.
+  const d = type === "player_error" && body.d && typeof body.d === "object" ? body.d : undefined;
+  const diagnostic = d ? {
+    source: d.source === "native" || d.source === "youtube" ? d.source : undefined,
+    ready: Number.isInteger(d.ready) && Number(d.ready) >= 0 && Number(d.ready) <= 4 ? d.ready : undefined,
+    network: Number.isInteger(d.network) && Number(d.network) >= 0 && Number(d.network) <= 3 ? d.network : undefined,
+    position: Number.isFinite(d.position) && Number(d.position) >= 0 && Number(d.position) <= 36000 ? Math.round(Number(d.position)) : undefined,
+    visibility: d.visibility === "visible" || d.visibility === "hidden" ? d.visibility : undefined,
+  } : undefined;
+  await query("insert into er_events(workspace,lead_id,type,meta) values('default',$1,$2,$3::jsonb)", [leadId, `video_${type}`, JSON.stringify({ v: value, bot, a: arm, p: String(body.p || "").replace(/[^a-zA-Z0-9/_.#:-]/g, "").slice(0, 80), session: /^[0-9a-f-]{36}$/i.test(String(body.sid||"")) ? body.sid : null, diagnostic, clientTs: Number.isFinite(Number(body.ts)) && Math.abs(Date.now()-Number(body.ts)) < 86400000 ? Math.floor(Number(body.ts)) : null })]).catch(() => null);
   const shouldNotify = type === "play" || (type === "progress" && value >= 50)
     || type === "booking_click" || type === "calendar_focus" || type === "calendar_open"
     || type === "whatsapp_click" || type === "chat_open" || type === "site_click"
