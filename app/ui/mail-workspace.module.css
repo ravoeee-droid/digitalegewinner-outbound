@@ -16,3 +16,42 @@
 .headerActions .secondary,.headerActions .primary{white-space:nowrap}
 .primary{background:#34c759;border-color:#34c759;color:#09100d}
 .mailShell,.inboxPane{background:rgba(255,255,255,.035)!important;border-color:rgba(255,255,255,.09)!important;box-shadow:none!important}
+
+
+/* Sent email reader: independently scrollable message and HTML preview.
+   No fixed-height overflow clipping inside the dashboard grid. */
+.mailShell { min-height: 0; }
+.inboxPane, .readerPane { min-height: 0; overflow: hidden; }
+.readerHead, .replyBar { flex: 0 0 auto; }
+.readerContent {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 18px 22px 24px;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+.emailPreview {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  height: min(620px, 68vh);
+  min-height: 360px;
+  overflow: auto;
+  border: 1px solid #e5e5e5;
+  border-radius: 10px;
+  background: #fff;
+}
+.previewNote {
+  color: #91a89e;
+  font-size: 12px;
+  line-height: 1.5;
+  margin: 0 0 12px;
+}
+.emailPreview + .previewNote { margin: 12px 0 0; }
+@media (max-width:900px) {
+  .readerPane { height: min(76vh, 840px); min-height: 480px; }
+  .readerContent { padding: 12px; }
+  .emailPreview { height: min(540px, 60vh); min-height: 320px; }
+}
