@@ -75,3 +75,7 @@ Die Tabelle `outbound_contact_permissions` enthielt **0 Datensätze**. Für kein
 ## 7. Abnahme
 
 **Noch nicht abgeschlossen:** Die 300er-Charge ist abgearbeitet (299 SMTP angenommen, 1 fehlgeschlagen), aber das vollständige Optimierungs-Abnahmekriterium ist nicht erreicht: 0 verifizierte Termine, 0 dokumentierte Kontaktberechtigungen, 33 Bounce-Ereignisse, offene Player-/Mobile-/Booking-End-to-End-Tests. Die einmalige Optimierungsaufgabe darf deshalb noch nicht als vollständig erledigt deaktiviert werden.
+
+## 8. Öffentlicher Browser-Smoke-Test
+
+Am 28.10.2026 wurde die öffentliche PV-Demoseite in einem echten Browser geprüft: Seite lädt; großer Video-Play-Button vorhanden; Google-Calendar-Einbettung zeigt interaktive Datum-/Zeit-Auswahl; keine sichtbare Fehlermeldung. **Nicht bestätigt:** tatsächliche 3-Sekunden-Wiedergabe, mobile Viewport-Darstellung, vollständige Terminbuchung. Der zunächst unter dem 670-px-Kalender platzierte Fallback-Link war im Screenshot nicht sichtbar; deshalb wurde der direkte Kalender-CTA **über** die Einbettung verschoben. Diese neue Position benötigt noch einen erneuten visuellen Test. Es wurde keine Testbuchung erzeugt.
