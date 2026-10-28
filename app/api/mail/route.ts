@@ -1,4 +1,7 @@
 import { z } from "zod";
+import { trackedEmailHtml, videoPageUrl, unsubscribeUrl } from "@/lib/email-tracking";
+import { resolveSlots, withSignatureLink } from "@/lib/outreach-copy";
+import { pvPageUrl } from "@/lib/pv-page";
 import { loadMailboxCredentials } from "@/lib/mailbox-credentials";
 import { listImapMessages, type ImapMailboxCredential } from "@/lib/imap-client";
 import { sendMail } from "@/lib/mailer";
@@ -48,14 +51,28 @@ async function loadSentMessages(mailboxId: string, limit: number) {
     [mailboxId, limit],
   );
   // Kampagnen-Mails laufen über den Versand-Cron und stehen nur in der Warteschlange (er_outbox), nicht in der Gesendet-Tabelle.
-  const campaign = await query<{ id: string; recipient: string; subject: string; body: string; sent_at: string }>(
-    `select id::text as id, recipient, subject, body, sent_at::text as sent_at from er_outbox
+  const campaign = await query<{ id: string; recipient: string; subject: string; body: string; sent_at: string; lead_id: string; campaign_id: string }>(
+    `select id::text as id, recipient, subject, body, sent_at::text as sent_at, lead_id, campaign_id from er_outbox
      where workspace='default' and status='sent' and mailbox_id=$1 order by sent_at desc limit $2`,
     [mailboxId, limit],
   ).catch(() => []);
+  // Render the precise outbound HTML template as a safe read-only preview.
+  const origin = (process.env.NEXT_PUBLIC_APP_URL || "https://app.digitalegewinner.de").replace(/\/$/, "");
+  const pvUrl = campaign.some(row => row.body.includes("{{pv_link}}")) ? await pvPageUrl().catch(() => "") : "";
+  const previews = campaign.map((row) => {
+    if (!row.lead_id || !row.campaign_id?.includes("loom")) return { ...row, bodyHtml: "" };
+    const content = resolveSlots(withSignatureLink(row.body))
+      .replaceAll("{{pv_link}}", pvUrl)
+      .replaceAll("{{video_link}}", videoPageUrl(origin, row.lead_id));
+    // Do not artificially record opens or clicks from the operator's mailbox preview.
+    const html = trackedEmailHtml(content, origin, row.id, row.lead_id, unsubscribeUrl(origin, row.id, row.lead_id))
+      .replace(/<img[^>]*\/api\/t\/open[^>]*>/gi, "")
+      .replace(/href="[^"]*"/gi, 'href="#"');
+    return { ...row, body: content, bodyHtml: html };
+  });
   const all = [
-    ...rows.map((row) => ({ uid: row.id as number | string, recipient: row.recipient, subject: row.subject, body: row.body, sent_at: row.sent_at })),
-    ...campaign.map((row) => ({ uid: row.id as number | string, recipient: row.recipient, subject: row.subject, body: row.body, sent_at: row.sent_at })),
+    ...rows.map((row) => ({ uid: row.id as number | string, recipient: row.recipient, subject: row.subject, body: row.body, bodyHtml: "", sent_at: row.sent_at })),
+    ...previews.map((row) => ({ uid: row.id as number | string, recipient: row.recipient, subject: row.subject, body: row.body, bodyHtml: row.bodyHtml, sent_at: row.sent_at })),
   ].sort((a, b) => new Date(b.sent_at).getTime() - new Date(a.sent_at).getTime()).slice(0, limit);
   return all.map((row) => ({
     uid: row.uid as number,
@@ -68,6 +85,7 @@ async function loadSentMessages(mailboxId: string, limit: number) {
     replyTo: "",
     unread: false,
     bodyText: row.body,
+    bodyHtml: row.bodyHtml,
   }));
 }
 
