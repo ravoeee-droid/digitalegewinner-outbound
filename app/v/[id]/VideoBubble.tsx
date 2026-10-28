@@ -130,19 +130,18 @@ export default function VideoPlayer({ youtubeId, screenshot, company }: { youtub
         </div>
       )}
       {!playing && !finished && !failed && (
-        <button type="button" className={styles.bigPlay} onClick={() => {
-          if (!ready) {
-            // Browser privacy settings can block the IFrame API indefinitely.
-            // Do not strand visitors behind a disabled play button.
-            track("play_intent");
-            setFailed(true);
-            return;
-          }
-          toggle();
-        }} aria-label={started ? "Video fortsetzen" : "Video abspielen"}>
-          <span className={styles.bigIcon} aria-hidden="true">▶</span>
-          {!started && <span className={styles.bigLabel}>Video abspielen · ca. {duration ? clock(duration) : "1:30"} Min</span>}
-        </button>
+        ready ? (
+          <button type="button" className={styles.bigPlay} onClick={toggle} aria-label={started ? "Video fortsetzen" : "Video abspielen"}>
+            <span className={styles.bigIcon} aria-hidden="true">▶</span>
+            {!started && <span className={styles.bigLabel}>Video abspielen · ca. {duration ? clock(duration) : "1:30"} Min</span>}
+          </button>
+        ) : (
+          <a className={styles.bigPlay} href={"https://www.youtube.com/watch?v=" + encodeURIComponent(youtubeId)} target="_blank" rel="noopener noreferrer"
+             onClick={() => track("play_intent")} style={{textDecoration:"none"}}>
+            <span className={styles.bigIcon} aria-hidden="true">▶</span>
+            <span className={styles.bigLabel}>Videonachricht direkt ansehen ↗</span>
+          </a>
+        )
       )}
       {playing && <button type="button" className={styles.tapLayer} onClick={toggle} aria-label="Video pausieren" />}
       <div className={styles.bar}>
