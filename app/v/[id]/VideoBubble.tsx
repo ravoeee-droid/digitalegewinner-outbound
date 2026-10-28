@@ -42,7 +42,7 @@ export default function VideoPlayer({ youtubeId, screenshot, company, autoStart 
       if (event.source !== iframeRef.current?.contentWindow) return;
       let data: {event?: string; info?: number} | undefined;
       try { data = typeof event.data === "string" ? JSON.parse(event.data) : event.data; } catch { return; }
-      if (data?.event === "onError") { track("player_error",typeof data.info==="number"?data.info:408); setShowRescue(true); }
+      if (data?.event === "onError") { track("player_error",typeof data.info==="number"?data.info:408,{source:"youtube",visibility:document.visibilityState}); setShowRescue(true); }
       if (data?.event === "onStateChange" && typeof data.info === "number") {
         setPlaying(data.info === 1);
         if (data.info === 1) { setShowRescue(false); track("play"); }
