@@ -93,7 +93,7 @@ export default async function VideoPage({ params, searchParams }: { params: Prom
         operations: ["get"],
         validUntil: Date.now() + 24 * 60 * 60 * 1000
       });
-      const signed = await presignUrl(signedToken, {
+      const signed = await presignUrl(signedToken, { access: "private",
         pathname: path,
         operation: "get",
         validUntil: Date.now() + 24 * 60 * 60 * 1000
