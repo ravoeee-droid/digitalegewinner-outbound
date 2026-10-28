@@ -49,7 +49,14 @@ export function trackedEmailHtml(text:string,origin:string,outboxId:string,leadI
     const index=match.index??0;
     html+=escapeHtml(text.slice(cursor,index)).replace(/\n/g,"<br>");
     const target=match[0];
-    html+=`<a href="${escapeHtml(clickTrackingUrl(origin,outboxId,leadId,target))}">${escapeHtml(target)}</a>`;
+    const href=escapeHtml(clickTrackingUrl(origin,outboxId,leadId,target));
+    // Replace only this lead's signed personal video URL with a clear email-safe CTA.
+    // Keep the original tracked destination and preserve all other links as text.
+    if(target===videoPageUrl(origin,leadId)) {
+      html+=`<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;margin:16px 0 20px"><tr><td bgcolor="#ec6500" style="background-color:#ec6500;border-radius:8px;text-align:center"><a href="${href}" style="display:inline-block;padding:15px 24px;border-radius:8px;background-color:#ec6500;color:#ffffff;font-family:Arial,sans-serif;font-size:16px;font-weight:700;line-height:22px;text-decoration:none">▶ Persönliches Video ansehen</a></td></tr></table>`;
+    } else {
+      html+=`<a href="${href}">${escapeHtml(target)}</a>`;
+    }
     cursor=index+target.length;
   }
   html+=escapeHtml(text.slice(cursor)).replace(/\n/g,"<br>");
