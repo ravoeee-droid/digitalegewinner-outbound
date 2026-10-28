@@ -3,6 +3,7 @@ import { z } from "zod";
 import { adminCookieName, sessionRole } from "@/lib/admin-auth";
 import { query, readState, writeState } from "@/lib/db";
 import { persistRadarLead } from "@/lib/sales-os";
+import { US_PV_MAILBOX_EMAILS } from "@/lib/us-pv-pilot";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -39,6 +40,7 @@ const campaign = (leadIds: string[]) => ({
   positive: 0,
   appointments: 0,
   leadIds,
+  mailboxEmails: [...US_PV_MAILBOX_EMAILS],
   steps: [
     {
       waitDays: 0,
@@ -120,4 +122,5 @@ export async function POST(request: Request) {
     return Response.json({ error: error instanceof Error ? error.message : "US-PV-Pilot konnte nicht vorbereitet werden." }, { status: 500 });
   }
 }
+
 

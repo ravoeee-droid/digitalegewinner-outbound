@@ -100,7 +100,7 @@ type Payload = {
 type FoundLead = { id: string; company: string; contact: string; email: string; phone: string; website: string; city: string; industry: string; lat?: number; lng?: number };
 type InboxItem = { id: number; leadId: string; company: string; contact: string; from: string; subject: string; mailboxId: string; createdAt: string; stage: string };
 type Step = { waitDays: number; subject: string; body: string; variants?: Array<{ label: string; subject: string; body: string }> };
-type Campaign = { id: string; name: string; audience: string; status: "Entwurf" | "Aktiv" | "Pausiert"; dailyLimit: number; steps: Step[]; sent: number; replies: number; positive: number; appointments: number; leadIds?: string[] };
+type Campaign = { id: string; name: string; audience: string; status: "Entwurf" | "Aktiv" | "Pausiert"; dailyLimit: number; steps: Step[]; sent: number; replies: number; positive: number; appointments: number; leadIds?: string[]; mailboxEmails?: string[] };
 type Mailbox = { id: string; name: string; email: string; provider: string; dailyLimit: number; sentToday: number; warmupDay: number; health: number; enabled: boolean; spf?: boolean; dkim?: boolean; dmarc?: boolean };
 type Store = { campaigns: Campaign[]; mailboxes: Mailbox[]; settings: { companyName: string; senderName: string; calendarUrl: string; timezone: string; pitchVideoUrl?: string }; [key: string]: unknown };
 type ResearchDetail = {
@@ -332,7 +332,7 @@ export default function PflegeProOS() {
     const byEmail = new Map(store.mailboxes.map((mailbox) => [mailbox.email.toLowerCase(), mailbox]));
     return mailConfig.filter((entry) => entry.configured).map((entry) => {
       const known = byEmail.get(entry.email.toLowerCase());
-      return { id: entry.id, enabled: known?.enabled ?? true, dailyLimit: known?.dailyLimit || 5 };
+      return { id: entry.id, email: entry.email, enabled: known?.enabled ?? true, dailyLimit: known?.dailyLimit || 5 };
     });
   }, [mailConfig, store.mailboxes]);
   const activeMailboxes = useMemo(() => sendableMailboxes.filter((mailbox) => mailbox.enabled), [sendableMailboxes]);
@@ -516,13 +516,15 @@ export default function PflegeProOS() {
     finally { setBusy(""); }
   }
   async function launchCampaign(campaign: Campaign) {
-    if (!activeMailboxes.length) return notify("Vor dem E-Mail-Start eine Mailbox unter /mail verbinden (IMAP/SMTP).");
+    const allowedMailboxEmails = campaign.mailboxEmails?.length ? new Set(campaign.mailboxEmails.map((email) => email.toLowerCase())) : null;
+    const campaignMailboxes = allowedMailboxEmails ? activeMailboxes.filter((mailbox) => allowedMailboxEmails.has(mailbox.email.toLowerCase())) : activeMailboxes;
+    if (!campaignMailboxes.length) return notify("Für diese Kampagne ist keine passende aktive Mailbox verbunden.");
     const audienceIds = campaign.leadIds?.length ? new Set(campaign.leadIds) : null;
     const leads = data.leads.filter((lead) => (!audienceIds || audienceIds.has(lead.id)) && lead.email && !lead.do_not_contact && !["Gewonnen", "Verloren"].includes(lead.stage)).map((lead) => ({ id: lead.id, company: lead.company, contact: lead.contact, email: lead.email, phone: lead.phone, website: lead.website, city: lead.city, industry: lead.industry, stage: lead.stage, dealValue: lead.deal_value, notes: lead.notes, intentScore: lead.intent_score }));
     if (!leads.length) return notify("Keine versandfähigen Leads.");
     setBusy(campaign.id);
     try {
-      const response = await fetch("/api/campaigns/launch", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ campaign, leads, mailboxes: sendableMailboxes, senderName: store.settings.senderName }) });
+      const response = await fetch("/api/campaigns/launch", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ campaign, leads, mailboxes: campaignMailboxes, senderName: store.settings.senderName }) });
       const json = await response.json() as { queued?: number; skipped?: number; error?: string };
       if (!response.ok) throw new Error(json.error || "Kampagnenstart fehlgeschlagen.");
       await saveStore({ ...store, campaigns: store.campaigns.map((item) => item.id === campaign.id ? { ...item, status: "Aktiv" as const } : item) });
@@ -742,4 +744,5 @@ function TimelineInspector({ lead, detail }: { lead: Lead; detail: ResearchDetai
 function DealInspector({ lead, onSubmit, busy }: { lead: Lead; onSubmit: (event: FormEvent<HTMLFormElement>) => void; busy: boolean }) {
   return <form className={styles.dealForm} onSubmit={onSubmit}><div className={styles.formGrid}><label>Stage<select name="stage" defaultValue={lead.stage}>{STAGES.map((stage) => <option key={stage}>{stage}</option>)}</select></label><label>Phone status<select name="phoneStatus" defaultValue={lead.phone_status}><option value="ready">Ready</option><option value="verify">Verify</option><option value="invalid">Invalid</option></select></label><label>Deal value €<input name="dealValue" type="number" min="0" defaultValue={lead.deal_value} /></label><label>Probability %<input name="probability" type="number" min="0" max="100" defaultValue={lead.probability} /></label><label>Next action<input name="nextAction" defaultValue={lead.next_action} /></label><label>Due<input name="nextActionAt" type="datetime-local" defaultValue={dtLocal(lead.next_action_at)} /></label><label>Expected close<input name="expectedCloseDate" type="date" defaultValue={lead.expected_close_date || ""} /></label><label>Lost reason<input name="lostReason" defaultValue={lead.lost_reason} /></label></div><label className={styles.fullField}>Notes<textarea name="notes" defaultValue={lead.notes} /></label><label className={styles.checkLabel}><input type="checkbox" name="dnc" defaultChecked={lead.do_not_contact} /> Do not contact</label><button className={styles.primaryButton} disabled={busy}>Save record</button></form>;
 }
+
 

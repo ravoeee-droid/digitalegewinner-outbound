@@ -22,6 +22,7 @@ export default function UsPvPilotPage() {
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState("");
   const [error, setError] = useState("");
+  const [repairing, setRepairing] = useState(false);
   const preview = useMemo(() => records.slice(0, limit), [records, limit]);
 
   async function chooseFile(event: ChangeEvent<HTMLInputElement>) {
@@ -66,6 +67,18 @@ export default function UsPvPilotPage() {
     } finally { setBusy(false); }
   }
 
+  async function repairMailboxes() {
+    setRepairing(true); setError(""); setResult("");
+    try {
+      const response = await fetch("/api/us-pv-pilot/repair-mailboxes", { method: "POST" });
+      const json = await response.json() as { reassigned?: number; mailboxes?: number; error?: string };
+      if (!response.ok) throw new Error(json.error || "Postfach-Zuordnung fehlgeschlagen.");
+      setResult(`${json.reassigned || 0} geplante Mails auf ${json.mailboxes || 0} US-Postfächer verteilt.`);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Postfach-Zuordnung fehlgeschlagen.");
+    } finally { setRepairing(false); }
+  }
+
   return (
     <main className={styles.page}>
       <header>
@@ -75,6 +88,7 @@ export default function UsPvPilotPage() {
       </header>
 
       <section className={styles.panel}>
+        <div className={styles.repair}><div><strong>US-Versandpostfächer</strong><small>Ordnet bereits geplante Pilot-Mails ausschließlich den 10 US-Postfächern zu.</small></div><button type="button" onClick={repairMailboxes} disabled={repairing}>{repairing ? "Wird korrigiert …" : "US-Postfächer zuweisen"}</button></div>
         <div className={styles.step}><b>1</b><div><strong>Shortlist auswählen</strong><small>Erwartet die geprüfte JSON-Datei mit <code>records</code>.</small></div></div>
         <label className={styles.file}>
           <input type="file" accept="application/json,.json" onChange={chooseFile} />
@@ -102,5 +116,6 @@ export default function UsPvPilotPage() {
     </main>
   );
 }
+
 
 
