@@ -101,7 +101,12 @@ async function run(request: Request) {
     "update er_outbox set status='suppressed',error='Alte Textkampagne durch Loom-Video-Kampagne ersetzt' where workspace='default' and status='queued' and campaign_id in ('pflege-starter-v2','pv-starter-v1')",
   );
 
-  await query("update er_outbox set status='queued',scheduled_at=now()+interval '5 minutes',error='Stale send claim recovered' where workspace='default' and status='sending' and scheduled_at<now()-interval '15 minutes'");
+  // Fail closed on stale SMTP claims: SMTP may already have accepted the message
+  // before the process crashed while writing the sent status. Requeueing would
+  // risk sending the same email twice. Reconcile provider receipt manually.
+  await query(
+    "update er_outbox set status='stopped',error='Stale SMTP claim: delivery uncertain; reconcile provider receipt before manual retry' where workspace='default' and status='sending' and scheduled_at<now()-interval '15 minutes'",
+  );
 
   const sentTodayRows = await query<{mailbox_id:string;count:string}>(
     `select mailbox_id,count(*)::text as count from er_outbox where workspace='default' and status='sent' and (sent_at at time zone 'Europe/Berlin')::date=(now() at time zone 'Europe/Berlin')::date group by mailbox_id`
@@ -263,6 +268,19 @@ async function run(request: Request) {
       || !/^[^\s@,<>]+@[^\s@,<>]+\.[^\s@,<>]+$/.test(recipient)) {
       await query(
         "update er_outbox set status='suppressed',error='Invalid recipient address syntax; requires manual correction and permission review' where id=$1 and status='sending'",
+        [row.id],
+      );
+      skipped++;
+      return;
+    }
+
+    // Known dummy/example recipients are never legitimate outreach targets.
+    // The 28 Oct PV batch accidentally included abc@xyz.com as a company contact.
+    // This is deliberately a narrow fail-closed guard, not domain-wide blocking.
+    const normalizedRecipient=recipient.trim().toLowerCase();
+    if (/^(abc@xyz\\.com|[^@]+@example\\.(com|org|net)|[^@]+@[^@]+\\.(invalid|test|localhost))$/i.test(normalizedRecipient)) {
+      await query(
+        "update er_outbox set status='suppressed',error='Known placeholder/test recipient; requires verified real address and permission' where id=$1 and status='sending'",
         [row.id],
       );
       skipped++;
