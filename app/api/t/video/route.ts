@@ -20,13 +20,20 @@ export async function POST(request: Request) {
   if (!leadId || !TYPES.has(type)) return new Response(null, { status: 204, headers: CORS });
   const value = Math.max(0, Math.min(100000, Math.round(Number(body.v) || 0)));
   const arm = String(body.a || "").toUpperCase() === "B" ? "B" : "A";
-  // Sicherheits-Scanner öffnen Mail-Links Sekunden nach der Zustellung in einem echten Browser. Besuche kurz nach dem Versand zählen deshalb nicht als Mensch.
-  const [sent] = await query<{ age: number | null }>("select extract(epoch from (now()-max(sent_at)))::int age from er_outbox where workspace='default' and lead_id=$1 and status='sent'", [leadId]).catch(() => []);
-  // Bots lesen direkt nach Zustellung; echte Menschen können aber sofort auf Play klicken.
-  // Aktive Signale dürfen deshalb auch in den ersten Minuten nicht pauschal als Bot gelten.
+  // Active interactions (play, progress, calendar, etc.) must not be
+  // suppressed merely because they happen immediately after delivery.
+  // Only passive events need the send-age lookup used for scanner detection.
   const passiveEvent = ["view","scroll","dwell","site_view","site_scroll","site_dwell"].includes(type);
-  const likelyImmediateScanner = sent?.age != null && sent.age >= 0 && sent.age < 90 && passiveEvent;
-  const bot = BOT.test(request.headers.get("user-agent") || "") || likelyImmediateScanner;
+  const knownBot = BOT.test(request.headers.get("user-agent") || "");
+  let likelyImmediateScanner = false;
+  if (passiveEvent && !knownBot) {
+    const [sent] = await query<{ age: number | null }>(
+      "select extract(epoch from (now()-max(sent_at)))::int age from er_outbox where workspace='default' and lead_id=$1 and status='sent'",
+      [leadId],
+    ).catch(() => []);
+    likelyImmediateScanner = sent?.age != null && sent.age >= 0 && sent.age < 90;
+  }
+  const bot = knownBot || likelyImmediateScanner;
   await query("insert into er_events(workspace,lead_id,type,meta) values('default',$1,$2,$3::jsonb)", [leadId, `video_${type}`, JSON.stringify({ v: value, bot, a: arm, p: String(body.p || "").replace(/[^a-zA-Z0-9/_.#:-]/g, "").slice(0, 80), session: /^[0-9a-f-]{36}$/i.test(String(body.sid||"")) ? body.sid : null, clientTs: Number.isFinite(Number(body.ts)) && Math.abs(Date.now()-Number(body.ts)) < 86400000 ? Math.floor(Number(body.ts)) : null })]).catch(() => null);
   const shouldNotify = type === "play" || (type === "progress" && value >= 50)
     || type === "booking_click" || type === "calendar_focus" || type === "calendar_open"
