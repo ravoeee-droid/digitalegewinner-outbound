@@ -6,7 +6,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 // Ereignisse der persönlichen Videoseite (/v/<token>): geöffnet, Play, Sehdauer, Scrollen, Verweildauer, Termin-Klick.
-const TYPES = new Set(["view", "play_intent", "play", "play_confirmed", "player_error", "progress", "watch", "scroll", "dwell", "booking_click", "calendar_focus", "chat_open", "whatsapp_click", "site_view", "site_scroll", "site_dwell", "site_click"]);
+const TYPES = new Set(["view", "play_intent", "play", "play_confirmed", "player_error", "progress", "watch", "scroll", "dwell", "booking_click", "calendar_focus", "calendar_open", "chat_open", "whatsapp_click", "site_view", "site_scroll", "site_dwell", "site_click"]);
 const CORS = { "access-control-allow-origin": "https://digitalegewinner.de", "access-control-allow-methods": "POST, OPTIONS", "access-control-allow-headers": "content-type" };
 const BOT = /(bot|crawl|spider|scan|proofpoint|mimecast|barracuda|safelinks|defender|symantec|trend ?micro|python|curl|wget|go-http|headless|preview|facebookexternalhit|slurp)/i;
 
@@ -39,7 +39,8 @@ export async function POST(request: Request) {
       type === "play" ? `▶️ Video gestartet: ${name}` :
       type === "progress" && value >= 50 ? `🔥 Video zu ${value} % gesehen: ${name}` :
       type === "booking_click" ? `📅 Klick auf "Termin buchen": ${name}` :
-      type === "calendar_focus" ? `🗓️ Kalender geöffnet: ${name}` :
+      type === "calendar_focus" ? `🗓️ Kalender-iframe fokussiert: ${name}` :
+      type === "calendar_open" ? `🗓️ Externer Kalender geöffnet: ${name}` :
       type === "whatsapp_click" ? `💬 WhatsApp-Button geklickt: ${name}` :
       type === "chat_open" ? `🤖 Chat geöffnet: ${name}` :
       type === "site_view" ? `🌐 ${name} ist auf der Website: ${String(body.p || "/").slice(0, 60)}` :
