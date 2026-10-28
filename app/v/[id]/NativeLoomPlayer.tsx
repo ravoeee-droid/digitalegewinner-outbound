@@ -13,6 +13,7 @@ export default function NativeLoomPlayer({src,screenshot,company,posterId}:{
   const [error,setError]=useState("");
   const milestones=useRef(new Set<number>());
   const startedTrack=useRef(false);
+  const confirmedTrack=useRef(false);
 
   async function play() {
     const el=video.current;
