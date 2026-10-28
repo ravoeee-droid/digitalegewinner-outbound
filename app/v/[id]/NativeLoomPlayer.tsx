@@ -1,0 +1,77 @@
+"use client";
+
+import { useRef, useState } from "react";
+import styles from "./page.module.css";
+import { track } from "./track";
+
+export default function NativeLoomPlayer({src,screenshot,company,posterId}:{
+  src:string;screenshot:string;company:string;posterId:string;
+}) {
+  const video=useRef<HTMLVideoElement>(null);
+  const [started,setStarted]=useState(false);
+  const [playing,setPlaying]=useState(false);
+  const [error,setError]=useState("");
+  const milestones=useRef(new Set<number>());
+  const startedTrack=useRef(false);
+
+  async function play() {
+    const el=video.current;
+    if(!el)return;
+    track("play_intent");
+    setStarted(true);
+    setError("");
+    try {
+      if (el.paused) await el.play();
+      else el.pause();
+    } catch {
+      setError("Die Videowiedergabe konnte nicht gestartet werden. Bitte erneut auf Play klicken.");
+    }
+  }
+
+  function onTime() {
+    const el=video.current;
+    if(!el||!el.duration)return;
+    const percent=Math.floor(el.currentTime/el.duration*100);
+    for(const value of [25,50,75,100]) {
+      if(percent>=value && !milestones.current.has(value)) {
+        milestones.current.add(value);track("progress",value);
+      }
+    }
+  }
+
+  return <div role="group" aria-label={`Persönliches Video für ${company}`}>
+    <div className={styles.player}>
+      <div className={styles.screen}
+        style={screenshot?{backgroundImage:`url(${screenshot})`}:undefined}
+        role="img" aria-label={`Website von ${company}`}/>
+      <div className={styles.cam} style={{width:"22%",left:"4%",bottom:"11%",zIndex:2}}>
+        <video ref={video} src={src} playsInline preload="none"
+          poster={posterId?`https://i.ytimg.com/vi/${posterId}/hqdefault.jpg`:undefined}
+          style={{width:"100%",height:"100%",objectFit:"cover",background:"#171717"}}
+          onPlay={()=>{
+            setPlaying(true);setStarted(true);setError("");
+            if(!startedTrack.current){startedTrack.current=true;track("play");}
+          }}
+          onPause={()=>setPlaying(false)}
+          onTimeUpdate={onTime}
+          onEnded={()=>{setPlaying(false);track("watch",Math.round(video.current?.duration||0));}}
+          onError={()=>{setPlaying(false);setError("Videodatei momentan nicht abspielbar. Bitte erneut versuchen.");}}
+        />
+      </div>
+      {!playing&&<button className={styles.bigPlay} type="button" onClick={play}
+        aria-label={started?"Persönliches Video fortsetzen":"Persönliches Video starten"}
+        style={{zIndex:3,background:"rgba(0,0,0,.16)"}}>
+        <span className={styles.bigIcon} aria-hidden="true">▶</span>
+        <span className={styles.bigLabel}>{started?"Video fortsetzen":"Persönliche Videonachricht starten"}</span>
+      </button>}
+      {playing&&<button type="button" onClick={play}
+        aria-label="Video pausieren" title="Video pausieren"
+        style={{position:"absolute",right:12,bottom:12,zIndex:4,padding:"9px 13px",border:"1px solid #eee",borderRadius:8,background:"#202021",color:"#fff",cursor:"pointer"}}>
+        ❚❚ Pause
+      </button>}
+    </div>
+    <p style={{fontSize:12,color:"#777571",margin:"10px 0 0"}}>
+      {error||"Firmenwebsite und persönliche Videobotschaft – ohne YouTube-Anmeldung."}
+    </p>
+  </div>;
+}
