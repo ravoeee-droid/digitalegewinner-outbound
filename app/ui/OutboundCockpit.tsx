@@ -6,7 +6,7 @@ import styles from "./OutboundCockpit.module.css";
 
 type Segment = "all"|"pflege"|"pv";
 type Totals = {sent_today:number;sent7:number;queued:number;failed:number;opened:number;clicked:number;page_viewed:number;started:number;quarter:number;half:number;three_quarters:number;completed:number;booking:number;replied:number;meetings:number};
-type Hot = {lead_id:string;segment:"pflege"|"pv";company:string;city:string|null;phone:string|null;score:number;plays:number;progress:number;booking:boolean;replied:boolean;last_signal:string};
+type Hot = {lead_id:string;segment:"pflege"|"pv";company:string;city:string|null;phone:string|null;score:number;plays:number;progress:number;booking:boolean;replied:boolean;restricted:boolean;last_signal:string};
 type ResponseData={segment:Segment;goal:number;totals:Totals;segments:Array<Totals&{segment:"pflege"|"pv";next_at:string|null}>;hot:Hot[];as_of:string};
 const number = (value:number)=>new Intl.NumberFormat("de-DE").format(value||0);
 const rate=(count:number,denominator:number)=>denominator>0?((count/denominator)*100).toLocaleString("de-DE",{maximumFractionDigits:1})+" %":"–";
@@ -99,7 +99,7 @@ export default function OutboundCockpit(){
         </div>
       </div>
       <div className={styles.panel}>
-        <div className={styles.panelHead}><div><h3>Jetzt anrufen</h3><p>Nach nachvollziehbaren Kaufsignalen sortiert. Nur gesendete, nicht gesperrte Leads.</p></div><Link className={styles.link} href="/crm">CRM öffnen →</Link></div>
+        <div className={styles.panelHead}><div><h3>Jetzt anrufen</h3><p>Nach nachvollziehbaren Kaufsignalen sortiert. Gesendete Leads; falsch gesperrte Videointeressenten als manuelle Prüfung gekennzeichnet.</p></div><Link className={styles.link} href="/crm">CRM öffnen →</Link></div>
         <div className={styles.tableWrap}>
           <table className={styles.table}>
             <thead><tr><th>Betrieb</th><th>Bereich</th><th>Signal</th><th>Score</th><th>Aktion</th></tr></thead>
@@ -108,9 +108,9 @@ export default function OutboundCockpit(){
               {data.hot.map(h=><tr key={h.segment+"-"+h.lead_id}>
                 <td><strong>{h.company}</strong><small>{h.city||"Ort unbekannt"} · {h.last_signal?new Date(h.last_signal).toLocaleString("de-DE",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"}):"Signalzeit unbekannt"}</small></td>
                 <td>{h.segment==="pflege"?"Pflege":"PV-Trust"}</td>
-                <td>{h.replied?"Antwort erhalten · ":""}{h.booking?"Termininteresse · ":""}{h.progress? h.progress+" % angesehen · ":""}{h.plays? h.plays+" Videostart"+(h.plays===1?"":"s"):""}</td>
+                <td>{h.restricted?"⚠️ Manuelle Prüfung · ":""}{h.replied?"Antwort erhalten · ":""}{h.booking?"Termininteresse · ":""}{h.progress? h.progress+" % angesehen · ":""}{h.plays? h.plays+" Videostart"+(h.plays===1?"":"s"):""}</td>
                 <td><span className={styles.score}>{h.score}</span></td>
-                <td>{h.phone?<a href={"tel:"+h.phone.replace(/[^+0-9]/g,"")} className={styles.call}>Anrufen</a>:<Link className={styles.link} href="/crm">CRM ansehen</Link>}</td>
+                <td>{h.restricted?<Link className={styles.link} href="/crm">Sperre prüfen · CRM</Link>:h.phone?<a href={"tel:"+h.phone.replace(/[^+0-9]/g,"")} className={styles.call}>Anrufen</a>:<Link className={styles.link} href="/crm">CRM ansehen</Link>}</td>
               </tr>)}
             </tbody>
           </table>
