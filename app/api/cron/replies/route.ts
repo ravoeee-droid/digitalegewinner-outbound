@@ -10,7 +10,7 @@ import { ingestInboundConversationMessage } from "@/lib/outbound-conversation-in
 import { handleBookingMail } from "@/lib/appointments";
 import { sendAlert, sendAlertOnce } from "@/lib/alerts";
 import { dbExpiry } from "@/lib/db-expiry";
-import { analyzeReply } from "@/lib/reply-insight";
+import { analyzeReply, isAutomaticAcknowledgement } from "@/lib/reply-insight";
 
 export const runtime="nodejs";export const maxDuration=60;
 type State={leads?:Array<Record<string,unknown>>};
@@ -49,6 +49,15 @@ async function recordReply(messageId:string,from:string,subject:string,mailboxId
  );
  const last=attribution[0];
  const optOut=detectExplicitOptOut(bodyText||subject);
+ // A machine-generated acknowledgement is NOT an actionable sales reply.
+ // Keep it for audit, but do not stop the sequence, elevate intent or block.
+ if(!optOut.matched && isAutomaticAcknowledgement(subject,bodyText||"")
+    && !/(?:unerlaubte|unerwünschte)\s+werbung|abmahnung|rechtliche schritte|bitte\s+nicht mehr (?:anschreiben|kontaktieren)/i.test(bodyText)){
+   await query("insert into er_events(workspace,lead_id,type,meta) values('default',$1,'auto_reply',$2::jsonb)",
+     [leadId,JSON.stringify({providerMessageId:messageId,from,subject,mailboxId,campaignId:last?.campaign_id||null,automatic:true})]);
+   console.info("[replies] automated acknowledgement ignored for suppression and reply KPIs",{leadId});
+   return "auto_reply";
+ }
  const conversation=await ingestInboundConversationMessage({
   leadId,
   mailboxId,
