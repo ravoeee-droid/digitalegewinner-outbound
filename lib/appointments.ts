@@ -7,7 +7,7 @@ const BOOKING_SUBJECT = /(neuer termin|neue terminbuchung|terminbuchung|termin (
 const EMAIL = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi;
 
 export function isBookingMail(from: string, subject: string) {
-  return CALENDAR_SENDERS.test(from) || BOOKING_SUBJECT.test(subject);
+  return CALENDAR_SENDERS.test(from) && BOOKING_SUBJECT.test(subject);
 }
 
 // Nur Treffer mit einem Lead zählen, dem wir wirklich geschrieben haben – das verhindert Fehlalarme bei fremden Einladungen.
@@ -60,18 +60,8 @@ export async function recordBooking(messageId: string, subject: string, mailboxI
 export async function handleBookingMail(messageId: string, from: string, subject: string, body: string, mailbox: { id: string; email: string }) {
   if (!isBookingMail(from, subject)) return false;
   let lead = await findBookedLead(from, subject, body, mailbox.email);
-  if (!lead) {
-    // Buchte jemand mit anderer E-Mail-Adresse: Wenn genau ein Lead in den letzten 3 Stunden den Kalender angeklickt hat, ist es sehr wahrscheinlich dieser.
-    const recent = await query<{ id: string; company: string; email: string }>(
-      `select l.id::text id, c.name company, coalesce(k.email,'') email
-       from sales_leads l join sales_companies c on c.id=l.company_id and c.workspace=l.workspace
-       left join lateral (select email from sales_contacts k where k.company_id=c.id and k.workspace=l.workspace order by (coalesce(email,'')<>'') desc limit 1) k on true
-       where l.workspace='default' and l.id::text in (
-         select e.lead_id from er_events e where e.workspace='default' and e.type in ('video_calendar_focus','video_booking_click') and coalesce(e.meta->>'bot','false')='false' and e.created_at>now()-interval '3 hours')
-         and not exists(select 1 from er_events a where a.workspace='default' and a.type='appointment' and a.lead_id=l.id::text)`,
-    ).catch(() => []);
-    if (recent.length === 1) lead = recent[0] as never;
-  }
+  // Do not infer a confirmed booking from a calendar click or iframe focus.
+  // A verified booking notice must contain an exact known prospect address.
   if (!lead) return false;
   return recordBooking(messageId, subject, mailbox.id, lead);
 }
