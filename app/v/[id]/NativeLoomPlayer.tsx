@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import styles from "./page.module.css";
 import { track } from "./track";
 import VideoPlayer from "./VideoBubble";
@@ -18,6 +18,30 @@ export default function NativeLoomPlayer({src,screenshot,company,posterId}:{
   const startedTrack=useRef(false);
   const confirmedTrack=useRef(false);
   const errorTrack=useRef(false);
+  const watchdogTimer=useRef<ReturnType<typeof setTimeout>|null>(null);
+  const watchdogPosition=useRef(0);
+  function clearWatchdog() {
+    if(watchdogTimer.current!==null){clearTimeout(watchdogTimer.current);watchdogTimer.current=null;}
+  }
+  function armWatchdog() {
+    clearWatchdog();
+    const el=video.current;
+    if(!el)return;
+    watchdogPosition.current=el.currentTime;
+    watchdogTimer.current=setTimeout(()=>{
+      watchdogTimer.current=null;
+      const current=video.current;
+      // Do not count a stalled/failed play as a confirmed video start.
+      // A pending play() promise may still report paused=true, so also check
+      // whether playback ever actually started.
+      if(current && current.currentTime < watchdogPosition.current+0.5 && (!current.paused || !startedTrack.current)){
+        reportPlayerError(408);
+        setError("Video lädt zu lange. Alternative Wiedergabe wird geöffnet.");
+        if(validYoutube)setYoutubeFallback(true);
+      }
+    },12000);
+  }
+  useEffect(()=>()=>clearWatchdog(),[]);
   function reportPlayerError(code:number) {
     if(!errorTrack.current) { errorTrack.current=true; track("player_error",code); }
   }
@@ -28,6 +52,8 @@ export default function NativeLoomPlayer({src,screenshot,company,posterId}:{
     track("play_intent");
     setStarted(true);
     setError("");
+    if(el.paused)armWatchdog();
+    else clearWatchdog();
     try {
       if (el.paused) await el.play();
       else el.pause();
@@ -44,6 +70,7 @@ export default function NativeLoomPlayer({src,screenshot,company,posterId}:{
   function onTime() {
     const el=video.current;
     if(!el||!el.duration)return;
+    if(el.currentTime>=watchdogPosition.current+0.5)clearWatchdog();
     if(el.currentTime>=3 && !confirmedTrack.current){confirmedTrack.current=true;track("play_confirmed",3);}
     const percent=Math.floor(el.currentTime/el.duration*100);
     for(const value of [25,50,75,100]) {
@@ -71,10 +98,12 @@ export default function NativeLoomPlayer({src,screenshot,company,posterId}:{
             setPlaying(true);setStarted(true);setError("");
             if(!startedTrack.current){startedTrack.current=true;track("play");}
           }}
-          onPause={()=>setPlaying(false)}
+          onPause={()=>{setPlaying(false);clearWatchdog();}}
           onTimeUpdate={onTime}
-          onEnded={()=>{setPlaying(false);if(!milestones.current.has(100)){milestones.current.add(100);track("progress",100);}track("watch",Math.round(video.current?.duration||0));}}
-          onError={()=>{const el=video.current;setPlaying(false);reportPlayerError(el?.error?.code||408);setError(`Video-Ladefehler: ${el?.error?.message||"Unbekannt"} (Code ${el?.error?.code||0}, Netzwerk ${el?.networkState||0})`);if(validYoutube)setYoutubeFallback(true);}}
+          onWaiting={()=>{if(startedTrack.current)armWatchdog();}}
+          onStalled={()=>armWatchdog()}
+          onEnded={()=>{clearWatchdog();setPlaying(false);if(!milestones.current.has(100)){milestones.current.add(100);track("progress",100);}track("watch",Math.round(video.current?.duration||0));}}
+          onError={()=>{clearWatchdog();const el=video.current;setPlaying(false);reportPlayerError(el?.error?.code||408);setError(`Video-Ladefehler: ${el?.error?.message||"Unbekannt"} (Code ${el?.error?.code||0}, Netzwerk ${el?.networkState||0})`);if(validYoutube)setYoutubeFallback(true);}}
         />
       </div>
       {!playing&&<button className={styles.bigPlay} type="button" onClick={play}
