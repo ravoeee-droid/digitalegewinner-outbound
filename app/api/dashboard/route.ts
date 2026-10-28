@@ -69,10 +69,15 @@ export async function GET(request: Request) {
         count(distinct o.lead_id) filter(where exists(select 1 from er_events e where e.workspace='default' and e.lead_id=o.lead_id and e.type in ('reply','positive_reply')))::int replies
       from er_outbox o where o.workspace='default' and o.campaign_id in ('pflege-loom-150-v1','pv-loom-150-v1') and o.status='sent' group by 1,2 order by 1,2`).catch(() => []);
     const video = await query<{ type: string; leads: number }>(`
-      select type, count(distinct lead_id)::int leads from er_events
-      where workspace='default' and (type like 'video\\_%' or type='site_view') and coalesce(meta->>'bot','false')='false'
-        and (type<>'video_progress' or coalesce((meta->>'v')::int,0)>=50)
-      group by type`).catch(() => []);
+      select e.type, count(distinct e.lead_id)::int leads from er_events e
+      where e.workspace='default' and (e.type like 'video\\_%' or e.type='site_view')
+        and coalesce(e.meta->>'bot','false')='false'
+        and (e.type<>'video_progress' or coalesce((e.meta->>'v')::int,0)>=50)
+        and not exists(select 1 from outbound_tracking_exclusions x where x.workspace='default' and x.lead_id=e.lead_id)
+        and exists(select 1 from er_outbox o where o.workspace='default' and o.lead_id=e.lead_id
+          and o.campaign_id in ('pflege-loom-150-v1','pv-loom-150-v1')
+          and o.status='sent' and o.sent_at<=e.created_at)
+      group by e.type`).catch(() => []);
     const checks = await buildChecks(queue);
     const source = await query<{ status: string; reason: string; n: number; started: string }>(`
       select j.status, coalesce(nullif(j.error,''),'') reason, count(*)::int n, max(r.started_at)::text started
