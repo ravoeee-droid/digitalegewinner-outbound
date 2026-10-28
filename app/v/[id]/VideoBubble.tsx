@@ -13,6 +13,7 @@ export default function VideoPlayer({ youtubeId, screenshot, company }: {
   const [loaded, setLoaded] = useState(false);
   const [playing, setPlaying] = useState(false);
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const confirmedTrack = useRef(false);
   const valid = /^[A-Za-z0-9_-]{11}$/.test(youtubeId);
   const embedUrl = valid
     ? `https://www.youtube-nocookie.com/embed/${youtubeId}?autoplay=1&playsinline=1&rel=0&controls=0&modestbranding=1&iv_load_policy=3&fs=0&enablejsapi=1`
@@ -39,6 +40,7 @@ export default function VideoPlayer({ youtubeId, screenshot, company }: {
       if (event.source !== iframeRef.current?.contentWindow) return;
       let data: {event?: string; info?: number} | undefined;
       try { data = typeof event.data === "string" ? JSON.parse(event.data) : event.data; } catch { return; }
+      if (data?.event === "onError") track("player_error",typeof data.info==="number"?data.info:408);
       if (data?.event === "onStateChange" && typeof data.info === "number") {
         setPlaying(data.info === 1);
         if (data.info === 1) track("play");
@@ -47,6 +49,17 @@ export default function VideoPlayer({ youtubeId, screenshot, company }: {
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
   }, [started]);
+
+  // YouTube fallback has no native video currentTime event. Confirm a start only
+  // after the iframe reports three uninterrupted seconds in PLAYING state.
+  useEffect(() => {
+    if(!playing || confirmedTrack.current) return;
+    const timer=window.setTimeout(() => {
+      confirmedTrack.current=true;
+      track("play_confirmed",3);
+    },3000);
+    return () => window.clearTimeout(timer);
+  },[playing]);
 
   return (
     <div role="group" aria-label={`Persönliche Videonachricht für ${company}`}>
