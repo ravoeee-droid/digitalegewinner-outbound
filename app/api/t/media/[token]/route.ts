@@ -93,7 +93,7 @@ export async function GET(request:NextRequest,{params}:{params:Promise<{token:st
     }
   }
   const range=request.headers.get("range");
-  if(range && !/^bytes=\\d*-\\d*$/.test(range))return new Response("Invalid range",{status:416});
+  if(range && !/^bytes=\d*-\d*$/.test(range))return new Response("Invalid range",{status:416});
   // Always request a partial-content stream, including initial browser loads.
   // A 200 full-blob stream (300 MB) stalls until enough metadata arrives.
   const requestedRange = range || "bytes=0-";
