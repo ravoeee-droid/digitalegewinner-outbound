@@ -278,7 +278,7 @@ async function run(request: Request) {
     // The 28 Oct PV batch accidentally included abc@xyz.com as a company contact.
     // This is deliberately a narrow fail-closed guard, not domain-wide blocking.
     const normalizedRecipient=recipient.trim().toLowerCase();
-    if (/^(abc@xyz\\.com|[^@]+@example\\.(com|org|net)|[^@]+@[^@]+\\.(invalid|test|localhost))$/i.test(normalizedRecipient)) {
+    if (/^(abc@xyz\.com|[^@]+@example\.(com|org|net)|[^@]+@[^@]+\.(invalid|test|localhost))$/i.test(normalizedRecipient)) {
       await query(
         "update er_outbox set status='suppressed',error='Known placeholder/test recipient; requires verified real address and permission' where id=$1 and status='sending'",
         [row.id],
