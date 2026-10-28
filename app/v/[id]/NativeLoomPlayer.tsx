@@ -23,8 +23,11 @@ export default function NativeLoomPlayer({src,screenshot,company,posterId}:{
     try {
       if (el.paused) await el.play();
       else el.pause();
-    } catch {
-      setError("Die Videowiedergabe konnte nicht gestartet werden. Bitte erneut auf Play klicken.");
+    } catch (err) {
+      const reason=err instanceof Error?`${err.name}: ${err.message}`:String(err);
+      const details=`code=${el.error?.code||0}, ready=${el.readyState}, network=${el.networkState}`;
+      console.error("[loom-player] play rejected",reason,details);
+      setError(`Wiedergabefehler: ${reason} (${details})`);
     }
   }
 
@@ -55,7 +58,7 @@ export default function NativeLoomPlayer({src,screenshot,company,posterId}:{
           onPause={()=>setPlaying(false)}
           onTimeUpdate={onTime}
           onEnded={()=>{setPlaying(false);track("watch",Math.round(video.current?.duration||0));}}
-          onError={()=>{setPlaying(false);setError("Videodatei momentan nicht abspielbar. Bitte erneut versuchen.");}}
+          onError={()=>{const el=video.current;setPlaying(false);setError(`Video-Ladefehler: ${el?.error?.message||"Unbekannt"} (Code ${el?.error?.code||0}, Netzwerk ${el?.networkState||0})`);}}
         />
       </div>
       {!playing&&<button className={styles.bigPlay} type="button" onClick={play}
