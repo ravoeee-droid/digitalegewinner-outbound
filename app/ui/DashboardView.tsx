@@ -225,7 +225,7 @@ export default function DashboardView() {
           )}
 
           <section className={styles.camps} aria-label="Kampagnen">
-            {[["pflege-starter-v2", "Pflege", "Mitarbeitergewinnung"], ["pv-starter-v1", "Photovoltaik", "Kundengewinnung"]].map(([id, name, sub]) => {
+            {[["pflege-loom-150-v1", "Pflege", "Mitarbeitergewinnung"], ["pv-loom-150-v1", "Photovoltaik", "Kundengewinnung"]].map(([id, name, sub]) => {
               const row = data.campaigns?.find((item) => item.id === id);
               return (
                 <div key={id} className={`dg-panel ${styles.camp}`}>
@@ -234,8 +234,8 @@ export default function DashboardView() {
                   {(() => {
                     const vs = (data.variants ?? []).filter((v) => v.campaign_id === id);
                     if (vs.length < 2) return null;
-                    const label = (v: string) => (id === "pv-starter-v1" ? (v === "A" ? "Lang" : v === "V" ? "Mit Video" : v === "D" ? "Neuer Text" : v === "E" ? "Emotional" : "Kurz") : v === "A" ? "Standard" : v === "C" ? "Ohne Stelle" : v === "V" ? "Mit Video" : v === "D" ? "Neuer Text" : v === "E" ? "Emotional" : "Videocall-Link");
-                    return <p className={styles.abLine}>{id === "pv-starter-v1" ? "Test Lang gegen Kurz" : "Mail-Varianten"}: {vs.map((v) => `${label(v.variant)} ${v.replies} Antworten bei ${v.leads} Angeschriebenen${v.leads ? ` (${Math.round((v.replies / v.leads) * 100)} %)` : ""}`).join(" · ")}</p>;
+                    const label = (v: string) => (id === "pv-loom-150-v1" ? (v === "A" ? "Lang" : v === "V" ? "Mit Video" : v === "D" ? "Neuer Text" : v === "E" ? "Emotional" : "Kurz") : v === "A" ? "Standard" : v === "C" ? "Ohne Stelle" : v === "V" ? "Mit Video" : v === "D" ? "Neuer Text" : v === "E" ? "Emotional" : "Videocall-Link");
+                    return <p className={styles.abLine}>{id === "pv-loom-150-v1" ? "Test Lang gegen Kurz" : "Mail-Varianten"}: {vs.map((v) => `${label(v.variant)} ${v.replies} Antworten bei ${v.leads} Angeschriebenen${v.leads ? ` (${Math.round((v.replies / v.leads) * 100)} %)` : ""}`).join(" · ")}</p>;
                   })()}
                   <dl><div><dt>Heute</dt><dd>{row?.sent_today ?? 0} / 150</dd></div><div><dt>7 Tage</dt><dd>{nf.format(row?.sent7 ?? 0)}</dd></div><div><dt>Wartend</dt><dd>{nf.format(row?.queued ?? 0)}</dd></div><div><dt>Antworten</dt><dd>{row?.replies ?? 0}</dd></div></dl>
                 </div>
