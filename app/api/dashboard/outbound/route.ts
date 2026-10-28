@@ -39,7 +39,7 @@ export async function GET(request: Request) {
           bool_or(e.type='email_open' and coalesce((e.meta->>'bot')::boolean,false)=false) opened,
           bool_or(e.type='email_click' and coalesce((e.meta->>'bot')::boolean,false)=false) clicked,
           bool_or(e.type='video_view' and coalesce((e.meta->>'bot')::boolean,false)=false) page_viewed,
-          bool_or(e.type='video_play' and coalesce((e.meta->>'bot')::boolean,false)=false) started,
+          bool_or(e.type='video_play_confirmed' and coalesce((e.meta->>'bot')::boolean,false)=false) started,
           bool_or(e.type='video_progress' and coalesce((e.meta->>'bot')::boolean,false)=false and coalesce((e.meta->>'v')::int,0)>=25) quarter,
           bool_or(e.type='video_progress' and coalesce((e.meta->>'bot')::boolean,false)=false and coalesce((e.meta->>'v')::int,0)>=50) half,
           bool_or(e.type='video_progress' and coalesce((e.meta->>'bot')::boolean,false)=false and coalesce((e.meta->>'v')::int,0)>=75) three_quarters,
@@ -80,7 +80,7 @@ export async function GET(request: Request) {
         group by o.lead_id,case when o.campaign_id='pv-loom-150-v1' then 'pv' else 'pflege' end
       ), signals as (
         select s.lead_id,s.segment,
-          count(*) filter(where e.type='video_play' and coalesce((e.meta->>'bot')::boolean,false)=false)::int plays,
+          count(*) filter(where e.type='video_play_confirmed' and coalesce((e.meta->>'bot')::boolean,false)=false)::int plays,
           max(coalesce((e.meta->>'v')::int,0)) filter(where e.type='video_progress' and coalesce((e.meta->>'bot')::boolean,false)=false)::int progress,
           bool_or(e.type in ('video_booking_click','video_calendar_focus','video_whatsapp_click') and coalesce((e.meta->>'bot')::boolean,false)=false) booking,
           bool_or(e.type in ('reply','positive_reply')) replied,
