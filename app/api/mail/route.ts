@@ -67,8 +67,8 @@ async function loadSentMessages(mailboxId: string, limit: number) {
     // Do not artificially record opens or clicks from the operator's mailbox preview.
     const html = trackedEmailHtml(content, origin, row.id, row.lead_id, unsubscribeUrl(origin, row.id, row.lead_id))
       .replace(/<img[^>]*\/api\/t\/open[^>]*>/gi, "")
-      .replace(/<a\\b[^>]*>/gi, "<span>")
-      .replace(/<\\/a>/gi, "</span>");
+      .replace(/<a[^>]*>/gi, "<span>")
+      .replaceAll("</a>", "</span>");
     return { ...row, body: content, bodyHtml: html, videoUrl: videoPageUrl(origin, row.lead_id) };
   });
   const all = [
