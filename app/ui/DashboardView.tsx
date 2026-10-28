@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import styles from "./DashboardView.module.css";
+import OutboundCockpit from "./OutboundCockpit";
 
 type Day = { day: string; sent: number; opened: number; replied: number; positive: number; meetings: number; bounces: number; unsubscribed: number };
 type Check = { id: string; label: string; status: "ok" | "warn" | "fail"; detail: string; href: string };
@@ -179,6 +180,8 @@ export default function DashboardView() {
           </div>
         </div>
       </header>
+
+      <OutboundCockpit />
 
       {data?.dbExpiry && (
         <p className="dg-notice" role="alert"><strong>Wichtig: Die Datenbank wird in {data.dbExpiry.hoursLeft} Stunden gelöscht.</strong> Dann sind alle Leads und Daten weg. <a href={data.dbExpiry.claimUrl} target="_blank" rel="noreferrer">Jetzt kostenlos übernehmen</a></p>
