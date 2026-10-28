@@ -28,7 +28,12 @@ export async function POST(request: Request) {
   const likelyImmediateScanner = sent?.age != null && sent.age >= 0 && sent.age < 90 && passiveEvent;
   const bot = BOT.test(request.headers.get("user-agent") || "") || likelyImmediateScanner;
   await query("insert into er_events(workspace,lead_id,type,meta) values('default',$1,$2,$3::jsonb)", [leadId, `video_${type}`, JSON.stringify({ v: value, bot, a: arm, p: String(body.p || "").replace(/[^a-zA-Z0-9/_.#:-]/g, "").slice(0, 80), session: /^[0-9a-f-]{36}$/i.test(String(body.sid||"")) ? body.sid : null, clientTs: Number.isFinite(Number(body.ts)) && Math.abs(Date.now()-Number(body.ts)) < 86400000 ? Math.floor(Number(body.ts)) : null })]).catch(() => null);
-  if (!bot) {
+  const shouldNotify = type === "play" || (type === "progress" && value >= 50)
+    || type === "booking_click" || type === "calendar_focus" || type === "calendar_open"
+    || type === "whatsapp_click" || type === "chat_open" || type === "site_click"
+    || (type === "site_dwell" && value >= 10);
+  // Most events (scroll, passive views, progress below 50%) need no company lookup.
+  if (!bot && shouldNotify) {
     const [row] = await query<{ company: string }>(
       "select c.name company from sales_leads l join sales_companies c on c.id=l.company_id and c.workspace=l.workspace where l.id::text=$1 limit 1",
       [leadId],
