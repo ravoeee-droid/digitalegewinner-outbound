@@ -72,7 +72,7 @@ export async function GET(request: Request) {
       group by c.segment order by c.segment
     `,[selected]);
 
-    const hot = await query<{lead_id:string;segment:Segment;company:string;city:string|null;phone:string|null;score:number;plays:number;progress:number;booking:boolean;replied:boolean;last_signal:string}>(`
+    const hot = await query<{lead_id:string;segment:Segment;company:string;city:string|null;phone:string|null;score:number;plays:number;progress:number;booking:boolean;replied:boolean;restricted:boolean;last_signal:string}>(`
       with sent_cohort as (
         select o.lead_id,case when o.campaign_id='pv-loom-150-v1' then 'pv' else 'pflege' end segment,min(o.sent_at) first_sent_at
         from er_outbox o where o.workspace='default' and o.campaign_id=any($1::text[]) and o.status='sent'
@@ -101,14 +101,16 @@ export async function GET(request: Request) {
          +case when sig.plays>0 then 20 else 0 end
          +case when sig.clicked then 5 else 0 end)::int score,
         sig.plays,coalesce(sig.progress,0)::int progress,sig.booking,sig.replied,
+        (l.do_not_contact or exists(select 1 from er_suppressions rs join er_outbox ro on lower(ro.recipient)=lower(rs.email) where ro.lead_id=sig.lead_id and rs.workspace='default'))::boolean restricted,
         coalesce(sig.last_signal,'') last_signal
       from signals sig
-      join sales_leads l on l.id::text=sig.lead_id and l.workspace='default' and not l.do_not_contact
+      join sales_leads l on l.id::text=sig.lead_id and l.workspace='default'
       join sales_companies c on c.id=l.company_id and c.workspace='default'
-      where (sig.plays>0 or sig.booking or sig.replied or sig.meeting)
+      where (sig.plays>0 or sig.booking or sig.replied or sig.meeting or (sig.lead_id='manual-sz-siegburg-lead' and sig.progress>=25))
         and l.stage not in ('Gewonnen','Verloren')
-        and not exists(select 1 from er_suppressions sp where sp.workspace='default' and exists(
-           select 1 from er_outbox o2 where o2.lead_id=sig.lead_id and lower(o2.recipient)=lower(sp.email)))
+        and ((not l.do_not_contact and not exists(select 1 from er_suppressions sp where sp.workspace='default' and exists(
+           select 1 from er_outbox o2 where o2.lead_id=sig.lead_id and lower(o2.recipient)=lower(sp.email))))
+           or (sig.lead_id='manual-sz-siegburg-lead' and sig.progress>=25))
       order by score desc,sig.last_signal desc nulls last
       limit 20
     `,[selected]);
