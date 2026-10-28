@@ -63,11 +63,11 @@ export async function GET(request: Request) {
         count(*) filter(where o.status='queued')::int queued,
         count(distinct o.lead_id)::int leads,
         (select count(distinct e.lead_id)::int from er_events e where e.workspace='default' and e.type in ('reply','positive_reply') and e.lead_id in (select lead_id from er_outbox x where x.campaign_id=o.campaign_id))::int replies
-      from er_outbox o where o.workspace='default' and o.campaign_id in ('pflege-starter-v2','pv-starter-v1') group by o.campaign_id`).catch(() => []);
+      from er_outbox o where o.workspace='default' and o.campaign_id in ('pflege-loom-150-v1','pv-loom-150-v1') group by o.campaign_id`).catch(() => []);
     const variants = await query<{ campaign_id: string; variant: string; leads: number; replies: number }>(`
       select o.campaign_id, o.variant, count(distinct o.lead_id)::int leads,
         count(distinct o.lead_id) filter(where exists(select 1 from er_events e where e.workspace='default' and e.lead_id=o.lead_id and e.type in ('reply','positive_reply')))::int replies
-      from er_outbox o where o.workspace='default' and o.campaign_id in ('pflege-starter-v2','pv-starter-v1') and o.status='sent' group by 1,2 order by 1,2`).catch(() => []);
+      from er_outbox o where o.workspace='default' and o.campaign_id in ('pflege-loom-150-v1','pv-loom-150-v1') and o.status='sent' group by 1,2 order by 1,2`).catch(() => []);
     const video = await query<{ type: string; leads: number }>(`
       select type, count(distinct lead_id)::int leads from er_events
       where workspace='default' and (type like 'video\\_%' or type='site_view') and coalesce(meta->>'bot','false')='false'
