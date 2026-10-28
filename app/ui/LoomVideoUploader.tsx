@@ -16,6 +16,34 @@ export default function LoomVideoUploader() {
   const [pct,setPct]=useState<Record<string,number>>({});
   const [message,setMessage]=useState<Record<string,string>>({});
   const [stage,setStage]=useState<Record<string,string>>({});
+  const [probeBusy,setProbeBusy]=useState(false);
+  const [probeStatus,setProbeStatus]=useState("");
+  async function testUpload() {
+    setProbeBusy(true);
+    setProbeStatus("Teste zunächst die Server-Freigabe …");
+    try {
+      const response = await fetch("/api/admin/loom-video-upload",{
+        method:"POST",headers:{"content-type":"application/json"},
+        body:JSON.stringify({action:"diagnose"}),credentials:"same-origin"
+      });
+      const json = await response.json() as {ok?:boolean;error?:string};
+      if(!response.ok||!json.ok)throw new Error(json.error||"Freigabe fehlgeschlagen.");
+      setProbeStatus("Freigabe OK. Lade nur 8 KB direkt in Vercel Blob …");
+      const diagnosticFile = new File([new Uint8Array(8192)],"probe.mp4",{type:"video/mp4"});
+      await Promise.race([
+        upload("loom-videos/probe.mp4",diagnosticFile,{
+          access:"public",handleUploadUrl:"/api/admin/loom-video-upload",
+          contentType:"video/mp4",multipart:false,clientPayload:"probe",
+          onUploadProgress:({percentage})=>setProbeStatus("Testupload: "+Math.round(percentage)+" %")
+        }),
+        new Promise<never>((_,reject)=>window.setTimeout(()=>reject(new Error("Testupload kommt innerhalb von 15 Sekunden nicht bei Vercel Blob an. Ursache vermutlich Browser-Netzwerk, CORS oder Speicherfreigabe.")),15000))
+      ]);
+      setProbeStatus("✓ Testupload erfolgreich – die Verbindung funktioniert. Der große Multipart-Upload ist das Problem.");
+    } catch(error) {
+      setProbeStatus("✕ "+(error instanceof Error?error.message:"Test fehlgeschlagen."));
+    } finally {setProbeBusy(false);}
+  }
+
 
   async function refresh() {
     const response = await fetch("/api/admin/loom-video-upload",{cache:"no-store"});
@@ -106,6 +134,13 @@ export default function LoomVideoUploader() {
       Die Dateien werden direkt in Vercel Blob geladen – niemals in Neon oder GitHub.
       Sobald eine Datei aktiviert ist, verwenden auch bereits versendete persönliche Links automatisch die neue Aufnahme.
     </p>
+    <section style={{marginTop:22,padding:18,border:"1px solid #345847",borderRadius:12}}>
+      <button type="button" onClick={()=>void testUpload()} disabled={probeBusy||Object.values(busy).some(Boolean)}
+        style={{background:"#5eeaa0",color:"#07180d",padding:"13px 18px",borderRadius:9,border:0,fontWeight:800,cursor:"pointer"}}>
+        {probeBusy?"Verbindung wird geprüft …":"Nur Verbindung testen (8 KB)"}
+      </button>
+      <p role="status" style={{fontSize:13,color:"#d3eada",overflowWrap:"anywhere"}}>{probeStatus||"Kein großer Video-Upload erforderlich."}</p>
+    </section>
     <div style={{display:"grid",gap:18,marginTop:28}}>
       {roles.map(({key,title})=><section key={key} style={{border:"1px solid #345847",borderRadius:16,padding:22,background:"#122219"}}>
         <h2 style={{fontSize:20,marginTop:0}}>{title}</h2>
