@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { notFound } from "next/navigation";
 import VideoPlayer from "./VideoBubble";
 import NativeLoomPlayer from "./NativeLoomPlayer";
+import { getLoomVideoUrl } from "@/lib/loom-assets";
 import PageTracker from "./PageTracker";
 import { WHATSAPP_NUMBER } from "@/lib/video-chat";
 import { VIDEO_IDS } from "@/lib/outreach-copy";
@@ -79,10 +80,10 @@ export default async function VideoPage({ params, searchParams }: { params: Prom
   const videoId = group === "B" ? String(shortVideoId) : mainVideoId;
   // A single externally hosted MP4 per segment. Never load video bytes from Neon.
   // Existing signed URLs resolve to this new player as soon as the MP4 upload completes.
-  const [directVideo] = hasVertical
-    ? await query<{video_url:string}>("select video_url from loom_video_assets where segment=$1 limit 1", [segment]).catch(() => [])
-    : [];
-  const mp4Url = directVideo?.video_url?.startsWith("https://") ? directVideo.video_url : "";
+  const assetUrl = hasVertical ? await getLoomVideoUrl(segment as "pv"|"pflege") : "";
+  // Private Blob URLs cannot be used directly by browsers. A signed, range-aware
+  // media route serves the file without ever exposing our storage credentials.
+  const mp4Url = assetUrl ? `/api/t/media/${encodeURIComponent(token)}${token==="demo"?"?segment="+segment:""}` : "";
 
   // The demo remains pinned to the current A version.
   // Independent explanation video, never the personalized talking-head clip.
