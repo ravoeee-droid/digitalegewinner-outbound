@@ -256,12 +256,10 @@ async function run(request: Request) {
       limited++; return;
     }
 
-    // Loom-Kampagnen erzwingen dokumentierte E-Mail-Kontaktberechtigung unabhängig vom globalen Shadow-Modus.
-    // Campaign owner attested contact authorization on 2026-10-28. Do not require a
-    // second database permission record for these two explicitly authorized batches.
-    // Global suppression lists, do-not-contact and the per-lead safeguards remain active.
-    const ownerAuthorizedLoom=row.campaign_id==="pflege-loom-150-v1"||row.campaign_id==="pv-loom-150-v1";
-    const sendComplianceMode=ownerAuthorizedLoom?"off":runtimeConfig.complianceMode;
+    // Every actual email send must have a documented, verified contact permission.
+    // Historical owner approval of a batch is not a per-contact legal permission.
+    // Never allow an off/shadow runtime setting to bypass this final send-time gate.
+    const sendComplianceMode="enforce" as const;
     if(sendComplianceMode!=="off"){
       try{
         const compliance=await evaluateEmailSendCompliance(row.lead_id,row.recipient);
