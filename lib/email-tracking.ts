@@ -53,7 +53,9 @@ export function trackedEmailHtml(text:string,origin:string,outboxId:string,leadI
     // Replace only this lead's signed personal video URL with a clear email-safe CTA.
     // Keep the original tracked destination and preserve all other links as text.
     if(target===videoPageUrl(origin,leadId)) {
-      html+=`<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;margin:16px 0 20px"><tr><td bgcolor="#ec6500" style="background-color:#ec6500;border-radius:8px;text-align:center"><a href="${href}" style="display:inline-block;padding:15px 24px;border-radius:8px;background-color:#ec6500;color:#ffffff;font-family:Arial,sans-serif;font-size:16px;font-weight:700;line-height:22px;text-decoration:none">▶ Persönliches Video ansehen</a></td></tr></table>`;
+      // An actual JPG thumbnail works in Gmail/Outlook; the picture and CTA share the same tracked video destination.
+      const imageSrc=escapeHtml(`${base(origin)}/api/t/preview/${encodeURIComponent(videoToken(leadId))}`);
+      html+=`<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;margin:16px 0 20px;width:100%;max-width:520px"><tr><td><a href="${href}" style="display:block;text-decoration:none" aria-label="Persönliches Video ansehen"><img src="${imageSrc}" width="520" height="293" alt="Videovorschau: Ihre Website mit Raphaels Videonachricht – jetzt ansehen" style="display:block;width:100%;max-width:520px;height:auto;border:0;border-radius:9px" /></a></td></tr><tr><td style="padding-top:12px"><table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr><td bgcolor="#ec6500" style="background-color:#ec6500;border-radius:8px;text-align:center"><a href="${href}" style="display:inline-block;padding:15px 24px;border-radius:8px;background-color:#ec6500;color:#ffffff;font-family:Arial,sans-serif;font-size:16px;font-weight:700;line-height:22px;text-decoration:none">▶ Persönliches Video ansehen</a></td></tr></table></td></tr></table>`;
     } else {
       html+=`<a href="${href}">${escapeHtml(target)}</a>`;
     }
