@@ -256,3 +256,35 @@
 .careBenefits li > span:first-child { flex: none; display: grid; place-items: center; width: 23px; height: 23px; border-radius: 50%; color: #171717; background: #ff8745; font-size: 12px; font-weight: 850; }
 .careBenefits li strong { color: #fff; font-weight: 810; }
 @media(max-width: 620px) { .careBenefits { gap: 11px; margin-bottom: 19px; } .careBenefits li { font-size: 13px; } }
+
+
+/* Secondary educational video: compact, optional and below the primary booking CTA. */
+.explainer { margin-top: 24px; padding: 24px 28px; background: #fff; border: 1px solid var(--line); border-radius: 16px; }
+.explainerIntro { display: flex; align-items: center; justify-content: space-between; gap: 24px; margin-bottom: 15px; }
+.explainerIntro h2 { margin: 0 0 7px; font-size: clamp(19px,2.2vw,25px); line-height: 1.2; letter-spacing: -.03em; }
+.explainerIntro p { margin: 0; color: #75726f; font-size: 13px; line-height: 1.5; }
+.explainerBooking { flex: none; color: #b85218; text-decoration: underline; font-size: 13px; font-weight: 800; text-underline-offset: 4px; }
+.explainerDisclosure { border: 1px solid #e8e5e0; border-radius: 12px; overflow: hidden; }
+.explainerToggle { display: flex; align-items: center; gap: 17px; min-height: 97px; padding: 11px 18px 11px 11px; cursor: pointer; list-style: none; }
+.explainerToggle::-webkit-details-marker { display: none; }
+.explainerThumb { width: 132px; height: 75px; flex: none; display: grid; place-items: center; background: #292827 center / cover no-repeat; border-radius: 8px; }
+.explainerPlay { width: 36px; height: 36px; display: grid; place-items: center; padding-left: 3px; background: #ff8745; color: #21170c; border-radius: 50%; font-size: 15px; }
+.explainerToggleText { display: grid; gap: 5px; }
+.explainerToggleText strong { color: #252525; font-size: 14px; }
+.explainerToggleText small { color: #777571; font-size: 12px; }
+.explainerChevron { margin-left: auto; color: #ca642d; font-size: 24px; }
+.explainerDisclosure[open] .explainerChevron { transform: rotate(180deg); }
+.explainerPlayback { padding: 0 15px 18px; }
+.explainerPlayback video { display: block; width: 100%; max-width: 780px; margin: 0 auto; aspect-ratio: 16/9; background: #181818; border-radius: 9px; }
+.explainerBottomCta { display: block; max-width: 780px; margin: 15px auto 0; padding: 13px 16px; text-align: center; border-radius: 8px; background: #ff8745; color: #21170c; font-size: 13px; font-weight: 800; text-decoration: none; }
+.explainerToggle:focus-visible, .explainerBooking:focus-visible, .explainerBottomCta:focus-visible { outline: 3px solid #ee782b; outline-offset: 3px; }
+@media (max-width: 620px) {
+  .explainer { margin-top: 17px; padding: 18px 14px; }
+  .explainerIntro { align-items: flex-start; flex-direction: column; gap: 10px; }
+  .explainerIntro h2 { font-size: 19px; }
+  .explainerToggle { gap: 10px; min-height: 81px; padding: 8px; }
+  .explainerThumb { width: 100px; height: 60px; }
+  .explainerToggleText strong { font-size: 12px; }
+  .explainerToggleText small { font-size: 11px; }
+  .explainerPlayback { padding: 0 8px 10px; }
+}
