@@ -23,6 +23,8 @@ export default function PageTracker({ token, variant = "A" }: { token: string; v
     const onClick = (event: MouseEvent) => {
       const link = (event.target as HTMLElement | null)?.closest?.('a[href="#termin"]');
       if (link) track("booking_click");
+      const externalCalendar = (event.target as HTMLElement | null)?.closest?.('a[data-calendar-open="true"]');
+      if (externalCalendar) track("calendar_open");
       const whatsapp = (event.target as HTMLElement | null)?.closest?.('a[data-secondary-action="whatsapp"]');
       if (whatsapp) track("whatsapp_click");
     };
