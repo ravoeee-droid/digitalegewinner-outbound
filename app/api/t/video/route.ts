@@ -6,7 +6,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 // Ereignisse der persönlichen Videoseite (/v/<token>): geöffnet, Play, Sehdauer, Scrollen, Verweildauer, Termin-Klick.
-const TYPES = new Set(["view", "play_intent", "play", "player_error", "progress", "watch", "scroll", "dwell", "booking_click", "calendar_focus", "chat_open", "whatsapp_click", "site_view", "site_scroll", "site_dwell", "site_click"]);
+const TYPES = new Set(["view", "play_intent", "play", "play_confirmed", "player_error", "progress", "watch", "scroll", "dwell", "booking_click", "calendar_focus", "chat_open", "whatsapp_click", "site_view", "site_scroll", "site_dwell", "site_click"]);
 const CORS = { "access-control-allow-origin": "https://digitalegewinner.de", "access-control-allow-methods": "POST, OPTIONS", "access-control-allow-headers": "content-type" };
 const BOT = /(bot|crawl|spider|scan|proofpoint|mimecast|barracuda|safelinks|defender|symantec|trend ?micro|python|curl|wget|go-http|headless|preview|facebookexternalhit|slurp)/i;
 
