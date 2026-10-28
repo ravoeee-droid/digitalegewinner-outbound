@@ -120,8 +120,8 @@ export function heuristicClassification(subject:string,body:string):Classificati
   if(inbox.category==="vermittler"){
     return safetyPolicy({replyClass:"objection_existing_solution",confidence:0.97,rationale:"Einwand zur Personalvermittlung; das Angebot ist keine Vermittlung.",recommendedAction:"human_reply",priority:"normal",requiresHuman:true,draftReply:null});
   }
-  if(/^(?:aw:|re:|fw:|wg:)?\\s*(?:automatische antwort|automatic reply|auto(?:matic)?[ -]?response|eingangsbestätigung|bestätigung des eingangs)/i.test(subject.trim()) &&
-     !/(?:unerlaubte|unerwünschte)\\s+werbung|abmahnung|rechtliche schritte|bitte\\s+nicht mehr (?:anschreiben|kontaktieren)/i.test(current)){
+  if(/^(?:aw:|re:|fw:|wg:)?\s*(?:automatische antwort|automatic reply|auto(?:matic)?[ -]?response|eingangsbestätigung|bestätigung des eingangs)/i.test(subject.trim()) &&
+     !/(?:unerlaubte|unerwünschte)\s+werbung|abmahnung|rechtliche schritte|bitte\s+nicht mehr (?:anschreiben|kontaktieren)/i.test(current)){
     return safetyPolicy({replyClass:"out_of_office",confidence:0.99,rationale:"Automatische Eingangsbestätigung; Datenschutztext ist keine Beschwerde.",recommendedAction:"no_action",priority:"low",requiresHuman:false,draftReply:null});
   }
   const text=`${subject}\n${current}`.toLowerCase();
