@@ -15,6 +15,7 @@ export default function LoomVideoUploader() {
   const [busy,setBusy]=useState<Record<string,boolean>>({});
   const [pct,setPct]=useState<Record<string,number>>({});
   const [message,setMessage]=useState<Record<string,string>>({});
+  const [stage,setStage]=useState<Record<string,string>>({});
 
   async function refresh() {
     const response = await fetch("/api/admin/loom-video-upload",{cache:"no-store"});
@@ -26,6 +27,7 @@ export default function LoomVideoUploader() {
 
   async function uploadFile(segment:Segment,file?:File) {
     if (!file) return;
+    if(Object.values(busy).some(Boolean)) {setMessage(x=>({...x,[segment]:"Bitte zuerst den anderen Upload beenden."}));return;}
     if (file.type !== "video/mp4" && !file.name.toLowerCase().endsWith(".mp4")) {
       setMessage(x=>({...x,[segment]:"Bitte eine MP4-Datei auswählen."})); return;
     }
@@ -42,7 +44,25 @@ export default function LoomVideoUploader() {
       }
     },5000);
     try {
-      const blob = await upload(`loom-videos/${segment}.mp4`,file,{
+      setStage(x=>({...x,[segment]:"Prüfe Anmeldung und Blob-Speicher …"}));
+      const check=await Promise.race([
+        fetch("/api/admin/loom-video-upload",{
+          method:"POST",headers:{"content-type":"application/json"},
+          credentials:"same-origin",body:JSON.stringify({action:"diagnose"})
+        }),
+        new Promise<never>((_,reject)=>window.setTimeout(()=>reject(new Error("Verbindungstest nach 15 Sekunden ohne Antwort. Browser-Konsole oder Netzwerksperre prüfen.")),15000))
+      ]);
+      const diagnostic=await check.json() as {ok?:boolean;error?:string};
+      if(!check.ok||!diagnostic.ok) throw new Error(diagnostic.error||`Verbindungstest fehlgeschlagen (HTTP ${check.status})`);
+      lastProgress=Date.now();
+      setStage(x=>({...x,[segment]:"Blob-Upload wird initialisiert …"}));
+      setMessage(x=>({...x,[segment]:"Verbindung bestätigt ✓  Der Upload wird jetzt gestartet."}));
+      const watchdog=window.setTimeout(()=>{
+        if(lastProgress && Date.now()-lastProgress>70000) controller.abort();
+      },70000);
+      let blob: Awaited<ReturnType<typeof upload>>;
+      try {
+        blob=await upload(`loom-videos/${segment}.mp4`,file,{
         access:"public",
         handleUploadUrl:"/api/admin/loom-video-upload",
         multipart:true,
@@ -51,10 +71,13 @@ export default function LoomVideoUploader() {
         clientPayload:segment,
         onUploadProgress:({loaded,total,percentage})=>{
           lastProgress=Date.now();
+          setStage(x=>({...x,[segment]:"Daten werden übertragen"}));
           setPct(x=>({...x,[segment]:Math.round(percentage)}));
           setMessage(x=>({...x,[segment]:`Hochladen: ${(loaded/1048576).toFixed(1)} von ${(total/1048576).toFixed(1)} MB · ${Math.round(percentage)} %`}));
         },
       });
+      } finally {window.clearTimeout(watchdog);}
+      setStage(x=>({...x,[segment]:"Prüfe Speicherung"}));
       setPct(x=>({...x,[segment]:100}));
       setMessage(x=>({...x,[segment]:"100 % übertragen. Video wird geprüft und aktiviert …"}));
       const response=await fetch("/api/admin/loom-video-upload",{
@@ -65,9 +88,11 @@ export default function LoomVideoUploader() {
       const result=await response.json() as {ok?:boolean;error?:string};
       if(!response.ok||!result.ok)throw new Error(result.error||"Datei übertragen, aber Aktivierung fehlgeschlagen.");
       await refresh();
+      setStage(x=>({...x,[segment]:"Fertig"}));
       setMessage(x=>({...x,[segment]:"✓ Video aktiv – persönliche Links benutzen jetzt die neue MP4."}));
     } catch(error) {
-      setMessage(x=>({...x,[segment]:error instanceof Error?error.message:"Upload fehlgeschlagen"}));
+      setStage(x=>({...x,[segment]:"Fehler"}));
+      setMessage(x=>({...x,[segment]:controller.signal.aborted?"Upload nach 70 Sekunden ohne Fortschritt beendet. Keine MP4 wurde aktiviert.":error instanceof Error?error.message:"Upload fehlgeschlagen"}));
     } finally {
       window.clearInterval(heartbeat);
       setBusy(x=>({...x,[segment]:false}));
@@ -92,9 +117,10 @@ export default function LoomVideoUploader() {
         {busy[key]&&<div style={{marginTop:14}}>
           <progress value={pct[key]||0} max={100} style={{display:"block",width:"100%",height:16,accentColor:"#34c759"}}/>
           <strong style={{fontSize:14,color:"#72f0ab"}}>{pct[key]||0} %</strong>
+          <strong style={{fontSize:12,marginLeft:12,color:"#72f0ab"}}>{stage[key]||"Upload vorbereiten"}</strong>
           <span style={{fontSize:12,marginLeft:12,color:"#a7bdaf"}}>{!pct[key] ? "Verbindung wird hergestellt – noch kein Uploadfortschritt bestätigt." : "Übertragung läuft."}</span>
         </div>}
-        <p style={{fontSize:13,overflowWrap:"anywhere",color:"#b5cbbd"}}>{message[key] || ""}</p>
+        <p role="status" style={{fontSize:13,overflowWrap:"anywhere",color:"#b5cbbd"}}>{message[key] || ""}</p>
         {urls[key]&&<a href={urls[key]} target="_blank" rel="noopener noreferrer" style={{color:"#72f0ab",fontSize:13}}>Videodatei prüfen ↗</a>}
       </section>)}
     </div>
