@@ -43,7 +43,7 @@ export default function NativeLoomPlayer({src,screenshot,company,posterId}:{
   }
   useEffect(()=>()=>clearWatchdog(),[]);
   function reportPlayerError(code:number) {
-    if(!errorTrack.current) { errorTrack.current=true; track("player_error",code); }
+    if(!errorTrack.current) { errorTrack.current=true; track("player_error",code,{source:"native",ready:video.current?.readyState??0,network:video.current?.networkState??0,position:Math.round(video.current?.currentTime||0),visibility:document.visibilityState}); }
   }
 
   async function play() {
