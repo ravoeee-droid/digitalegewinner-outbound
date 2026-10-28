@@ -160,3 +160,30 @@ Am 28.10.2026 wurde die öffentliche PV-Demoseite in einem echten Browser geprü
 - **Abnahme offen:** Native Wiedergabe und belastbare mobile End-to-End-Prüfung, providerbestätigte und deduplizierte Buchungszuordnung, Bounce-DSN-Ursachen und dokumentierte Kontaktberechtigungen. Keine automatische A/B-Aktivierung oder weiterer Versand. Die Optimierung ist nicht vollständig abgeschlossen; der einmalige Task bleibt bis zur belastbaren Abnahme aktiv.
 
 - **Nachtrag zum Stall-Watchdog:** Der `stalled`-Handler wird nur noch nach einem vom Nutzer initiierten Play-Versuch scharfgeschaltet, damit ein bloßes Medien-Preload-Ereignis keine falsche Fallback-Umschaltung auslöst. Commit `69ed9a90878931c9616a0949dacf65f3da0d2cdd`. Kein neuer Versand; erneute Wiedergabeabnahme auf realen Geräten bleibt erforderlich.
+
+
+## 16. Kohorten-Korrektur: Ereignisse VOR dem Versand ausschließen (29.10.2026, 05:34+ Asia/Bangkok)
+
+**Wichtiger analytischer Fehler in älteren Auswertungen identifiziert:** Ein Join nur über `lead_id` und `campaign_id` ordnet auch Videoereignisse vor dem tatsächlichen `sent_at` der Versandkohorte zu. Insbesondere waren zwei Pflege-Leads mit 100-%-Videoereignissen **vor** dem SMTP-Versand erfasst (27.10. 14:16 UTC bei Versand 28.10. 14:50 UTC; 28.10. 05:46 UTC bei Versand 28.10. 07:00 UTC). Diese Ereignisse dürfen nicht als Reaktion auf die Loom-E-Mail vom 28.10. gewertet werden. Es ist nicht nachgewiesen, ob es Tests oder anderweitig geteilte Links waren.
+
+**Korrigierte Kohorte, nur `status='sent'` und `er_events.created_at >= er_outbox.sent_at`, eindeutige Leads, 29.10. ca. 05:34 Thailand:**
+
+| Stufe | Pflege | PV | Gesamt |
+|---|---:|---:|---:|
+| SMTP angenommen | 150 | 149 | 299 |
+| Linkklick-Event (menschlich nicht verifiziert) | 39 | 18 | 57 |
+| Videoseite, `meta.bot=false` (nicht zwingend Mensch) | 31 | 19 | 50 |
+| Bestätigter 3-s-Start | 2 | 4 | 6 |
+| 25 % Video | 2 | 3 | 5 |
+| 50 % Video | 2 | 2 | 4 |
+| 100 % Video | **0** | **1** | **1** |
+| Kalenderinteraktion (kein Buchungsnachweis) | 1 | 0 | 1 |
+| Providerbestätigte qualifizierte Buchung | 0 nachweisbar | 0 nachweisbar | 0 nachweisbar |
+
+Die Stufen sind keine garantiert monotone Journey, da einzelne Player-/Trackingversionen unterschiedlich emittieren und Bot-Heuristiken unvollständig sind. Die zwei früher als Pflege-100-%-Erfolge gezählten Leads waren **keine nachgewiesenen Reaktionen auf die heutige Mail**. Der echte PV-100-%-Event vom 28.10. 15:55 UTC liegt nach dem PV-Versand 13:20 UTC.
+
+**Ab sofort als Pflichtfilter für Kohortenberichte:** `e.created_at >= o.sent_at AND o.status='sent'` sowie segmentierte Kampagnen und getrennte `bot`-/Preview-/Test-Betrachtung. Alte Gesamt-Event-Zahlen dürfen nicht als echte Post-Send-Conversions ausgegeben werden. Keine vorhandenen Rohereignisse gelöscht oder umgeschrieben.
+
+**Kalender-Providerprüfung:** Im verbundenen Primärkalender `digitalegewinner@gmail.com` vom 28.10. bis 30.11. wurde ein generischer Termin am 28.10. 10:00 Uhr Europe/Berlin mit `mpp-recruit@web.de` gefunden. Diese Adresse gehört **nicht** zu den 300 Loom-Outbox-Empfängern; der Termin ist keine verifizierte Buchung dieser Kampagne. Ein vollständiger Booking-Provider-Webhook fehlt weiterhin. Kein neues Kalenderevent erzeugt.
+
+**Compliance und Versand:** Erneut 150 Pflege `sent`, 149 PV `sent`, 1 PV `failed`, 0 ausstehend; `outbound_contact_permissions` weiterhin 0 Datensätze. Keine Sendungen, Freigaben oder Limiterhöhungen. Der eine fehlgeschlagene Versand wird nicht als Erfolg gezählt.
