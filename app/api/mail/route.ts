@@ -60,19 +60,20 @@ async function loadSentMessages(mailboxId: string, limit: number) {
   const origin = (process.env.NEXT_PUBLIC_APP_URL || "https://app.digitalegewinner.de").replace(/\/$/, "");
   const pvUrl = campaign.some(row => row.body.includes("{{pv_link}}")) ? await pvPageUrl().catch(() => "") : "";
   const previews = campaign.map((row) => {
-    if (!row.lead_id || !row.campaign_id?.includes("loom")) return { ...row, bodyHtml: "" };
+    if (!row.lead_id || !row.campaign_id?.includes("loom")) return { ...row, bodyHtml: "", videoUrl: "" };
     const content = resolveSlots(withSignatureLink(row.body))
       .replaceAll("{{pv_link}}", pvUrl)
       .replaceAll("{{video_link}}", videoPageUrl(origin, row.lead_id));
     // Do not artificially record opens or clicks from the operator's mailbox preview.
     const html = trackedEmailHtml(content, origin, row.id, row.lead_id, unsubscribeUrl(origin, row.id, row.lead_id))
       .replace(/<img[^>]*\/api\/t\/open[^>]*>/gi, "")
-      .replace(/href="[^"]*"/gi, 'href="#"');
-    return { ...row, body: content, bodyHtml: html };
+      .replace(/<a\\b[^>]*>/gi, "<span>")
+      .replace(/<\\/a>/gi, "</span>");
+    return { ...row, body: content, bodyHtml: html, videoUrl: videoPageUrl(origin, row.lead_id) };
   });
   const all = [
-    ...rows.map((row) => ({ uid: row.id as number | string, recipient: row.recipient, subject: row.subject, body: row.body, bodyHtml: "", sent_at: row.sent_at })),
-    ...previews.map((row) => ({ uid: row.id as number | string, recipient: row.recipient, subject: row.subject, body: row.body, bodyHtml: row.bodyHtml, sent_at: row.sent_at })),
+    ...rows.map((row) => ({ uid: row.id as number | string, recipient: row.recipient, subject: row.subject, body: row.body, bodyHtml: "", videoUrl: "", sent_at: row.sent_at })),
+    ...previews.map((row) => ({ uid: row.id as number | string, recipient: row.recipient, subject: row.subject, body: row.body, bodyHtml: row.bodyHtml, videoUrl: row.videoUrl, sent_at: row.sent_at })),
   ].sort((a, b) => new Date(b.sent_at).getTime() - new Date(a.sent_at).getTime()).slice(0, limit);
   return all.map((row) => ({
     uid: row.uid as number,
@@ -86,6 +87,7 @@ async function loadSentMessages(mailboxId: string, limit: number) {
     unread: false,
     bodyText: row.body,
     bodyHtml: row.bodyHtml,
+    videoUrl: row.videoUrl,
   }));
 }
 
