@@ -1,4 +1,5 @@
 import { handleUpload } from "@vercel/blob/client";
+import { head } from "@vercel/blob";
 import { NextRequest } from "next/server";
 import { adminCookieName, sessionRole } from "@/lib/admin-auth";
 import { query } from "@/lib/db";
@@ -27,6 +28,27 @@ export async function POST(request: NextRequest) {
   // Verify the actual operator session before issuing *any* upload token.
   try {
     const body = await request.json();
+    // Authenticated browser confirmation prevents a delayed completion webhook
+    // from leaving a successfully uploaded video stuck in "not active".
+    if (body?.action === "activate") {
+      if (sessionRole(request.cookies.get(adminCookieName())?.value) !== "admin")
+        return Response.json({error:"Forbidden"},{status:403});
+      const segment = String(body.segment||"");
+      const url = String(body.url||"");
+      if (!["pv","pflege"].includes(segment) || !/^https:\/\/[^/]+\.public\.blob\.vercel-storage\.com\/loom-videos\/(pv|pflege)(?:[^/]*)\.mp4$/.test(url))
+        return Response.json({error:"Ungültige Datei-Adresse"},{status:400});
+      if (!url.includes("/loom-videos/"+segment)) return Response.json({error:"Segment stimmt nicht"},{status:400});
+      const blob = await head(url);
+      if (!blob || blob.size > 500_000_000 || blob.contentType !== "video/mp4")
+        return Response.json({error:"MP4 konnte im Videospeicher nicht bestätigt werden"},{status:400});
+      await ensureTable();
+      await query(
+        `insert into loom_video_assets(segment,video_url,updated_at) values($1,$2,now())
+         on conflict(segment) do update set video_url=excluded.video_url,updated_at=now()`,
+        [segment, url]
+      );
+      return Response.json({ok:true,segment,url});
+    }
     const result = await handleUpload({
       body,
       request,
