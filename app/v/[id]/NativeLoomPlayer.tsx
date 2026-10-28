@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import styles from "./page.module.css";
 import { track } from "./track";
+import VideoPlayer from "./VideoBubble";
 
 export default function NativeLoomPlayer({src,screenshot,company,posterId}:{
   src:string;screenshot:string;company:string;posterId:string;
@@ -11,6 +12,8 @@ export default function NativeLoomPlayer({src,screenshot,company,posterId}:{
   const [started,setStarted]=useState(false);
   const [playing,setPlaying]=useState(false);
   const [error,setError]=useState("");
+  const [youtubeFallback,setYoutubeFallback]=useState(false);
+  const validYoutube=/^[A-Za-z0-9_-]{11}$/.test(posterId);
   const milestones=useRef(new Set<number>());
   const startedTrack=useRef(false);
   const confirmedTrack=useRef(false);
@@ -34,6 +37,7 @@ export default function NativeLoomPlayer({src,screenshot,company,posterId}:{
       console.error("[loom-player] play rejected",reason,details);
       reportPlayerError(el.error?.code||408);
       setError(`Wiedergabefehler: ${reason} (${details})`);
+      if(validYoutube)setYoutubeFallback(true);
     }
   }
 
@@ -48,6 +52,11 @@ export default function NativeLoomPlayer({src,screenshot,company,posterId}:{
       }
     }
   }
+
+  // Never leave prospects stranded on a broken MP4: retain the existing
+  // YouTube facecam as an explicit fallback, with its own 3-second tracking.
+  if(youtubeFallback && validYoutube)
+    return <VideoPlayer youtubeId={posterId} screenshot={screenshot} company={company}/>;
 
   return <div role="group" aria-label={`Persönliches Video für ${company}`}>
     <div className={styles.player}>
@@ -65,7 +74,7 @@ export default function NativeLoomPlayer({src,screenshot,company,posterId}:{
           onPause={()=>setPlaying(false)}
           onTimeUpdate={onTime}
           onEnded={()=>{setPlaying(false);if(!milestones.current.has(100)){milestones.current.add(100);track("progress",100);}track("watch",Math.round(video.current?.duration||0));}}
-          onError={()=>{const el=video.current;setPlaying(false);reportPlayerError(el?.error?.code||408);setError(`Video-Ladefehler: ${el?.error?.message||"Unbekannt"} (Code ${el?.error?.code||0}, Netzwerk ${el?.networkState||0})`);}}
+          onError={()=>{const el=video.current;setPlaying(false);reportPlayerError(el?.error?.code||408);setError(`Video-Ladefehler: ${el?.error?.message||"Unbekannt"} (Code ${el?.error?.code||0}, Netzwerk ${el?.networkState||0})`);if(validYoutube)setYoutubeFallback(true);}}
         />
       </div>
       {!playing&&<button className={styles.bigPlay} type="button" onClick={play}
