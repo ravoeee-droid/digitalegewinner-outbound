@@ -35,6 +35,17 @@ export async function GET(request:NextRequest,{params}:{params:Promise<{token:st
   const secret=process.env.BLOB_READ_WRITE_TOKEN;
   if(!secret)return new Response("Video storage unavailable",{status:503});
 
+  if(request.nextUrl.searchParams.get("diagnose")==="1") {
+    const test=await fetch(url,{
+      headers:{authorization:`Bearer ${secret}`,range:"bytes=0-1023"},
+      cache:"no-store",
+      signal:AbortSignal.timeout(10000)
+    }).catch(()=>null);
+    if(!test)return Response.json({ok:false,error:"Blob-Verbindung fehlgeschlagen"},{status:502});
+    const sample=await test.arrayBuffer().catch(()=>new ArrayBuffer(0));
+    return Response.json({ok:test.status===206,status:test.status,bytes:sample.byteLength,
+      contentRange:test.headers.get("content-range"),mime:test.headers.get("content-type")});
+  }
   const range=request.headers.get("range");
   if(range && !/^bytes=\\d*-\\d*$/.test(range))return new Response("Invalid range",{status:416});
   const result = range ? null : await get(url,{access:"private"}).catch((error)=>{
