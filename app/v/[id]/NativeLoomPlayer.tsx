@@ -101,7 +101,7 @@ export default function NativeLoomPlayer({src,screenshot,company,posterId}:{
           onPause={()=>{setPlaying(false);clearWatchdog();}}
           onTimeUpdate={onTime}
           onWaiting={()=>{if(startedTrack.current)armWatchdog();}}
-          onStalled={()=>armWatchdog()}
+          onStalled={()=>{if(started)armWatchdog();}}
           onEnded={()=>{clearWatchdog();setPlaying(false);if(!milestones.current.has(100)){milestones.current.add(100);track("progress",100);}track("watch",Math.round(video.current?.duration||0));}}
           onError={()=>{clearWatchdog();const el=video.current;setPlaying(false);reportPlayerError(el?.error?.code||408);setError(`Video-Ladefehler: ${el?.error?.message||"Unbekannt"} (Code ${el?.error?.code||0}, Netzwerk ${el?.networkState||0})`);if(validYoutube)setYoutubeFallback(true);}}
         />
