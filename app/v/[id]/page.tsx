@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import VideoPlayer from "./VideoBubble";
 import NativeLoomPlayer from "./NativeLoomPlayer";
 import { getLoomVideoUrl } from "@/lib/loom-assets";
+import { issueSignedToken, presignUrl } from "@vercel/blob";
 import PageTracker from "./PageTracker";
 import { WHATSAPP_NUMBER } from "@/lib/video-chat";
 import { VIDEO_IDS } from "@/lib/outreach-copy";
@@ -83,7 +84,26 @@ export default async function VideoPage({ params, searchParams }: { params: Prom
   const assetUrl = hasVertical ? await getLoomVideoUrl(segment as "pv"|"pflege") : "";
   // Private Blob URLs cannot be used directly by browsers. A signed, range-aware
   // media route serves the file without ever exposing our storage credentials.
-  const mp4Url = assetUrl ? `/api/t/media/${encodeURIComponent(token)}${token==="demo"?"?segment="+segment:""}` : "";
+  let mp4Url = "";
+  if (assetUrl) {
+    try {
+      const path = new URL(assetUrl).pathname.slice(1);
+      const signedToken = await issueSignedToken({
+        pathname: path,
+        operations: ["get"],
+        validUntil: Date.now() + 24 * 60 * 60 * 1000
+      });
+      const signed = await presignUrl(signedToken, {
+        pathname: path,
+        operation: "get",
+        validUntil: Date.now() + 24 * 60 * 60 * 1000
+      });
+      mp4Url = signed.presignedUrl;
+    } catch (error) {
+      console.error("[loom] direct media presign failed", error instanceof Error ? error.message : "unknown");
+      mp4Url = `/api/t/media/${encodeURIComponent(token)}${token==="demo"?"?segment="+segment:""}`;
+    }
+  }
 
   // The demo remains pinned to the current A version.
   // Independent explanation video, never the personalized talking-head clip.
