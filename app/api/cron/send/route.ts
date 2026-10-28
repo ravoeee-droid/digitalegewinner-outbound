@@ -58,14 +58,14 @@ function insideBusinessSendWindow(){
   const now=berlinClock();
   if(["Sat","Sun"].includes(now.weekday))return false;
   const minutes=now.hour*60+now.minute;
-  return minutes>=8*60+30&&minutes<=17*60+30;
+  return minutes>=8*60&&minutes<=17*60+30;
 }
 
 async function run(request: Request) {
   const startedAt = Date.now();
   if (!authorized(request)) return Response.json({ error:"Unauthorized" }, { status:401 });
   if(!insideBusinessSendWindow()){
-    return Response.json({ok:true,skipped:true,reason:"outside_berlin_business_window",window:"08:30-17:30 Europe/Berlin"});
+    return Response.json({ok:true,skipped:true,reason:"outside_berlin_business_window",window:"08:00-17:30 Europe/Berlin"});
   }
   const runtimeConfig=await resolveOutboundRuntimeConfig();
   if (runtimeConfig.v3Mode === "active") {
@@ -146,6 +146,20 @@ async function run(request: Request) {
              )
          )
          and (sl.id is null or (sl.stage not in ('Gewonnen','Verloren') and not sl.do_not_contact))
+         -- Keep Loom leads in the queue until documented permission is available.
+         -- Never claim-and-suppress 300 otherwise eligible leads merely because
+         -- contact evidence has not yet been verified.
+         and (
+           o.campaign_id not in ('pflege-loom-150-v1','pv-loom-150-v1')
+           or exists (
+             select 1 from outbound_contact_permissions p
+             where p.workspace=o.workspace and p.channel='email'
+               and p.status='verified' and p.revoked_at is null
+               and (p.valid_from is null or p.valid_from<=now())
+               and (p.valid_until is null or p.valid_until>=now())
+               and (p.contact_id=sl.contact_id or p.company_id=sl.company_id)
+           )
+         )
        order by o.scheduled_at asc
        for update of o skip locked
        limit 100
