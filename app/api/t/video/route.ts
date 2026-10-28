@@ -24,7 +24,7 @@ export async function POST(request: Request) {
   const [sent] = await query<{ age: number | null }>("select extract(epoch from (now()-max(sent_at)))::int age from er_outbox where workspace='default' and lead_id=$1 and status='sent'", [leadId]).catch(() => []);
   // Bots lesen direkt nach Zustellung; echte Menschen können aber sofort auf Play klicken.
   // Aktive Signale dürfen deshalb auch in den ersten Minuten nicht pauschal als Bot gelten.
-  const passiveEvent = type === "view" || type === "scroll" || type === "dwell";
+  const passiveEvent = ["view","scroll","dwell","site_view","site_scroll","site_dwell"].includes(type);
   const likelyImmediateScanner = sent?.age != null && sent.age >= 0 && sent.age < 90 && passiveEvent;
   const bot = BOT.test(request.headers.get("user-agent") || "") || likelyImmediateScanner;
   await query("insert into er_events(workspace,lead_id,type,meta) values('default',$1,$2,$3::jsonb)", [leadId, `video_${type}`, JSON.stringify({ v: value, bot, a: arm, p: String(body.p || "").replace(/[^a-zA-Z0-9/_.#:-]/g, "").slice(0, 80), session: /^[0-9a-f-]{36}$/i.test(String(body.sid||"")) ? body.sid : null, clientTs: Number.isFinite(Number(body.ts)) && Math.abs(Date.now()-Number(body.ts)) < 86400000 ? Math.floor(Number(body.ts)) : null })]).catch(() => null);
@@ -35,7 +35,7 @@ export async function POST(request: Request) {
     ).catch(() => []);
     const name = row?.company || `Lead ${leadId}`;
     const message =
-      type === "view" ? `👀 Videoseite geöffnet: ${name}` :
+      type === "view" ? "" :
       type === "play" ? `▶️ Video gestartet: ${name}` :
       type === "progress" && value >= 50 ? `🔥 Video zu ${value} % gesehen: ${name}` :
       type === "booking_click" ? `📅 Klick auf "Termin buchen": ${name}` :
@@ -43,7 +43,8 @@ export async function POST(request: Request) {
       type === "calendar_open" ? `🗓️ Externer Kalender geöffnet: ${name}` :
       type === "whatsapp_click" ? `💬 WhatsApp-Button geklickt: ${name}` :
       type === "chat_open" ? `🤖 Chat geöffnet: ${name}` :
-      type === "site_view" ? `🌐 ${name} ist auf der Website: ${String(body.p || "/").slice(0, 60)}` :
+      type === "site_view" ? "" :
+      type === "site_dwell" && value >= 10 ? `🌐 ${name} war mindestens ${value} Sekunden auf der Website: ${String(body.p || "/").slice(0, 60)}` :
       type === "site_click" ? `🖱️ ${name} hat auf der Website geklickt: ${String(body.p || "").slice(0, 60)}` : "";
     if (message) await sendAlertOnce(`video:${type}${type === "progress" ? value : ""}${type.startsWith("site_") ? String(body.p || "") : ""}:${leadId}`, message, type.startsWith("site_") ? 12 : 24 * 30).catch(() => null);
   }
