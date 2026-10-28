@@ -3,6 +3,7 @@ import { head, put } from "@vercel/blob";
 import { NextRequest } from "next/server";
 import { adminCookieName, sessionRole } from "@/lib/admin-auth";
 import { query } from "@/lib/db";
+import { getLoomVideoUrl } from "@/lib/loom-assets";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -19,6 +20,7 @@ export async function GET(request: NextRequest) {
   if (sessionRole(request.cookies.get(adminCookieName())?.value) !== "admin")
     return Response.json({error:"Forbidden"}, {status:403});
   await ensureTable();
+  await Promise.all([getLoomVideoUrl("pv"),getLoomVideoUrl("pflege")]);
   const rows = await query<{segment:string;video_url:string}>("select segment, video_url from loom_video_assets order by segment");
   return Response.json({videos:rows});
 }
@@ -51,7 +53,7 @@ export async function POST(request: NextRequest) {
         return Response.json({error:"Forbidden"},{status:403});
       const segment = String(body.segment||"");
       const url = String(body.url||"");
-      if (!["pv","pflege"].includes(segment) || !/^https:\/\/[^/]+\.public\.blob\.vercel-storage\.com\/[^?#]+\.mp4(?:\?[^#]*)?$/.test(url))
+      if (!["pv","pflege"].includes(segment) || !/^https:\/\/[a-z0-9-]+\.(?:public|private)\.blob\.vercel-storage\.com\/[^?#]+\.mp4(?:\?[^#]*)?$/.test(url))
         return Response.json({error:"Ungültige Datei-Adresse"},{status:400});
       // The operator can use a Blob URL uploaded through the Vercel dashboard.
       // The Vercel SDK head() below validates that it belongs to our configured store.
