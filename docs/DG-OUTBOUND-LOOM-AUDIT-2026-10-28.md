@@ -79,3 +79,14 @@ Die Tabelle `outbound_contact_permissions` enthielt **0 Datensätze**. Für kein
 ## 8. Öffentlicher Browser-Smoke-Test
 
 Am 28.10.2026 wurde die öffentliche PV-Demoseite in einem echten Browser geprüft: Seite lädt; großer Video-Play-Button vorhanden; Google-Calendar-Einbettung zeigt interaktive Datum-/Zeit-Auswahl; keine sichtbare Fehlermeldung. **Nicht bestätigt:** tatsächliche 3-Sekunden-Wiedergabe, mobile Viewport-Darstellung, vollständige Terminbuchung. Der zunächst unter dem 670-px-Kalender platzierte Fallback-Link war im Screenshot nicht sichtbar; deshalb wurde der direkte Kalender-CTA **über** die Einbettung verschoben. Diese neue Position benötigt noch einen erneuten visuellen Test. Es wurde keine Testbuchung erzeugt.
+
+
+## 9. Zweiter Prüfstand (28.10.2026, 23:40 Asia/Bangkok)
+
+- Live-Neon-Abfrage bestätigt unverändert: `pflege-loom-150-v1` 150 `sent`, 0 `failed`; `pv-loom-150-v1` 149 `sent`, 1 `failed`. Insgesamt **299 SMTP-angenommen, 1 fehlgeschlagen, 0 wartend**. `sent` bedeutet keine nachgewiesene Inbox-Zustellung.
+- `outbound_contact_permissions` weiterhin **0** Datensätze. Compliance-Blockade für künftige Kontakte bleibt bestehen; keine Kontakte freigegeben und kein Versand gestartet.
+- Seit 15:00 UTC in `er_events`: 5 `video_play_confirmed`-Ereignisse von 3 eindeutigen Leads und 9 `video_progress`-Ereignisse von 3 Leads; keine `appointment`-Events in dieser jüngeren Teilmenge. Über den gesamten heutigen Zeitraum wurde 1 `video_calendar_focus` registriert; dies ist keine Buchung.
+- Über den heutigen Zeitraum: 35 `bounce`-Events insgesamt, davon im früheren Kampagnenabgleich 33 eindeutig den beiden Loom-Chargen zugeordnet. Nicht pauschal alle 35 als heutige Kampagnen-Bounces zählen. 20 `video_player_error`-Events, alle mit Wert 408, von 8 Leads. Ursache weiter offen.
+- **Neue technische Verbesserung:** Im Video-Tracking-Endpunkt wird die Datenbankabfrage nach dem Versandalter nur noch bei passiven Events ohne bekannten Bot-User-Agent ausgeführt. Aktive Ereignisse (Play, 3-Sekunden-Bestätigung, Progress, Kalender) behalten dieselbe Scanner-/Event-Semantik, benötigen aber diese Abfrage nicht mehr. Commit `b4155fc321a52c613cc2a4312392430cd0274f77`. Vercel-Build erfolgreich, Production-Deployment `dpl_HHxYkqMppwmHybGxtiv3yzMzoyKu` **READY**. Tatsächliche Einsparung bei Neon-Compute noch nicht quantitativ gemessen.
+- Live-HTTP-Prüfung aus dieser Ausführungsumgebung war wegen DNS-/Netzwerkauflösung nicht möglich. Die frühere öffentliche Browser-Smoke-Prüfung deckte weder echte mobile Wiedergabe noch eine abgeschlossene Buchung ab; diese offenen End-to-End-Tests sind weiterhin **nicht bestanden bzw. nicht nachgewiesen**.
+- Keine Änderung an SMTP-Limits, Kontaktfreigaben, aktiven Kampagnen oder Empfängerstatus. **4 eindeutige qualifizierte Buchungen sind nicht nachgewiesen.** Optimierungsaufgabe bleibt wegen Compliance-Nachweisen, Bounce-Analyse, Player-Fehlern und Buchungsbestätigung offen.
