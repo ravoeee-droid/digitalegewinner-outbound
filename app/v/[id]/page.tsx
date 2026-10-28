@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { createHash } from "node:crypto";
 import { notFound } from "next/navigation";
 import VideoPlayer from "./VideoBubble";
+import NativeLoomPlayer from "./NativeLoomPlayer";
 import PageTracker from "./PageTracker";
 import { WHATSAPP_NUMBER } from "@/lib/video-chat";
 import { VIDEO_IDS } from "@/lib/outreach-copy";
@@ -76,6 +77,13 @@ export default async function VideoPage({ params, searchParams }: { params: Prom
   const group: "A" | "B" = testIsOn && leadId && (createHash("sha256").update("loom-v1:"+leadId).digest()[0] & 1) === 1 ? "B" : "A";
   const mainVideoId = isPv ? VIDEO_IDS.pv : VIDEO_IDS.pflege;
   const videoId = group === "B" ? String(shortVideoId) : mainVideoId;
+  // A single externally hosted MP4 per segment. Never load video bytes from Neon.
+  // Existing signed URLs resolve to this new player as soon as the MP4 upload completes.
+  const [directVideo] = hasVertical
+    ? await query<{video_url:string}>("select video_url from loom_video_assets where segment=$1 limit 1", [segment]).catch(() => [])
+    : [];
+  const mp4Url = directVideo?.video_url?.startsWith("https://") ? directVideo.video_url : "";
+
   // The demo remains pinned to the current A version.
   // Independent explanation video, never the personalized talking-head clip.
   // PV asset is published on the main website. Pflege asset may be configured separately
@@ -108,11 +116,16 @@ export default async function VideoPage({ params, searchParams }: { params: Prom
         <div className={styles.heroGrid}>
           <section className={styles.videoFrame} aria-label="Persönliche Videonachricht">
             {(hasVertical&&Boolean(videoId))||token==="demo" ? (
-              <VideoPlayer
-                youtubeId={token==="demo"?(mainVideoId||data.youtubeId):videoId}
-                screenshot={data.screenshot}
-                company={data.company}
-              />
+              {mp4Url ? (
+                <NativeLoomPlayer src={mp4Url} screenshot={data.screenshot} company={data.company}
+                  posterId={token==="demo"?(mainVideoId||data.youtubeId):videoId}/>
+              ) : (
+                <VideoPlayer
+                  youtubeId={token==="demo"?(mainVideoId||data.youtubeId):videoId}
+                  screenshot={data.screenshot}
+                  company={data.company}
+                />
+              )}
             ):(
               <div className={styles.staticShot} style={data.screenshot?{backgroundImage:"url("+data.screenshot+")"}:undefined} role="img" aria-label={"Website von "+data.company}/>
             )}
