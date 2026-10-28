@@ -6,10 +6,10 @@ import { track } from "./track";
 
 // Loom-style composition: the prospect's screenshot is always visible and the
 // YouTube clip is always cropped INSIDE the circular facecam, never full-frame.
-export default function VideoPlayer({ youtubeId, screenshot, company }: {
-  youtubeId: string; screenshot: string; company: string;
+export default function VideoPlayer({ youtubeId, screenshot, company, autoStart = false }: {
+  youtubeId: string; screenshot: string; company: string; autoStart?: boolean;
 }) {
-  const [started, setStarted] = useState(false);
+  const [started, setStarted] = useState(autoStart);
   const [loaded, setLoaded] = useState(false);
   const [playing, setPlaying] = useState(false);
   const iframeRef = useRef<HTMLIFrameElement>(null);
@@ -114,6 +114,7 @@ export default function VideoPlayer({ youtubeId, screenshot, company }: {
       <p style={{margin:"10px 0 0",fontSize:12,color:"#777571"}}>
         {started ? "Die Firmenwebsite bleibt sichtbar. Ihre persönliche Nachricht läuft in der runden Facecam." :
           "▶ Klicken Sie auf Play, um Ihre persönliche Videonachricht anzusehen."}
+        {started && !playing && valid && <><span> </span><a href={`https://www.youtube.com/watch?v=${youtubeId}`} target="_blank" rel="noopener noreferrer">Video startet nicht? Direkt auf YouTube ansehen.</a></>}
       </p>
     </div>
   );
