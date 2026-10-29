@@ -222,7 +222,17 @@ async function run(request: Request) {
     // below remain effective.
     const berlinDate=new Intl.DateTimeFormat("en-CA",{timeZone:"Europe/Berlin",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date());
     const catchupLoom=berlinDate==="2026-10-28" && (row.campaign_id==="pflege-loom-150-v1"||row.campaign_id==="pv-loom-150-v1");
-    let mailboxLimit=catchupLoom?Math.max(configuredMailboxLimit,30):configuredMailboxLimit;
+    // Complete the owner's existing 300-message release across 20 mailboxes.
+    // The original round-robin allocation contains 14 or 16 messages per box.
+    const releasedLoomCampaign = row.campaign_id === "pflege-loom-150-v1" || row.campaign_id === "pv-loom-150-v1";
+    const [release] = releasedLoomCampaign ? await query<{ approved: boolean }>(
+      `select exists(select 1 from er_outbox
+       where id=$1 and workspace='default'
+         and created_at >= '2026-10-29T08:07:25Z'::timestamptz
+         and created_at < '2026-10-29T08:07:29Z'::timestamptz) as approved`,
+      [row.id],
+    ) : [];
+    let mailboxLimit=catchupLoom?Math.max(configuredMailboxLimit,30):release?.approved?Math.max(configuredMailboxLimit,16):configuredMailboxLimit;
     if(runtimeConfig.deliverabilityMode==="enforce"){
       const observedAt=health?.observed_at?new Date(health.observed_at).getTime():0;
       const stale=!observedAt||(Date.now()-observedAt)>3*60*60*1000;
@@ -290,14 +300,6 @@ async function run(request: Request) {
     // The owner explicitly released the 300 prepared DG Loom messages on 29 Oct.
     // Scope this operational release to that existing cohort, without inventing
     // contact consent records or changing suppression/recipient checks above.
-    const releasedLoomCampaign = row.campaign_id === "pflege-loom-150-v1" || row.campaign_id === "pv-loom-150-v1";
-    const [release] = releasedLoomCampaign ? await query<{ approved: boolean }>(
-      `select exists(select 1 from er_outbox
-       where id=$1 and workspace='default'
-         and created_at >= '2026-10-29T08:07:25Z'::timestamptz
-         and created_at < '2026-10-29T08:07:29Z'::timestamptz) as approved`,
-      [row.id],
-    ) : [];
     const sendComplianceMode="enforce" as const;
     if (!release?.approved) {
       try{
