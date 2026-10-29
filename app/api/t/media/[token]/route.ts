@@ -94,11 +94,14 @@ export async function GET(request:NextRequest,{params}:{params:Promise<{token:st
   }
   const range=request.headers.get("range");
   if(range && !/^bytes=\d*-\d*$/.test(range))return new Response("Invalid range",{status:416});
-  // Always request a partial-content stream, including initial browser loads.
-  // A 200 full-blob stream (300 MB) stalls until enough metadata arrives.
-  // Keep each response bounded: the browser can request consecutive chunks,
-  // without a serverless stream that must remain open for the full MP4.
-  const requested = parseRange(range,size,512*1024);
+  // Small campaign MP4s must honor the browser's open-ended Range request.
+  // Truncating bytes=0- to 512 KiB caused some browsers to stall instead of
+  // requesting the next segment. Stream the complete requested range for
+  // assets up to 32 MiB, without buffering video bytes in the JS heap.
+  // Large assets remain bounded to 4 MiB per response.
+  if(!Number.isSafeInteger(size)||size<=0)return new Response("Video size unavailable",{status:502});
+  const maxRangeBytes=size<=32*1024*1024?size:4*1024*1024;
+  const requested = parseRange(range,size,maxRangeBytes);
   if(!requested)return new Response("Range not satisfiable",{status:416,headers:{"content-range":`bytes */${size}`}});
   const requestedRange = `bytes=${requested.start}-${requested.end}`;
   const upstream=await fetch(url,{
@@ -113,7 +116,7 @@ export async function GET(request:NextRequest,{params}:{params:Promise<{token:st
     segment, range:requestedRange, status:upstream?.status, length:upstream?.headers.get("content-length"),
     contentRange:upstream?.headers.get("content-range")
   });
-  if(!upstream || !upstream.ok || !upstream.body)return new Response("Video temporarily unavailable",{status:502});
+  if(!upstream || upstream.status!==206 || !upstream.body)return new Response("Video temporarily unavailable",{status:502});
   const headers=new Headers({
     "content-type":"video/mp4",
     "cache-control":"private, max-age=1800",
@@ -124,5 +127,9 @@ export async function GET(request:NextRequest,{params}:{params:Promise<{token:st
     const value=upstream.headers.get(key);
     if(value)headers.set(key,value);
   }
-  return new Response(upstream.body,{status:upstream.status===206?206:200,headers});
+  // A request without Range is a normal 200 response only when the entire
+  // small asset is streamed; do not advertise Content-Range on a 200 response.
+  const fullResponse=!range&&requested.start===0&&requested.end===size-1;
+  if(fullResponse)headers.delete("content-range");
+  return new Response(upstream.body,{status:fullResponse?200:206,headers});
 }
