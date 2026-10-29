@@ -44,7 +44,7 @@ Ein PV-Fehler: SMTP 501 5.1.3 Bad recipient address syntax. 300 verschiedene Emp
 3. Video-Fehler auf realem Safari und Chrome erfassen: `play_intent`, `player_error`, `play_confirmed` mit Sitzung, Player, Gerät; echte Wiedergabe darf nicht aus HTTP 206 abgeleitet werden.
 4. Separater kontrollierter Test nur auf rechtlich freigegebenen Kontakten: A = aktueller Einstieg; B = in den ersten 5 Sekunden konkreter Schmerz + Nutzen und eine einzige Buchungs-CTA. Randomisierung auf Lead-Ebene, gleiche Sendefenster und Segmente, **Primärmetrik eindeutig gebuchter qualifizierter Termin pro gesendeter rechtmäßiger Mail**, sekundär 3-s-Starts. Keine automatischen Mehrsendungen.
 5. Bots, Sicherheits-Scanner, eigene Tests, Auto-Replies, Bounces und Sperren dauerhaft aus Human-Conversion-Funnel ausschließen; deduplizierte Empfänger-/Sitzungs-IDs; Replays nur als Engagement, nie als neue Leads.
-6. Datenbankabfragen und Indizes anhand `EXPLAIN` und realen Lastprofilen prüfen; `er_events` hat derzeit nur PK und Claim-Index. Keine großflächigen Updates oder pauschalen Limitänderungen.
+6. Neue, gültige Indizes im Betrieb auf tatsächliche Query-Latenz, Scan-Anteil und Neon-Verbrauch prüfen; weitere Indizes nur bei nachgewiesenem Bedarf. Keine großflächigen Updates oder pauschalen Limitänderungen.
 7. Screenshot-Fehler pro Domain mit Backoff, Deadline, Cache und sicherem neutralem Fallback behandeln; Anreden vor Versand anhand Kontaktquelle/Ansprechpartner validieren, Unbekanntes neutral adressieren.
 8. Follow-ups ausschließlich bei rechtlich geprüftem Kontaktstatus und sauberem Suppression-/Reply-Gate. Keine automatisierte Freigabe.
 
