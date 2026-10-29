@@ -163,7 +163,7 @@ export default async function VideoPage({ params, searchParams }: { params: Prom
                 <p>Genau das schauen wir uns gemeinsam an. Ob sich eine Zusammenarbeit lohnt oder nicht – <strong>beides ist vollkommen in Ordnung.</strong></p>
               </>
             )}
-            <a href="#termin" className={styles.cta}>Kostenlosen Termin wählen <span aria-hidden="true">↗</span></a>
+            <a href={CALENDAR_URL} className={styles.cta} data-calendar-open="true" target="_blank" rel="noopener noreferrer">15-Minuten-Termin direkt buchen <span aria-hidden="true">↗</span></a>
             <span className={styles.ctaNote}>Unverbindlich. Kein Verkaufsdruck.</span>
             <a href={whatsappUrl} className={styles.secondaryContact} target="_blank" rel="noopener noreferrer" data-secondary-action="whatsapp">Lieber kurz eine Frage stellen? WhatsApp ↗</a>
           </aside>
