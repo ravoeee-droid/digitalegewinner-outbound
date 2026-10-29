@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState, type ReactNode } from "react";
 import styles from "./AppFrame.module.css";
+import InterestNotifications from "./InterestNotifications";
 
 type IconName = "today" | "crm" | "call" | "send" | "care" | "web" | "mail" | "studio" | "seo" | "draft" | "dot";
 type Item = { href: string; label: string; icon?: IconName; hint?: string; sales?: boolean };
@@ -155,6 +156,7 @@ export default function AppFrame({ children }: { children: ReactNode }) {
       </aside>
 
       <div id="main" className={styles.main}>{children}</div>
+      {role && <InterestNotifications />}
     </div>
   );
 }

@@ -8,6 +8,7 @@ import { replyClassSchema, type ReplyClass } from "@/lib/outbound-contracts";
 import { resolveOutboundRuntimeConfig } from "@/lib/outbound-runtime-config";
 import { createComplianceSuppression } from "@/lib/outbound-compliance-engine";
 import { classifyInboxMessage, currentReplyText } from "@/lib/inbox-classifier";
+import { reflectInterestedReply } from "@/lib/reply-crm-interest";
 
 export const CONVERSATION_POLICY_VERSION="dg-conversation-2026-09-27-v1";
 export const CONVERSATION_PROMPT_VERSION="reply-classifier-v1";
@@ -132,6 +133,14 @@ export function heuristicClassification(subject:string,body:string):Classificati
   }
   if(has(/\b(anwalt|rechtsanwalt|abmahn|dsgvo|datenschutz|unzulässig|rechtswidrig|beschwerde|legal action|lawyer)\b/i)){
     return safetyPolicy({replyClass:"legal_complaint",confidence:0.91,rationale:"Rechtliche oder Datenschutz-Beschwerde erkannt.",recommendedAction:"legal_review",priority:"urgent",requiresHuman:true,draftReply:null});
+  }
+  // "Die Stelle ist noch NICHT besetzt" ist ein Bedarfssignal, keine Absage.
+  // Eine neutrale Sachauskunft zur offenen Stelle ist noch keine Kaufzusage.
+  if(/\b(?:nicht|noch nicht|weiterhin nicht)\s+(?:vollständig\s+)?besetzt\b/i.test(current)) {
+    return safetyPolicy({replyClass:"unknown",confidence:0.65,rationale:"Offene Stelle bestätigt, Verkaufsinteresse noch unklar.",recommendedAction:"human_review",priority:"high",requiresHuman:true,draftReply:null});
+  }
+  if(has(/\b(kein interesse|nicht interessiert|nicht interessant|kein bedarf|keinen bedarf|bitte nicht|danke,? nein)\b/i)) {
+    return safetyPolicy({replyClass:"not_interested",confidence:0.90,rationale:"Ablehnende Antwort erkannt.",recommendedAction:"close_loop",priority:"normal",requiresHuman:true,draftReply:null});
   }
   if(has(/\b(stelle|position|vakanz).{0,28}\b(besetzt|vergeben|geschlossen)\b|\bkein(?:en)? personalbedarf\b/i)){
     return safetyPolicy({replyClass:"already_filled",confidence:0.92,rationale:"Antwort deutet darauf hin, dass die Stelle bzw. der Bedarf bereits erledigt ist.",recommendedAction:"close_loop",priority:"normal",requiresHuman:true,draftReply:null});
@@ -488,6 +497,11 @@ async function persistClassification(input:{
        where workspace=$1 and id=$2`,
       ["default",input.thread.lead_id,safe.replyClass,safe.requiresHuman],
     );
+  }
+
+  if(assist&&["positive","meeting_intent","needs_information"].includes(safe.replyClass)){
+    await reflectInterestedReply({leadId:input.thread.lead_id,replyClass:safe.replyClass,messageId:input.message.provider_message_id||input.message.id})
+      .catch(error=>console.error("[conversation-crm] failed",error instanceof Error?error.message:"unknown"));
   }
 
   await recordOutboundEventByMode({

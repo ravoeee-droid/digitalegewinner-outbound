@@ -39,7 +39,8 @@ export function classifyInboxMessage(message: { from: string; subject: string; b
   // Bounces und automatische Empfangs-/Abwesenheitsmeldungen ins Nebenfach.
   if (/^(mailer-daemon|postmaster|noreply|no-reply|donotreply|do-not-reply)@/i.test(from)
     || /^(aw:\s*|re:\s*)?(automatische antwort|automatic reply|out of office|abwesenheitsnotiz|undeliverable|undelivered mail|mail delivery failed|delivery status notification|nicht zustellbar|unzustellbar|zustellung fehlgeschlagen)/i.test(subject)
-    || /^(ich bin (?:derzeit |aktuell )?nicht im (?:büro|haus)|i am (?:currently )?out of (?:the )?office|dies ist eine automatisch generierte (?:antwort|nachricht))/i.test(body)) {
+    || /^(ich bin (?:derzeit |aktuell )?nicht im (?:büro|haus)|i am (?:currently )?out of (?:the )?office|dies ist eine automatisch generierte (?:antwort|nachricht))/i.test(body)
+    || /(?:wir haben (?:ihre|deine) nachricht erhalten|wir werden uns schnellstmöglich (?:bei ihnen )?zurückmelden|vielen dank für ihre e-?mail[.,]?\s*(?:diese haben wir erhalten)?)/i.test(body) && /(?:wir haben|diese haben wir|werden uns schnellstmöglich)/i.test(body)) {
     return { category: "automatisch", label: "Automatische Nachricht", priority: "low", automatic: true, nextStep: "Automatische Meldung / Zustellfehler" };
   }
 
@@ -61,14 +62,14 @@ export function classifyInboxMessage(message: { from: string; subject: string; b
     return { category: "vermittler", label: "Missverständnis: Vermittlung", priority: "normal", automatic: false, nextStep: "Nicht mit einer Vermittlung verwechseln; Antwort persönlich prüfen" };
   }
 
+  if (/\b(kein interesse|keinerlei interesse|nicht interessiert|kein bedarf|aktuell kein bedarf|keinen bedarf|bitte nicht|kommt nicht infrage|kommt nicht in frage)\b/i.test(body)) {
+    return { category: "absage", label: "Absage / kein Bedarf", priority: "normal", automatic: false, nextStep: "Ablehnung respektieren; keine automatische Folge-Mail" };
+  }
   if (/\b(termin|gespräch|telefonat|interessiert|klingt gut|gerne mehr|ja gerne|schicken sie mir)\b/i.test(body)) {
     return { category: "interesse", label: "Interesse / Gespräch", priority: "high", automatic: false, nextStep: "Persönlich antworten oder Termin vereinbaren" };
   }
   if (/\b(mehr informationen|weitere informationen|unterlagen|weitere infos|wie funktioniert|details)\b/i.test(body)) {
     return { category: "information", label: "Informationsanfrage", priority: "high", automatic: false, nextStep: "Passende Informationen schicken" };
-  }
-  if (/\b(kein interesse|keinerlei interesse|nicht interessiert|kein bedarf|aktuell kein bedarf|keinen bedarf|bitte nicht|kommt nicht infrage|kommt nicht in frage)\b/i.test(body)) {
-    return { category: "absage", label: "Absage / kein Bedarf", priority: "normal", automatic: false, nextStep: "Ablehnung respektieren; keine automatische Folge-Mail" };
   }
   if (/\b(bereits einen anbieter|bereits eine agentur|bestehende lösung|machen wir intern|zu teuer|kein budget|später|nicht zuständig)\b/i.test(body)) {
     return { category: "einwand", label: "Einwand / Rückfrage", priority: "normal", automatic: false, nextStep: "Persönlich einschätzen und nachfassen, falls angemessen" };

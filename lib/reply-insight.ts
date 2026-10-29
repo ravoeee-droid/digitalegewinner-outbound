@@ -67,7 +67,7 @@ const LATER = /(noch\s?mal|erneut|wieder|später)\s+(schreiben|melden|anschreibe
 // complaints merely because their standard boilerplate mentions GDPR or revocation.
 export function isAutomaticAcknowledgement(subject:string,body:string):boolean {
   const automaticSubject=/^(?:aw:|re:|fw:|wg:)?\s*(?:automatische antwort|automatic reply|auto(?:matic)?[ -]?response|eingangsbestätigung|bestätigung des eingangs|abwesenheitsnotiz|out of office)/i.test(subject.trim());
-  const acknowledgement=/\b(?:bestätigen (?:wir )?(?:ihnen )?den eingang|eingang (?:ihrer|ihrer nachricht|ihrer bewerbung)|vielen dank für ihre (?:bewerbung|nachricht)|your message has been received|we have received your message)\b/i.test(body);
+  const acknowledgement=/\b(?:bestätigen (?:wir )?(?:ihnen )?den eingang|eingang (?:ihrer|ihrer nachricht|ihrer bewerbung)|vielen dank für ihre (?:bewerbung|nachricht)|wir haben ihre nachricht erhalten|werden uns schnellstmöglich bei ihnen zurückmelden|your message has been received|we have received your message)\b/i.test(body);
   return automaticSubject || acknowledgement;
 }
 export function analyzeReply(subject: string, body: string, now = new Date()) {
