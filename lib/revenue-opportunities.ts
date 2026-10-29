@@ -19,7 +19,7 @@ export const REVENUE_STAGES = [
 ] as const;
 
 export type RevenueStage = (typeof REVENUE_STAGES)[number];
-export type ProductKey = "pflege_recruiting" | "website" | "seo" | "automation";
+export type ProductKey = "pflege_recruiting" | "website" | "seo" | "automation" | "inbound_interest";
 
 export const PRODUCT_CATALOG: Record<ProductKey, {
   key: ProductKey;
@@ -30,6 +30,15 @@ export const PRODUCT_CATALOG: Record<ProductKey, {
   monthly: number;
   accent: string;
 }> = {
+  inbound_interest: {
+    key: "inbound_interest",
+    label: "Eingehender Interessent",
+    shortLabel: "Interessent",
+    description: "Eingegangene Antwort – Angebot und Bedarf noch qualifizieren",
+    setup: 0,
+    monthly: 0,
+    accent: "lime",
+  },
   pflege_recruiting: {
     key: "pflege_recruiting",
     label: "Pflege Social Recruiting",
@@ -275,6 +284,7 @@ function signalSummary(row: OpportunityRow) {
   const rawReasons = asArray(daily?.reasons).map(String).filter(Boolean);
   const jobs = Math.max(0, num(asObject(daily?.jobGrowth)?.relevantOpenJobs));
 
+  if (row.product_key === "inbound_interest") return "Hat auf die Ansprache reagiert · Gespräch persönlich qualifizieren";
   if (row.product_key === "website") {
     const label = text(intel.label);
     const category = text(intel.category);
