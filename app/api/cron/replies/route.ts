@@ -11,6 +11,8 @@ import { handleBookingMail } from "@/lib/appointments";
 import { sendAlert, sendAlertOnce } from "@/lib/alerts";
 import { dbExpiry } from "@/lib/db-expiry";
 import { analyzeReply, isAutomaticAcknowledgement } from "@/lib/reply-insight";
+import { reflectInterestedReply } from "@/lib/reply-crm-interest";
+import { currentReplyText } from "@/lib/inbox-classifier";
 
 export const runtime="nodejs";export const maxDuration=60;
 type State={leads?:Array<Record<string,unknown>>};
@@ -48,11 +50,12 @@ async function recordReply(messageId:string,from:string,subject:string,mailboxId
   [leadId],
  );
  const last=attribution[0];
- const optOut=detectExplicitOptOut(bodyText||subject);
+ const freshBody=currentReplyText(bodyText||subject);
+ const optOut=detectExplicitOptOut(freshBody);
  // A machine-generated acknowledgement is NOT an actionable sales reply.
  // Keep it for audit, but do not stop the sequence, elevate intent or block.
- if(!optOut.matched && isAutomaticAcknowledgement(subject,bodyText||"")
-    && !/(?:unerlaubte|unerwünschte)\s+werbung|abmahnung|rechtliche schritte|bitte\s+nicht mehr (?:anschreiben|kontaktieren)/i.test(bodyText)){
+ if(!optOut.matched && isAutomaticAcknowledgement(subject,freshBody)
+    && !/(?:unerlaubte|unerwünschte)\s+werbung|abmahnung|rechtliche schritte|bitte\s+nicht mehr (?:anschreiben|kontaktieren)/i.test(freshBody)){
    await query("insert into er_events(workspace,lead_id,type,meta) values('default',$1,'auto_reply',$2::jsonb)",
      [leadId,JSON.stringify({providerMessageId:messageId,from,subject,mailboxId,campaignId:last?.campaign_id||null,automatic:true})]);
    console.info("[replies] automated acknowledgement ignored for suppression and reply KPIs",{leadId});
@@ -63,7 +66,7 @@ async function recordReply(messageId:string,from:string,subject:string,mailboxId
   mailboxId,
   providerMessageId:messageId,
   subject,
-  bodyText:bodyText||subject,
+  bodyText:freshBody||subject,
   forcedClass:optOut.matched?"unsubscribe":null,
   metadata:{
    from,
@@ -137,11 +140,14 @@ async function recordReply(messageId:string,from:string,subject:string,mailboxId
  }
  await query("update er_outbox set status='stopped' where workspace='default' and lead_id=$1 and status='queued'",[leadId]);
  if(!optOut.matched){
-  const insight=analyzeReply(subject,bodyText||"");
+  const insight=analyzeReply(subject,freshBody);
   const highIntent=["positive","meeting_intent","needs_information"].includes(insight.replyClass);
   try{
    await query("update sales_leads set next_action=$2,next_action_at=$3,last_outcome=$4,updated_at=now() where id=$1 and workspace='default'",[leadId,insight.action,insight.due,insight.replyClass]);
    await query("insert into er_events(workspace,lead_id,type,meta) values('default',$1,'reply_classified',$2::jsonb)",[leadId,JSON.stringify({messageId,replyClass:insight.replyClass,label:insight.label,action:insight.action,due:insight.due?.toISOString()||null})]);
+   if(highIntent&&!insight.suppress){
+    await reflectInterestedReply({leadId,replyClass:insight.replyClass,messageId}).catch(error=>console.error("[reply-crm] failed",error instanceof Error?error.message:"unknown"));
+   }
    if(insight.suppress){
     await queryIfTable("insert into er_suppressions(workspace,email,reason) values('default',lower($1),$2) on conflict(workspace,email) do update set reason=excluded.reason",[from,insight.replyClass]);
     await query("update er_outbox set status='suppressed' where workspace='default' and lower(recipient)=lower($1) and status='queued'",[from]);
