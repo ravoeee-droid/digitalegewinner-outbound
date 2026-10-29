@@ -106,7 +106,7 @@ function summary(o: Opp) {
   return Array.isArray(s) ? s.map(String).join(" · ") : typeof s === "string" ? s : "";
 }
 
-export default function CRMWorkspace({ embedded = false, initialSegment = "pflege" }: { embedded?: boolean; initialSegment?: Segment }) {
+export default function CRMWorkspace({ embedded = false, initialSegment = "pflege", initialLeadId = null }: { embedded?: boolean; initialSegment?: Segment; initialLeadId?: string | null }) {
   const [snap, setSnap] = useState<Snapshot | null>(null);
   const [error, setError] = useState("");
   const [toast, setToast] = useState("");
@@ -115,7 +115,7 @@ export default function CRMWorkspace({ embedded = false, initialSegment = "pfleg
   const [segment, setSegment] = useState<Segment>(initialSegment);
   const [quick, setQuick] = useState<Quick>("all");
   const [allStages, setAllStages] = useState(false);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(initialLeadId);
   const [contactDraft, setContactDraft] = useState<ContactDraft | null>(null);
   const [contactBusy, setContactBusy] = useState(false);
   const [contactError, setContactError] = useState("");
@@ -220,7 +220,7 @@ export default function CRMWorkspace({ embedded = false, initialSegment = "pfleg
     return map;
   }, [filtered, stages]);
 
-  const selected = useMemo(() => all.find((o) => o.id === selectedId) || null, [all, selectedId]);
+  const selected = useMemo(() => all.find((o) => o.id === selectedId || o.lead_id === selectedId) || null, [all, selectedId]);
   const selectedEmail = selected?.contacts.find((contact) => contact.is_primary && contact.email)?.email ||
     selected?.contacts.find((contact) => contact.email)?.email || selected?.email || "";
 
