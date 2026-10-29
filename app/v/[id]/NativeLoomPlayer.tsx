@@ -5,8 +5,8 @@ import styles from "./page.module.css";
 import { track } from "./track";
 import VideoPlayer from "./VideoBubble";
 
-export default function NativeLoomPlayer({src,screenshot,company,posterId}:{
-  src:string;screenshot:string;company:string;posterId:string;
+export default function NativeLoomPlayer({src,screenshot,company,posterId,debug=false}:{
+  src:string;screenshot:string;company:string;posterId:string;debug?:boolean;
 }) {
   const video=useRef<HTMLVideoElement>(null);
   const [started,setStarted]=useState(false);
@@ -88,7 +88,12 @@ export default function NativeLoomPlayer({src,screenshot,company,posterId}:{
   // Never leave prospects stranded on a broken MP4: retain the existing
   // YouTube facecam as an explicit fallback, with its own 3-second tracking.
   if(youtubeFallback && validYoutube)
-    return <VideoPlayer youtubeId={posterId} screenshot={screenshot} company={company} autoStart/>;
+    return <div>
+      <VideoPlayer youtubeId={posterId} screenshot={screenshot} company={company} autoStart/>
+      {debug && <p role="status" data-testid="native-mp4-diagnostic" style={{fontSize:13,color:"#a00000",padding:8}}>
+        Native MP4 failed: {error||"Unknown error"}; ready={video.current?.readyState??"n/a"}; network={video.current?.networkState??"n/a"}; time={video.current?.currentTime??"n/a"}
+      </p>}
+    </div>;
 
   return <div role="group" aria-label={`Persönliches Video für ${company}`}>
     <div className={styles.player}>
