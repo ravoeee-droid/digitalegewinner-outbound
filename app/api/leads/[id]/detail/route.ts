@@ -53,7 +53,11 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     const p = String(event.meta?.p || "");
     let title = EVENT_LABELS[event.type] || "";
     let detail = "";
-    if (event.type === "video_progress") title = `Video zu ${v} % gesehen`;
+    if (event.type === "video_explainer_open") title = "Erklärvideo geöffnet";
+    else if (event.type === "video_explainer_play_confirmed") title = "Erklärvideo mindestens 3 Sekunden abgespielt";
+    else if (event.type === "video_explainer_progress") title = `Erklärvideo zu ${v} % gesehen`;
+    else if (["video_explainer_calendar_click", "video_explainer_calendar_focus"].includes(event.type)) title = "Kalender nach Erklärvideo angeklickt";
+    else if (event.type === "video_progress") title = `Video zu ${v} % gesehen`;
     else if (event.type === "video_watch") title = `Video angesehen: ${v} s`;
     else if (event.type === "video_scroll") title = `Videoseite gescrollt (${v} %)`;
     else if (event.type === "video_dwell") title = `Verweildauer auf der Videoseite: ${v} s`;

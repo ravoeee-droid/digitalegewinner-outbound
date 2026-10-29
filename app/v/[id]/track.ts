@@ -1,7 +1,10 @@
 let token = "";
+let explainerPlayed = false;
+export function markExplainerPlayed() { explainerPlayed = true; }
+export function trackExplainerCalendarFocus() { if (explainerPlayed) track("explainer_calendar_focus"); }
 let variant: "A" | "B" = "A";
 export function setTrackVariant(value: "A" | "B") { variant = value; }
-export function setTrackToken(value: string) { token = value; }
+export function setTrackToken(value: string) { if (token !== value) explainerPlayed = false; token = value; }
 
 // Sendet ein Ereignis an die Auswertung; läuft auch beim Schließen der Seite (sendBeacon).
 export function track(event: string, value = 0, diagnostic?: {source?: "native" | "youtube"; ready?: number; network?: number; position?: number; visibility?: string}) {

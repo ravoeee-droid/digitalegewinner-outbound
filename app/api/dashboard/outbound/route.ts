@@ -115,6 +115,28 @@ export async function GET(request: Request) {
       limit 20
     `,[selected]);
 
+    const [explainer] = await query<{opened:number;started:number;quarter:number;half:number;three_quarters:number;completed:number;calendar:number}>(`
+      with cohort as (
+        select lead_id,min(sent_at) first_sent from er_outbox o
+        where workspace='default' and status='sent' and campaign_id=any($1::text[])
+          and not exists(select 1 from outbound_tracking_exclusions x where x.workspace=o.workspace and x.lead_id=o.lead_id)
+        group by lead_id
+      ), signals as (
+        select c.lead_id,
+          bool_or(e.type='video_explainer_open') opened,
+          bool_or(e.type='video_explainer_play_confirmed') started,
+          max(coalesce((e.meta->>'v')::int,0)) filter(where e.type='video_explainer_progress') progress,
+          bool_or(e.type in ('video_explainer_calendar_click','video_explainer_calendar_focus')) calendar
+        from cohort c join er_events e on e.workspace='default' and e.lead_id=c.lead_id
+          and e.created_at>=c.first_sent and e.created_at>=now()-interval '7 days'
+          and coalesce((e.meta->>'bot')::boolean,false)=false
+          and e.type like 'video_explainer_%'
+        group by c.lead_id
+      ) select count(*) filter(where opened)::int opened,count(*) filter(where started)::int started,
+        count(*) filter(where progress>=25)::int quarter,count(*) filter(where progress>=50)::int half,
+        count(*) filter(where progress>=75)::int three_quarters,count(*) filter(where progress>=100)::int completed,
+        count(*) filter(where calendar)::int calendar from signals
+    `,[selected]);
     const totals = sent.reduce((sum,row)=>({
       sent_today:sum.sent_today+row.sent_today,sent7:sum.sent7+row.sent7,queued:sum.queued+row.queued,
       failed:sum.failed+row.failed,opened:sum.opened+row.opened,clicked:sum.clicked+row.clicked,
@@ -123,7 +145,7 @@ export async function GET(request: Request) {
       completed:sum.completed+row.completed,booking:sum.booking+row.booking,replied:sum.replied+row.replied,
       meetings:sum.meetings+row.meetings
     }),{sent_today:0,sent7:0,queued:0,failed:0,opened:0,clicked:0,page_viewed:0,started:0,quarter:0,half:0,three_quarters:0,completed:0,booking:0,replied:0,meetings:0});
-    return Response.json({segment,goal:segment==='all'?300:150,totals,segments:sent,hot,as_of:new Date().toISOString()}, {headers:{"cache-control":"no-store"}});
+    return Response.json({segment,goal:segment==='all'?300:150,totals,explainer,segments:sent,hot,as_of:new Date().toISOString()}, {headers:{"cache-control":"no-store"}});
   } catch(error) {
     console.error("[outbound-cockpit]",error);
     return Response.json({error:"Performance-Cockpit konnte nicht geladen werden."},{status:503,headers:{"cache-control":"no-store"}});

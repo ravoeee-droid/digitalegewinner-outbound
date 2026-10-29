@@ -29,6 +29,11 @@
   },
   "blockers": [
     {
+      "surface": "explainerVideoTracking",
+      "peer": "CLIENT-WALKENHORST",
+      "detail": "DG adds separate YouTube explainer events through signed /api/t/video tokens and er_events. Read-only inspection of peer components/video-engagement-tracker.tsx found energy_video_events keyed by public video_page_id, native media/custom events, and no equivalent optional YouTube explainer or DG token route. A direct port would not attach to a real peer explainer surface. Peer runtime/data remain unchanged; parity is not claimed."
+    },
+    {
       "id": "cloudflare-d1-runtime-port-2026-10-16",
       "surface": "cloudflareD1Persistence",
       "peer": "CLIENT-WALKENHORST",

@@ -17,7 +17,8 @@ export async function POST(request: Request) {
   try { body = JSON.parse(await request.text()); } catch { return new Response(null, { status: 204, headers: CORS }); }
   const leadId = verifyVideoToken(String(body.t || ""));
   const type = String(body.e || "");
-  if (!leadId || !TYPES.has(type)) return new Response(null, { status: 204, headers: CORS });
+  const explainerTypes = new Set(["explainer_open", "explainer_play_confirmed", "explainer_progress", "explainer_calendar_click", "explainer_calendar_focus"]);
+  if (!leadId || (!TYPES.has(type) && !explainerTypes.has(type))) return new Response(null, { status: 204, headers: CORS });
   const value = Math.max(0, Math.min(100000, Math.round(Number(body.v) || 0)));
   const arm = String(body.a || "").toUpperCase() === "B" ? "B" : "A";
   // Active interactions (play, progress, calendar, etc.) must not be
@@ -44,7 +45,8 @@ export async function POST(request: Request) {
     visibility: d.visibility === "visible" || d.visibility === "hidden" ? d.visibility : undefined,
   } : undefined;
   await query("insert into er_events(workspace,lead_id,type,meta) values('default',$1,$2,$3::jsonb)", [leadId, `video_${type}`, JSON.stringify({ v: value, bot, a: arm, p: String(body.p || "").replace(/[^a-zA-Z0-9/_.#:-]/g, "").slice(0, 80), session: /^[0-9a-f-]{36}$/i.test(String(body.sid||"")) ? body.sid : null, diagnostic, clientTs: Number.isFinite(Number(body.ts)) && Math.abs(Date.now()-Number(body.ts)) < 86400000 ? Math.floor(Number(body.ts)) : null })]).catch(() => null);
-  const shouldNotify = type === "play_confirmed" || (type === "progress" && value >= 50)
+  const shouldNotify = type === "explainer_play_confirmed" || (type === "explainer_progress" && value >= 50)
+    || type === "play_confirmed" || (type === "progress" && value >= 50)
     || type === "booking_click" || type === "calendar_focus" || type === "calendar_open"
     || type === "whatsapp_click" || type === "chat_open" || type === "site_click"
     || (type === "site_dwell" && value >= 10);
@@ -56,6 +58,8 @@ export async function POST(request: Request) {
     ).catch(() => []);
     const name = row?.company || `Lead ${leadId}`;
     const message =
+      type === "explainer_play_confirmed" ? `▶️ Erklärvideo mindestens 3 Sekunden abgespielt: ${name}` :
+      type === "explainer_progress" ? `🔥 Erklärvideo zu ${value} % gesehen: ${name}` :
       type === "play_confirmed" ? `▶️ Video mindestens 3 Sekunden abgespielt: ${name}` :
       type === "progress" && value >= 50 ? `🔥 Video zu ${value} % gesehen: ${name}` :
       type === "booking_click" ? `📅 Klick auf "Termin buchen": ${name}` :
@@ -65,7 +69,7 @@ export async function POST(request: Request) {
       type === "chat_open" ? `🤖 Chat geöffnet: ${name}` :
       type === "site_dwell" && value >= 10 ? `🌐 ${name} war mindestens ${value} Sekunden auf der Website: ${String(body.p || "/").slice(0, 60)}` :
       type === "site_click" ? `🖱️ ${name} hat auf der Website geklickt: ${String(body.p || "").slice(0, 60)}` : "";
-    if (message) await sendAlertOnce(`video:${type}${type === "progress" ? value : ""}${type.startsWith("site_") ? String(body.p || "") : ""}:${leadId}`, message, type.startsWith("site_") ? 12 : 24 * 30).catch(() => null);
+    if (message) await sendAlertOnce(`video:${type}${type.endsWith("progress") ? value : ""}${type.startsWith("site_") ? String(body.p || "") : ""}:${leadId}`, message, type.startsWith("site_") ? 12 : 24 * 30).catch(() => null);
   }
   return new Response(null, { status: 204, headers: CORS });
 }

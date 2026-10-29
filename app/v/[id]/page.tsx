@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { notFound } from "next/navigation";
 import VideoPlayer from "./VideoBubble";
 import NativeLoomPlayer from "./NativeLoomPlayer";
+import ExplainerVideo from "./ExplainerVideo";
 import { getLoomVideoUrl } from "@/lib/loom-assets";
 import PageTracker from "./PageTracker";
 import { WHATSAPP_NUMBER } from "@/lib/video-chat";
@@ -191,7 +192,7 @@ export default async function VideoPage({ params, searchParams }: { params: Prom
                 <span aria-hidden="true" className={styles.explainerChevron}>⌄</span>
               </summary>
               <div className={styles.explainerPlayback}>
-                <iframe src={explainerVideoUrl} title={isPv ? "PV-Trust – Das System in 3 Minuten erklärt" : "Pflege-Recruiting – Das System erklärt"} loading="lazy" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerPolicy="strict-origin-when-cross-origin" allowFullScreen />
+                <ExplainerVideo src={explainerVideoUrl} title={isPv ? "PV-Trust – Das System in 3 Minuten erklärt" : "Pflege-Recruiting – Das System erklärt"} />
                 <a href="#termin" className={styles.explainerBottomCta}>Kostenloses 15-Minuten-Gespräch vereinbaren ↗</a>
               </div>
             </details>

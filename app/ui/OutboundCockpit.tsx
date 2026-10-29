@@ -7,7 +7,7 @@ import styles from "./OutboundCockpit.module.css";
 type Segment = "all"|"pflege"|"pv";
 type Totals = {sent_today:number;sent7:number;queued:number;failed:number;opened:number;clicked:number;page_viewed:number;started:number;quarter:number;half:number;three_quarters:number;completed:number;booking:number;replied:number;meetings:number};
 type Hot = {lead_id:string;segment:"pflege"|"pv";company:string;city:string|null;phone:string|null;score:number;plays:number;progress:number;booking:boolean;replied:boolean;restricted:boolean;last_signal:string};
-type ResponseData={segment:Segment;goal:number;totals:Totals;segments:Array<Totals&{segment:"pflege"|"pv";next_at:string|null}>;hot:Hot[];as_of:string};
+type ResponseData={segment:Segment;goal:number;totals:Totals;explainer?:{opened:number;started:number;quarter:number;half:number;three_quarters:number;completed:number;calendar:number};segments:Array<Totals&{segment:"pflege"|"pv";next_at:string|null}>;hot:Hot[];as_of:string};
 const number = (value:number)=>new Intl.NumberFormat("de-DE").format(value||0);
 const rate=(count:number,denominator:number)=>denominator>0?((count/denominator)*100).toLocaleString("de-DE",{maximumFractionDigits:1})+" %":"–";
 
@@ -26,7 +26,7 @@ export default function OutboundCockpit(){
         if(alive){setData(payload);setError("");setLoading(false);}
       }catch(e){if(alive){setError(e instanceof Error?e.message:"Datenfehler");setLoading(false);}}
     }
-    setLoading(true);void load();
+    void load();
     const timer=setInterval(()=>{void load();},45000);
     return ()=>{alive=false;clearInterval(timer);};
   },[segment]);
@@ -46,7 +46,7 @@ export default function OutboundCockpit(){
     <div className={styles.head}>
       <div><span className={styles.eyebrow}>LIVE PERFORMANCE · LOOM OUTBOUND</span><h2>Vertriebs-Cockpit</h2><p>Von der personalisierten E-Mail zum konkreten Gespräch. Automatisch alle 45 Sekunden aktualisiert.</p></div>
       <div className={styles.filters} role="group" aria-label="Geschäftsfeld wählen">
-        {([["all","Gesamt"],["pflege","Pflege"],["pv","PV-Trust"]] as const).map(([value,label])=><button key={value} type="button" onClick={()=>setSegment(value)} className={segment===value?styles.active:""} aria-pressed={segment===value}>{label}</button>)}
+        {([["all","Gesamt"],["pflege","Pflege"],["pv","PV-Trust"]] as const).map(([value,label])=><button key={value} type="button" onClick={()=>{if(value!==segment){setLoading(true);setSegment(value);}}} className={segment===value?styles.active:""} aria-pressed={segment===value}>{label}</button>)}
       </div>
     </div>
     {error&&<p className={styles.error} role="alert">{error}</p>}
@@ -72,6 +72,18 @@ export default function OutboundCockpit(){
           <span>{number(s.started)} Videostarts</span>
           <div className={styles.meter}><i style={{width:Math.min(100,s.sent_today/150*100)+"%"}}/></div>
         </div>)}
+      </div>}
+      {data.explainer && <div className={styles.panel}>
+        <div className={styles.panelHead}><h3>Erklärvideo · separat ausgewertet</h3><span>Eindeutige Leads · 7 Tage</span></div>
+        <div className={styles.statusList}>
+          {([
+            ["Geöffnet",data.explainer.opened],["Mindestens 3 Sekunden abgespielt",data.explainer.started],
+            ["25 % angesehen",data.explainer.quarter],["50 % angesehen",data.explainer.half],
+            ["75 % angesehen",data.explainer.three_quarters],["100 % angesehen",data.explainer.completed],
+            ["Anschließend Kalender angeklickt",data.explainer.calendar],
+          ] as const).map(([label,value])=><div key={label}><span>{label}</span><strong>{number(value)}</strong></div>)}
+        </div>
+        <p className={styles.note}>Tracking ab Einführung. Die Werte gehören zum zusätzlichen Erklärvideo. Ein anschließender Kalenderklick zeigt die Reihenfolge, keine bestätigte Buchung oder bewiesene Wirkung.</p>
       </div>}
       <div className={styles.columns}>
         <div className={styles.panel}>

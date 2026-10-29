@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { setTrackToken, setTrackVariant, track } from "./track";
+import { setTrackToken, setTrackVariant, track, trackExplainerCalendarFocus } from "./track";
 
 // Misst: Seite geöffnet, Scrolltiefe, Verweildauer (nur bei sichtbarem Tab), Klick auf "Termin buchen", Kalender angeklickt.
 export default function PageTracker({ token, variant = "A" }: { token: string; variant?: "A" | "B" }) {
@@ -30,7 +30,7 @@ export default function PageTracker({ token, variant = "A" }: { token: string; v
     };
     let focusSent = false;
     const onBlur = () => window.setTimeout(() => {
-      if (!focusSent && document.activeElement instanceof HTMLIFrameElement && document.activeElement.title.startsWith("Terminbuchung")) { focusSent = true; track("calendar_focus"); }
+      if (!focusSent && document.activeElement instanceof HTMLIFrameElement && document.activeElement.title.startsWith("Terminbuchung")) { focusSent = true; track("calendar_focus"); trackExplainerCalendarFocus(); }
     }, 50);
     window.addEventListener("scroll", onScroll, { passive: true });
     window.addEventListener("pagehide", flush);
