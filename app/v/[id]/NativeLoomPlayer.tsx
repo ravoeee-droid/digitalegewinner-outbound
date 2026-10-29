@@ -5,14 +5,15 @@ import styles from "./page.module.css";
 import { track } from "./track";
 import VideoPlayer from "./VideoBubble";
 
-export default function NativeLoomPlayer({src,screenshot,company,posterId}:{
-  src:string;screenshot:string;company:string;posterId:string;
+export default function NativeLoomPlayer({src,screenshot,company,posterId,debug=false}:{
+  src:string;screenshot:string;company:string;posterId:string;debug?:boolean;
 }) {
   const video=useRef<HTMLVideoElement>(null);
   const [started,setStarted]=useState(false);
   const [playing,setPlaying]=useState(false);
   const [error,setError]=useState("");
   const [youtubeFallback,setYoutubeFallback]=useState(false);
+  const [probe,setProbe]=useState("");
   const validYoutube=/^[A-Za-z0-9_-]{11}$/.test(posterId);
   const milestones=useRef(new Set<number>());
   const startedTrack=useRef(false);
@@ -85,10 +86,44 @@ export default function NativeLoomPlayer({src,screenshot,company,posterId}:{
     }
   }
 
+  // Preview-only differential diagnosis: compare the streamed response with
+  // a fully buffered Blob and inspect metadata. Never fetch the full asset in
+  // production; this is enabled only on the protected preview deployment.
+  useEffect(()=>{
+    if(!debug || !youtubeFallback)return;
+    let cancelled=false;
+    (async()=>{
+      try{
+        const response=await fetch(src,{headers:{Range:"bytes=0-"}});
+        const bytes=await response.arrayBuffer();
+        if(cancelled)return;
+        const test=document.createElement("video");
+        const blobUrl=URL.createObjectURL(new Blob([bytes],{type:"video/mp4"}));
+        test.preload="metadata";
+        const mediaResult=await new Promise<string>(resolve=>{
+          const timeout=window.setTimeout(()=>resolve("metadata_timeout"),8000);
+          test.onloadedmetadata=()=>{clearTimeout(timeout);resolve("metadata_ok duration="+test.duration);};
+          test.onerror=()=>{clearTimeout(timeout);resolve("metadata_error code="+(test.error?.code??0));};
+          test.src=blobUrl;
+        });
+        URL.revokeObjectURL(blobUrl);
+        if(!cancelled)setProbe("HTTP "+response.status+" received="+bytes.byteLength+" length="+response.headers.get("content-length")+" range="+response.headers.get("content-range")+" buffered="+mediaResult+" canPlay="+test.canPlayType('video/mp4; codecs="avc1.64001f"'));
+      }catch(err){
+        if(!cancelled)setProbe("fetch_error "+(err instanceof Error?err.message:String(err)));
+      }
+    })();
+    return ()=>{cancelled=true;};
+  },[debug,youtubeFallback,src]);
+
   // Never leave prospects stranded on a broken MP4: retain the existing
   // YouTube facecam as an explicit fallback, with its own 3-second tracking.
   if(youtubeFallback && validYoutube)
-    return <VideoPlayer youtubeId={posterId} screenshot={screenshot} company={company} autoStart/>;
+    return <div>
+      <VideoPlayer youtubeId={posterId} screenshot={screenshot} company={company} autoStart/>
+      {debug && <p role="status" data-testid="native-mp4-diagnostic" style={{fontSize:13,color:"#a00000",padding:8}}>
+        Native MP4 failed: {error||"Unknown error"}; ready={video.current?.readyState??"n/a"}; network={video.current?.networkState??"n/a"}; time={video.current?.currentTime??"n/a"}; {probe||"probe pending"}
+      </p>}
+    </div>;
 
   return <div role="group" aria-label={`Persönliches Video für ${company}`}>
     <div className={styles.player}>

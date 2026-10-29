@@ -122,7 +122,7 @@ export default async function VideoPage({ params, searchParams }: { params: Prom
             {(hasVertical&&Boolean(videoId))||token==="demo" ? (
               mp4Url ? (
                 <NativeLoomPlayer src={mp4Url} screenshot={data.screenshot} company={data.company}
-                  posterId={token==="demo"?(mainVideoId||data.youtubeId):videoId}/>
+                  posterId={token==="demo"?(mainVideoId||data.youtubeId):videoId} debug={process.env.VERCEL_ENV==="preview"}/>
               ) : (
                 <VideoPlayer
                   youtubeId={token==="demo"?(mainVideoId||data.youtubeId):videoId}
