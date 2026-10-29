@@ -8,6 +8,7 @@ import { replyClassSchema, type ReplyClass } from "@/lib/outbound-contracts";
 import { resolveOutboundRuntimeConfig } from "@/lib/outbound-runtime-config";
 import { createComplianceSuppression } from "@/lib/outbound-compliance-engine";
 import { classifyInboxMessage, currentReplyText } from "@/lib/inbox-classifier";
+import { reflectInterestedReply } from "@/lib/reply-crm-interest";
 
 export const CONVERSATION_POLICY_VERSION="dg-conversation-2026-09-27-v1";
 export const CONVERSATION_PROMPT_VERSION="reply-classifier-v1";
@@ -488,6 +489,11 @@ async function persistClassification(input:{
        where workspace=$1 and id=$2`,
       ["default",input.thread.lead_id,safe.replyClass,safe.requiresHuman],
     );
+  }
+
+  if(assist&&["positive","meeting_intent","needs_information"].includes(safe.replyClass)){
+    await reflectInterestedReply({leadId:input.thread.lead_id,replyClass:safe.replyClass,messageId:input.message.provider_message_id||input.message.id})
+      .catch(error=>console.error("[conversation-crm] failed",error instanceof Error?error.message:"unknown"));
   }
 
   await recordOutboundEventByMode({
