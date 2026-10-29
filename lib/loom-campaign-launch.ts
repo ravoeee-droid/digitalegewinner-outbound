@@ -149,6 +149,74 @@ export async function diagnoseLoomReadiness() {
   return out;
 }
 
+
+// A verified permission may arrive after a personalized Loom draft was created.
+// Do not lose that draft (or create another): promote it idempotently on a later
+// planner run, but never infer consent from CRM membership or campaign approval.
+async function promoteVerifiedLoomDrafts() {
+  const promoted:Record<Segment,number>={pflege:0,pv:0};
+  const rows=await query<{id:string;lead_id:string;recipient:string;campaign_id:string}>(
+    `select o.id::text id,o.lead_id,o.recipient,o.campaign_id
+     from er_outbox o
+     join sales_leads l on l.workspace=o.workspace and l.id=o.lead_id
+     join sales_contacts ct on ct.workspace=l.workspace and ct.id=l.contact_id
+     where o.workspace='default'
+       and o.status='draft'
+       and o.campaign_id in ('pflege-loom-150-v1','pv-loom-150-v1')
+       and (o.created_at at time zone 'Europe/Berlin')::date =
+           (now() at time zone 'Europe/Berlin')::date
+       and l.status='active' and l.stage in ('Neu','Research','Bereit')
+       and coalesce(l.do_not_contact,false)=false
+       and lower(trim(ct.email))=lower(trim(o.recipient))
+       and exists(select 1 from outbound_contact_permissions p
+         where p.workspace=o.workspace and p.channel='email'
+           and p.status='verified' and p.revoked_at is null
+           and (p.contact_id=l.contact_id or p.company_id=l.company_id)
+           and (p.valid_from is null or p.valid_from<=now())
+           and (p.valid_until is null or p.valid_until>=now()))
+       and not exists(select 1 from er_suppressions s
+         where s.workspace=o.workspace and lower(s.email)=lower(o.recipient))
+       and not exists(select 1 from outbound_compliance_suppressions s
+         where s.workspace=o.workspace and s.channel='email'
+           and s.status='active' and lower(s.identifier)=lower(o.recipient))
+       and not exists(select 1 from er_outbox prior
+         where prior.workspace=o.workspace and prior.id<>o.id
+           and (prior.lead_id=o.lead_id or lower(prior.recipient)=lower(o.recipient))
+           and prior.status in ('sent','queued','sending'))
+       and not exists(select 1 from er_events e
+         where e.workspace=o.workspace and e.lead_id=o.lead_id
+           and e.type in ('reply','positive_reply','appointment','bounce'))
+       and exists(select 1 from lead_screenshots sc
+         where sc.lead_id=o.lead_id and sc.status='ok')
+     order by o.created_at
+     limit 300`,
+  );
+  for(const row of rows){
+    const segment:Segment=row.campaign_id===LOOM_CAMPAIGNS.pv?"pv":"pflege";
+    if(segment==="pv"&&PV_CAREER_RECIPIENT.test(row.recipient))continue;
+    // Evaluate the full jurisdiction/basis policy immediately before queuing.
+    const compliance=await evaluateEmailSendCompliance(row.lead_id,row.recipient).catch(()=>null);
+    if(!compliance?.decision.allowed)continue;
+    const updated=await query<{id:string}>(
+      `update er_outbox o set status='queued',scheduled_at=greatest(o.scheduled_at,now()),error=null
+       where o.id=$1::uuid and o.status='draft'
+         and not exists(select 1 from er_outbox prior
+           where prior.workspace=o.workspace and prior.id<>o.id
+             and (prior.lead_id=o.lead_id or lower(prior.recipient)=lower(o.recipient))
+             and prior.status in ('sent','queued','sending'))
+         and not exists(select 1 from er_suppressions s
+           where s.workspace=o.workspace and lower(s.email)=lower(o.recipient))
+         and not exists(select 1 from outbound_compliance_suppressions s
+           where s.workspace=o.workspace and s.channel='email'
+             and s.status='active' and lower(s.identifier)=lower(o.recipient))
+       returning o.id::text id`,
+      [row.id],
+    );
+    if(updated.length)promoted[segment]++;
+  }
+  return promoted;
+}
+
 export async function ensureLoomCampaigns() {
   // Old sequences must not survive the switch.
   const [old] = await query<{n:string}>(
@@ -195,6 +263,15 @@ export async function ensureLoomCampaigns() {
       if(allowed)result[segment].queued++;
     }
     result[segment].reason=result[segment].queued>0?"queued":result[segment].prepared>0?"drafts_prepared_awaiting_legal_permission":"no_screenshot_ready_unsent_recipients";
+  }
+  // A legal permission can be reviewed after initial draft creation.
+  // Promote only those drafts that independently pass the send-policy gate.
+  const promoted=mailboxes.length?await promoteVerifiedLoomDrafts():{pflege:0,pv:0};
+  for(const segment of ["pflege","pv"] as const){
+    if(promoted[segment]){
+      result[segment].queued+=promoted[segment];
+      result[segment].reason="verified_drafts_queued";
+    }
   }
   await writeCampaignDashboard({
     pflege:result.pflege.queued,
