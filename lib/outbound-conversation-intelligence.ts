@@ -134,6 +134,14 @@ export function heuristicClassification(subject:string,body:string):Classificati
   if(has(/\b(anwalt|rechtsanwalt|abmahn|dsgvo|datenschutz|unzulässig|rechtswidrig|beschwerde|legal action|lawyer)\b/i)){
     return safetyPolicy({replyClass:"legal_complaint",confidence:0.91,rationale:"Rechtliche oder Datenschutz-Beschwerde erkannt.",recommendedAction:"legal_review",priority:"urgent",requiresHuman:true,draftReply:null});
   }
+  // "Die Stelle ist noch NICHT besetzt" ist ein Bedarfssignal, keine Absage.
+  // Eine neutrale Sachauskunft zur offenen Stelle ist noch keine Kaufzusage.
+  if(/\b(?:nicht|noch nicht|weiterhin nicht)\s+(?:vollständig\s+)?besetzt\b/i.test(current)) {
+    return safetyPolicy({replyClass:"unknown",confidence:0.65,rationale:"Offene Stelle bestätigt, Verkaufsinteresse noch unklar.",recommendedAction:"human_review",priority:"high",requiresHuman:true,draftReply:null});
+  }
+  if(has(/\b(kein interesse|nicht interessiert|nicht interessant|kein bedarf|keinen bedarf|bitte nicht|danke,? nein)\b/i)) {
+    return safetyPolicy({replyClass:"not_interested",confidence:0.90,rationale:"Ablehnende Antwort erkannt.",recommendedAction:"close_loop",priority:"normal",requiresHuman:true,draftReply:null});
+  }
   if(has(/\b(stelle|position|vakanz).{0,28}\b(besetzt|vergeben|geschlossen)\b|\bkein(?:en)? personalbedarf\b/i)){
     return safetyPolicy({replyClass:"already_filled",confidence:0.92,rationale:"Antwort deutet darauf hin, dass die Stelle bzw. der Bedarf bereits erledigt ist.",recommendedAction:"close_loop",priority:"normal",requiresHuman:true,draftReply:null});
   }
