@@ -3,11 +3,11 @@
   "crons": [
     {
       "path": "/api/cron/appointment-goal",
-      "schedule": "10 6-16 * * 1-5"
+      "schedule": "10 6-16 * * 1-6"
     },
     {
       "path": "/api/cron/send",
-      "schedule": "*/15 6-16 * * 1-5"
+      "schedule": "*/15 6-16 * * 1-6"
     },
     {
       "path": "/api/cron/replies",
@@ -15,43 +15,43 @@
     },
     {
       "path": "/api/cron/enrich-call-leads",
-      "schedule": "0 6-16/2 * * 1-5"
+      "schedule": "0 6-16/2 * * 1-6"
     },
     {
       "path": "/api/cron/daily-report",
-      "schedule": "0 16 * * 1-5"
+      "schedule": "0 16 * * 1-6"
     },
     {
       "path": "/api/cron/ba-leads",
-      "schedule": "5,35 5-15 * * 1-5"
+      "schedule": "5,35 5-15 * * 1-6"
     },
     {
       "path": "/api/cron/pv-pool",
-      "schedule": "20,50 5-15 * * 1-5"
+      "schedule": "20,50 5-15 * * 1-6"
     },
     {
       "path": "/api/cron/pflege-enrich",
-      "schedule": "10,40 5-15 * * 1-5"
+      "schedule": "10,40 5-15 * * 1-6"
     },
     {
       "path": "/api/cron/pflege-pool",
-      "schedule": "25,55 5-15 * * 1-5"
+      "schedule": "25,55 5-15 * * 1-6"
     },
     {
       "path": "/api/cron/pflege-sites",
-      "schedule": "15,45 5-15 * * 1-5"
+      "schedule": "15,45 5-15 * * 1-6"
     },
     {
       "path": "/api/cron/screenshots",
-      "schedule": "0,30 5-15 * * 1-5"
+      "schedule": "0,30 5-15 * * 1-6"
     },
     {
       "path": "/api/cron/contacts-enrich",
-      "schedule": "20,50 5-17 * * 1-5"
+      "schedule": "20,50 5-17 * * 1-6"
     },
     {
       "path": "/api/cron/pflege-source",
-      "schedule": "0 6-15/3 * * 1-5"
+      "schedule": "0 6-15/3 * * 1-6"
     },
     {
       "path": "/api/cron/pv-whatsapp",
@@ -59,7 +59,7 @@
     },
     {
       "path": "/api/cron/loom-campaigns",
-      "schedule": "7,37 6-16 * * 1-5"
+      "schedule": "7,37 6-16 * * 1-6"
     }
   ],
   "regions": [

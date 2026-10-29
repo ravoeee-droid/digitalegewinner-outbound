@@ -40,7 +40,6 @@ export function classifyInboxMessage(message: { from: string; subject: string; b
   if (/^(mailer-daemon|postmaster|noreply|no-reply|donotreply|do-not-reply)@/i.test(from)
     || /^(aw:\s*|re:\s*)?(automatische antwort|automatic reply|out of office|abwesenheitsnotiz|undeliverable|undelivered mail|mail delivery failed|delivery status notification|nicht zustellbar|unzustellbar|zustellung fehlgeschlagen)/i.test(subject)
     || /^(ich bin (?:derzeit |aktuell )?nicht im (?:büro|haus)|i am (?:currently )?out of (?:the )?office|dies ist eine automatisch generierte (?:antwort|nachricht))/i.test(body)
-    || /(?:vielen dank für ihre bewerbung|wir bestätigen den eingang ihrer bewerbung|wir haben ihre unterlagen erhalten)/i.test(body)
     || /(?:wir haben (?:ihre|deine) nachricht erhalten|wir werden uns schnellstmöglich (?:bei ihnen )?zurückmelden|vielen dank für ihre e-?mail[.,]?\s*(?:diese haben wir erhalten)?)/i.test(body) && /(?:wir haben|diese haben wir|werden uns schnellstmöglich)/i.test(body)) {
     return { category: "automatisch", label: "Automatische Nachricht", priority: "low", automatic: true, nextStep: "Automatische Meldung / Zustellfehler" };
   }

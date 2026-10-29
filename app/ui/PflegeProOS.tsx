@@ -668,7 +668,7 @@ export default function PflegeProOS() {
                 {variants.length > 1 && <p className={styles.campaignAb}>Betreffzeilen-Test: {variants.map((v) => `${v.variant}: ${v.sent} gesendet, ${v.replies} Antworten${v.sent ? ` (${Math.round(v.replies / v.sent * 100)} %)` : ""}`).join("  ·  ")}</p>}
                 <footer className={styles.campaignFoot}>
                   <button className={styles.primaryButton} type="button" onClick={() => void launchCampaign(campaign)} disabled={busy === campaign.id} title={campaign.status === "Aktiv" ? "Bereits eingeplante Leads werden übersprungen, nur neue Leads kommen dazu." : undefined}>{busy === campaign.id ? "Startet …" : campaign.status === "Aktiv" ? "Neue Leads einplanen" : "Kampagne starten"}</button>
-                  <span>{campaign.status === "Aktiv" ? "Die Kampagne läuft automatisch Mo–Fr 8:30–17:30 Uhr." : "Nach dem Start läuft sie automatisch."}</span>
+                  <span>{campaign.status === "Aktiv" ? "Die Kampagne läuft automatisch Mo–Sa 8:30–17:30 Uhr." : "Nach dem Start läuft sie automatisch."}</span>
                 </footer>
               </article>
             );

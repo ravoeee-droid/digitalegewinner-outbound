@@ -56,7 +56,7 @@ function berlinClock(){
 
 function insideBusinessSendWindow(){
   const now=berlinClock();
-  if(["Sat","Sun"].includes(now.weekday))return false;
+  if(now.weekday==="Sun")return false;
   const minutes=now.hour*60+now.minute;
   return minutes>=8*60&&minutes<=17*60+30;
 }
@@ -494,4 +494,3 @@ async function run(request: Request) {
 
 export async function GET(request: Request) { return run(request); }
 export async function POST(request: Request) { return run(request); }
-

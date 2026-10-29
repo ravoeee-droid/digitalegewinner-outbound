@@ -5,8 +5,8 @@ name: Outbound heartbeat
 
 on:
   schedule:
-    # Every 10 minutes, Mon-Fri, 06:00-19:00 UTC (DE business hours).
-    - cron: "*/10 6-19 * * 1-5"
+    # Every 10 minutes, Mon-Sat, 06:00-19:00 UTC (DE business hours).
+    - cron: "*/10 6-19 * * 1-6"
   workflow_dispatch:
 
 jobs:

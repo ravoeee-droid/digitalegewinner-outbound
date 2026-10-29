@@ -29,9 +29,9 @@ export async function POST(request: Request) {
     let message = "";
     if (goal.skipped && goal.reason === "no_active_mailboxes") message = "Es ist kein Postfach aktiv. Bitte unter Postfächer ein Postfach verbinden.";
     else if (goal.skipped) message = "Der automatische Versand ist in den Einstellungen ausgeschaltet.";
-    else if (!goal.queuedMessages && searchStarted) message = "Die Mail-Warteschlange ist noch leer. Die Lead-Suche wurde gerade gestartet und braucht einige Minuten. Danach füllt sich die Warteschlange automatisch (stündlich) und der Versand beginnt Mo–Fr ab 8:30 Uhr.";
+    else if (!goal.queuedMessages && searchStarted) message = "Die Mail-Warteschlange ist noch leer. Die Lead-Suche wurde gerade gestartet und braucht einige Minuten. Danach füllt sich die Warteschlange automatisch (stündlich) und der Versand beginnt Mo–Sa ab 8:30 Uhr.";
     else if (!goal.queuedMessages) message = `${seed.leads} Leads vorhanden, aber keine neuen Mails eingeplant. Entweder fehlen Leads mit E-Mail-Adresse oder alles ist schon eingeplant.`;
-    else message = `${goal.queuedLeads || 0} Leads eingeplant, ${goal.queuedMessages} Mails in der Warteschlange. Der Versand läuft Mo–Fr 8:30–17:30 Uhr automatisch.`;
+    else message = `${goal.queuedLeads || 0} Leads eingeplant, ${goal.queuedMessages} Mails in der Warteschlange. Der Versand läuft Mo–Sa 8:30–17:30 Uhr automatisch.`;
 
     return Response.json({ ok: Boolean(goal.queuedMessages) || searchStarted, message, leads: seed.leads, seeded: seed.seeded, queuedLeads: goal.queuedLeads || 0, queuedMessages: goal.queuedMessages || 0 });
   } catch (error) {
