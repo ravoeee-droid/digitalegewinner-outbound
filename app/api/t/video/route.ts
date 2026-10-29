@@ -44,7 +44,7 @@ export async function POST(request: Request) {
     visibility: d.visibility === "visible" || d.visibility === "hidden" ? d.visibility : undefined,
   } : undefined;
   await query("insert into er_events(workspace,lead_id,type,meta) values('default',$1,$2,$3::jsonb)", [leadId, `video_${type}`, JSON.stringify({ v: value, bot, a: arm, p: String(body.p || "").replace(/[^a-zA-Z0-9/_.#:-]/g, "").slice(0, 80), session: /^[0-9a-f-]{36}$/i.test(String(body.sid||"")) ? body.sid : null, diagnostic, clientTs: Number.isFinite(Number(body.ts)) && Math.abs(Date.now()-Number(body.ts)) < 86400000 ? Math.floor(Number(body.ts)) : null })]).catch(() => null);
-  const shouldNotify = type === "play" || (type === "progress" && value >= 50)
+  const shouldNotify = type === "play_confirmed" || (type === "progress" && value >= 50)
     || type === "booking_click" || type === "calendar_focus" || type === "calendar_open"
     || type === "whatsapp_click" || type === "chat_open" || type === "site_click"
     || (type === "site_dwell" && value >= 10);
@@ -56,7 +56,7 @@ export async function POST(request: Request) {
     ).catch(() => []);
     const name = row?.company || `Lead ${leadId}`;
     const message =
-      type === "play" ? `▶️ Video gestartet: ${name}` :
+      type === "play_confirmed" ? `▶️ Video mindestens 3 Sekunden abgespielt: ${name}` :
       type === "progress" && value >= 50 ? `🔥 Video zu ${value} % gesehen: ${name}` :
       type === "booking_click" ? `📅 Klick auf "Termin buchen": ${name}` :
       type === "calendar_focus" ? `🗓️ Kalender-iframe fokussiert: ${name}` :
