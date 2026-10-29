@@ -113,7 +113,7 @@ export async function GET(request:NextRequest,{params}:{params:Promise<{token:st
     return null;
   });
   console.info("[loom-media] response",{
-    segment, range:requestedRange, status:upstream?.status, length:upstream?.headers.get("content-length"),
+    segment, clientRange:range??"none", range:requestedRange, status:upstream?.status, length:upstream?.headers.get("content-length"),
     contentRange:upstream?.headers.get("content-range")
   });
   if(!upstream || upstream.status!==206 || !upstream.body)return new Response("Video temporarily unavailable",{status:502});
