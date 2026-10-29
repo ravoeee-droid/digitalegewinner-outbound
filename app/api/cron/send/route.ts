@@ -228,8 +228,16 @@ async function run(request: Request) {
     const [release] = releasedLoomCampaign ? await query<{ approved: boolean }>(
       `select exists(select 1 from er_outbox
        where id=$1 and workspace='default'
-         and created_at >= '2026-10-29T08:07:25Z'::timestamptz
-         and created_at < '2026-10-29T08:07:29Z'::timestamptz) as approved`,
+         and ((created_at >= '2026-10-29T08:07:25Z'::timestamptz
+               and created_at < '2026-10-29T08:07:29Z'::timestamptz)
+           or exists(select 1 from er_events e
+             where e.workspace='default' and e.type='owner_loom_batch_release'
+               and e.meta->>'outboxId'=$1::text
+               and e.meta->>'batchId'='dg-loom-2026-10-30'
+               and e.meta->>'sendDate'='2026-10-30'))
+         and not exists(select 1 from outbound_compliance_suppressions s
+           where s.workspace='default' and s.channel='email' and s.status='active'
+             and lower(s.identifier)=lower(er_outbox.recipient))) as approved`,
       [row.id],
     ) : [];
     let mailboxLimit=catchupLoom?Math.max(configuredMailboxLimit,30):release?.approved?Math.max(configuredMailboxLimit,16):configuredMailboxLimit;

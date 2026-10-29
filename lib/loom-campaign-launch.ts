@@ -232,7 +232,7 @@ export async function ensureLoomCampaigns() {
   };
   for(const segment of ["pflege","pv"] as const) {
     const id=LOOM_CAMPAIGNS[segment];
-    const [count]=await query<{n:string}>(`select count(distinct lead_id)::text n from er_outbox where workspace='default' and campaign_id=$1 and (created_at at time zone 'Europe/Berlin')::date=(now() at time zone 'Europe/Berlin')::date`,[id]);
+    const [count]=await query<{n:string}>(`select count(distinct lead_id)::text n from er_outbox where workspace='default' and campaign_id=$1 and ((created_at at time zone 'Europe/Berlin')::date=(now() at time zone 'Europe/Berlin')::date or (scheduled_at at time zone 'Europe/Berlin')::date=(now() at time zone 'Europe/Berlin')::date)`,[id]);
     const already=Number(count?.n||0);
     result[segment].already=already;
     const remaining=Math.max(0,MAX_PER_SEGMENT-already);
