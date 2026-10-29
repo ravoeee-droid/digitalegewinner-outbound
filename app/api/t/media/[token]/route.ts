@@ -40,12 +40,19 @@ export async function GET(request:NextRequest,{params}:{params:Promise<{token:st
       const response=await fetch(url,{headers:{authorization:`Bearer ${secret}`,range},cache:"no-store",signal:AbortSignal.timeout(15000)});
       const bytes=Buffer.from(await response.arrayBuffer());
       const snippet=bytes.toString("latin1");
+      const avcC=bytes.indexOf(Buffer.from("avcC"));
+      const moov=bytes.indexOf(Buffer.from("moov"));
       return {
         status:response.status, bytes:bytes.length,
-        moov:snippet.indexOf("moov"),mdat:snippet.indexOf("mdat"),
+        majorBrand:bytes.length>=12?bytes.toString("ascii",8,12):null,
+        moov,moovBoxSize:moov>=4?bytes.readUInt32BE(moov-4):null,
+        mdat:snippet.indexOf("mdat"),
         avc1:snippet.includes("avc1"),hvc1:snippet.includes("hvc1"),
         hev1:snippet.includes("hev1"),av01:snippet.includes("av01"),
-        mp4a:snippet.includes("mp4a"),vp09:snippet.includes("vp09")
+        mp4a:snippet.includes("mp4a"),vp09:snippet.includes("vp09"),
+        avcProfile:avcC>=0&&avcC+8<=bytes.length?bytes[avcC+5]:null,
+        avcCompatibility:avcC>=0&&avcC+8<=bytes.length?bytes[avcC+6]:null,
+        avcLevel:avcC>=0&&avcC+8<=bytes.length?bytes[avcC+7]:null
       };
     };
     const [first,last]=await Promise.all([inspect("bytes=0-65535"),inspect("bytes=-4194304")]);
