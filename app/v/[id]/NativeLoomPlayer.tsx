@@ -19,6 +19,9 @@ export default function NativeLoomPlayer({src,screenshot,company,posterId,debug=
   const confirmedTrack=useRef(false);
   // Accumulate real media progression; a seek to 3s is not 3s watched.
   const watchedSeconds=useRef(0);
+  // Union of genuinely played intervals: replaying or seeking cannot inflate
+  // the 25/50/75/100% milestones. A time jump is never counted as watching.
+  const watchedRanges=useRef<Array<[number,number]>>([]);
   const lastPlaybackPosition=useRef(0);
   const errorTrack=useRef(false);
   const watchdogTimer=useRef<ReturnType<typeof setTimeout>|null>(null);
@@ -71,15 +74,28 @@ export default function NativeLoomPlayer({src,screenshot,company,posterId,debug=
 
   function onTime() {
     const el=video.current;
-    if(!el||!el.duration)return;
+    if(!el||!Number.isFinite(el.duration)||el.duration<=0)return;
     if(el.currentTime>=watchdogPosition.current+0.5)clearWatchdog();
     const delta=el.currentTime-lastPlaybackPosition.current;
-    if(delta>0 && delta<=1.5 && !el.paused && !el.seeking) watchedSeconds.current+=delta;
+    if(delta>0 && delta<=1.5 && !el.paused && !el.seeking) {
+      let start=lastPlaybackPosition.current;
+      let end=el.currentTime;
+      const remaining:Array<[number,number]>=[];
+      for(const [a,b] of watchedRanges.current){
+        if(b<start || a>end)remaining.push([a,b]);
+        else {start=Math.min(start,a);end=Math.max(end,b);}
+      }
+      remaining.push([start,end]);
+      watchedRanges.current=remaining.sort((a,b)=>a[0]-b[0]);
+      watchedSeconds.current=watchedRanges.current.reduce((sum,[a,b])=>sum+b-a,0);
+    }
     lastPlaybackPosition.current=el.currentTime;
     if(watchedSeconds.current>=3 && !confirmedTrack.current){confirmedTrack.current=true;track("play_confirmed",3);}
-    const percent=Math.floor(el.currentTime/el.duration*100);
+    // Milestones represent unique media seconds actually played, not the
+    // current seek position. 100% allows a small end-of-file event gap.
     for(const value of [25,50,75,100]) {
-      if(percent>=value && !milestones.current.has(value)) {
+      const threshold=el.duration*(value===100?0.98:value/100);
+      if(confirmedTrack.current && watchedSeconds.current>=threshold && !milestones.current.has(value)) {
         milestones.current.add(value);track("progress",value);
       }
     }
@@ -151,9 +167,11 @@ export default function NativeLoomPlayer({src,screenshot,company,posterId,debug=
           }}
           onPause={()=>{setPlaying(false);clearWatchdog();}}
           onTimeUpdate={onTime}
+          onSeeking={()=>{lastPlaybackPosition.current=video.current?.currentTime??0;}}
+          onSeeked={()=>{lastPlaybackPosition.current=video.current?.currentTime??0;}}
           onWaiting={()=>{if(startedTrack.current)armWatchdog();}}
           onStalled={()=>{if(started)armWatchdog();}}
-          onEnded={()=>{clearWatchdog();setPlaying(false);if(!milestones.current.has(100)){milestones.current.add(100);track("progress",100);}track("watch",Math.round(video.current?.duration||0));}}
+          onEnded={()=>{onTime();clearWatchdog();setPlaying(false);track("watch",Math.round(watchedSeconds.current));}}
           onError={()=>{clearWatchdog();const el=video.current;setPlaying(false);reportPlayerError(el?.error?.code||408);setError(`Video-Ladefehler: ${el?.error?.message||"Unbekannt"} (Code ${el?.error?.code||0}, Netzwerk ${el?.networkState||0})`);if(validYoutube)setYoutubeFallback(true);}}
         />
       </div>
