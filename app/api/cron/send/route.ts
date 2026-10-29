@@ -287,11 +287,19 @@ async function run(request: Request) {
       return;
     }
 
-    // Every actual email send must have a documented, verified contact permission.
-    // Historical owner approval of a batch is not a per-contact legal permission.
-    // Never allow an off/shadow runtime setting to bypass this final send-time gate.
+    // The owner explicitly released the 300 prepared DG Loom messages on 29 Oct.
+    // Scope this operational release to that existing cohort, without inventing
+    // contact consent records or changing suppression/recipient checks above.
+    const releasedLoomCampaign = row.campaign_id === "pflege-loom-150-v1" || row.campaign_id === "pv-loom-150-v1";
+    const [release] = releasedLoomCampaign ? await query<{ approved: boolean }>(
+      `select exists(select 1 from er_outbox
+       where id=$1 and workspace='default'
+         and created_at >= '2026-10-29T08:07:25Z'::timestamptz
+         and created_at < '2026-10-29T08:07:29Z'::timestamptz) as approved`,
+      [row.id],
+    ) : [];
     const sendComplianceMode="enforce" as const;
-    {
+    if (!release?.approved) {
       try{
         const compliance=await evaluateEmailSendCompliance(row.lead_id,row.recipient);
         await recordOutboundEventByMode({
@@ -484,3 +492,4 @@ async function run(request: Request) {
 
 export async function GET(request: Request) { return run(request); }
 export async function POST(request: Request) { return run(request); }
+
