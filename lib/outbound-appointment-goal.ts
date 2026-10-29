@@ -409,6 +409,27 @@ async function ensureCampaignQueue(workspace:string,def:CampaignDef) {
 
 // Beide Kampagnen nacheinander planen; Ergebnis zusammenfassen.
 export async function ensureAppointmentGoalQueue(workspace="default") {
+  // These legacy text campaigns were retired in favor of the Loom campaigns.
+  // The send worker already suppresses every queued starter message. Continuing
+  // to enqueue them produces unusable rows and duplicate experiment events.
+  // Fail closed here, before creating ANY outbox rows or touching the queue.
+  // This does not alter Loom campaign scheduling or send-time compliance gates.
+  const retiredCampaignIds = new Set(["pflege-starter-v2", "pv-starter-v1"]);
+  if (CAMPAIGN_DEFS.every(def => retiredCampaignIds.has(def.id))) {
+    return {
+      ok:true,
+      skipped:true,
+      reason:"legacy_text_campaigns_replaced_by_loom",
+      queuedLeads:0,
+      queuedMessages:0,
+      complianceBlocked:0,
+      snapshot:await getAppointmentGoalSnapshot(workspace),
+      campaigns:CAMPAIGN_DEFS.map(def => ({
+        id:def.id,queuedLeads:0,queuedMessages:0,
+        reason:"legacy_text_campaign_replaced_by_loom",
+      })),
+    };
+  }
   await applyBlocklist().catch(()=>null);
   const results: Array<Awaited<ReturnType<typeof ensureCampaignQueue>> & Record<string,unknown>> = [];
   for (const def of CAMPAIGN_DEFS) {
