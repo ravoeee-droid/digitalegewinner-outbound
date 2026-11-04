@@ -150,9 +150,10 @@ export async function diagnoseLoomReadiness() {
 }
 
 
-// A verified permission may arrive after a personalized Loom draft was created.
-// Do not lose that draft (or create another): promote it idempotently on a later
-// planner run, but never infer consent from CRM membership or campaign approval.
+// A verified permission may arrive days after a personalized Loom draft was created.
+// Check the complete backlog, not just today's drafts. The database update remains
+// idempotent, and the full compliance/suppression checks must still pass before queuing.
+// Never infer consent from CRM membership or campaign approval.
 async function promoteVerifiedLoomDrafts() {
   const promoted:Record<Segment,number>={pflege:0,pv:0};
   const rows=await query<{id:string;lead_id:string;recipient:string;campaign_id:string}>(
@@ -163,8 +164,6 @@ async function promoteVerifiedLoomDrafts() {
      where o.workspace='default'
        and o.status='draft'
        and o.campaign_id in ('pflege-loom-150-v1','pv-loom-150-v1')
-       and (o.created_at at time zone 'Europe/Berlin')::date =
-           (now() at time zone 'Europe/Berlin')::date
        and l.status='active' and l.stage in ('Neu','Research','Bereit')
        and coalesce(l.do_not_contact,false)=false
        and lower(trim(ct.email))=lower(trim(o.recipient))
