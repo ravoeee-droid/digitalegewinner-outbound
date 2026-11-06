@@ -41,6 +41,6 @@ export const config={
   "/studio/:path*",
   "/ui/:path*",
   "/websites/:path*",
-  "/api/((?!auth/login|track|t/|events/inbound|cron/|oauth/google/callback|oauth/microsoft/callback|video/callback|admin/loom-video-upload).*)"
+  "/api/((?!auth/login|track|site-track|t/|events/inbound|cron/|oauth/google/callback|oauth/microsoft/callback|video/callback|admin/loom-video-upload).*)"
  ]
 };
