@@ -3,6 +3,7 @@ import { query, readStateFields } from "@/lib/db";
 import { leadSegmentSql } from "@/lib/lead-segment";
 import { evaluateEmailSendCompliance } from "@/lib/outbound-compliance-runtime";
 import { loadMailboxCredentials } from "@/lib/mailbox-credentials";
+import { DG_MAILBOX_EMAILS } from "@/lib/dg-mailboxes";
 import { VIDEO_IDS } from "@/lib/outreach-copy";
 
 type Segment = "pflege" | "pv";
@@ -224,7 +225,9 @@ export async function ensureLoomCampaigns() {
   const creds=await loadMailboxCredentials();
   const oldState=(await readStateFields(["mailboxes"]))?.payload as {mailboxes?:Array<{email?:string;enabled?:boolean}>}|undefined;
   const enabledByEmail=new Map((oldState?.mailboxes||[]).map(m=>[m.email?.toLowerCase(),m.enabled!==false]));
-  const mailboxes=creds.filter(c=>c.provider==="smtp"&&enabledByEmail.get(c.email?.toLowerCase())!==false);
+  // DE-Outreach geht ausschließlich über die deutschen DG-Postfächer; andere (z. B. US-)Postfächer sind ausgeschlossen.
+  const dgEmails=new Set<string>(DG_MAILBOX_EMAILS);
+  const mailboxes=creds.filter(c=>c.provider==="smtp"&&dgEmails.has(c.email?.toLowerCase())&&enabledByEmail.get(c.email?.toLowerCase())!==false);
   const result:Record<Segment,{already:number;prepared:number;queued:number;rejected:number;scanned:number;reason?:string}>={
     pflege:{already:0,prepared:0,queued:0,rejected:0,scanned:0},
     pv:{already:0,prepared:0,queued:0,rejected:0,scanned:0},
