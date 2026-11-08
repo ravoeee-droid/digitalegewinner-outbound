@@ -1,5 +1,14 @@
 // Google Ads Transparency Center hat keine offizielle API. Wir nutzen SerpAPI (SERPAPI_KEY), sonst wird übersprungen.
+import { tinyfishEnabled, tinyfishRun } from "./tinyfish.mjs";
+
 export async function enrichGoogleAds(company) {
+  if (tinyfishEnabled()) {
+    const d = (company.domain || company.website || "").replace(/^https?:\/\//, "").replace(/^www\./, "").split("/")[0];
+    if (!d) return { status: "skipped", data: { reason: "keine Domain" } };
+    const r = await tinyfishRun({ url: `https://adstransparency.google.com/?region=DE&domain=${encodeURIComponent(d)}`, maxSteps: 15, maxSeconds: 90,
+      goal: "Look at the ads shown for this advertiser domain. Return JSON with keys: runsAds (boolean), adCount (number or null), advertiserName (string or null), formats (array of text/image/video), lastShown (string or null). If no ads or advertiser are found return runsAds false." });
+    return { status: "ok", data: { via: "tinyfish", ...r } };
+  }
   const key = process.env.SERPAPI_KEY;
   if (!key) return { status: "skipped", data: { reason: "SERPAPI_KEY fehlt" } };
   const domain = (company.domain || company.website || "").replace(/^https?:\/\//, "").replace(/^www\./, "").split("/")[0];

@@ -32,3 +32,10 @@ test("computeLift: Signal mit mehr Erfolg bekommt Lift > 1, wenig Daten werden i
   assert.ok(l.find((x) => x.signal === "ads:meta").lift > 1); assert.ok(l.find((x) => x.signal === "web:veraltet").lift < 1); assert.ok(!l.find((x) => x.signal === "selten"));
 });
 test("signalsOf", () => { const s = signalsOf({ mobileReady: false, https: true, mentionsJobs: true, hasJobPostingSchema: false, tech: ["Wix"], tracking: [] }, { runsAds: true }); assert.ok(["web:nicht_mobil", "web:jobs_ohne_schema", "tech:Wix", "ads:meta", "web:kein_tracking"].every((x) => s.includes(x))); });
+import { parseAgentResult } from "./enrichers/tinyfish.mjs";
+test("parseAgentResult versteht Objekt, JSON-String und Codeblock", () => {
+  assert.deepEqual(parseAgentResult({ a: 1 }), { a: 1 });
+  assert.deepEqual(parseAgentResult('{"followers": 12}'), { followers: 12 });
+  assert.deepEqual(parseAgentResult('Hier:\n```json\n{"runsAds": true}\n```'), { runsAds: true });
+  assert.ok(parseAgentResult("kein json").text);
+});

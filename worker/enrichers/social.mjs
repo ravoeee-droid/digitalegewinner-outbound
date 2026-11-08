@@ -1,4 +1,5 @@
 import { fetchText } from "../lib.mjs";
+import { tinyfishEnabled, tinyfishRun } from "./tinyfish.mjs";
 
 // Social-Daten ohne Login: (1) optional ein Scraping-Anbieter (SOCIAL_SCRAPER_URL + SOCIAL_SCRAPER_KEY, POST {url} -> JSON),
 // (2) sonst die öffentlichen Open-Graph-Tags, wie sie auch Link-Vorschauen nutzen. Kein eigenes Login-Scraping.
@@ -20,6 +21,11 @@ export async function enrichSocial(company, websiteData) {
   const out = {};
   for (const [network, url] of entries) {
     try {
+      if (tinyfishEnabled()) {
+        const r = await tinyfishRun({ url, maxSteps: 20, maxSeconds: 90, goal: "Read only publicly visible information on this profile page without logging in. Return JSON with keys: followers (number or null), postsLast30Days (number or null), lastPostDate (ISO date or null), bio (string), contactEmail (string or null), contactPhone (string or null), website (string or null), isActive (boolean). Do not click login or follow buttons." });
+        out[network] = { url, via: "tinyfish", ...r };
+        continue;
+      }
       if (process.env.SOCIAL_SCRAPER_URL) {
         const r = await fetch(process.env.SOCIAL_SCRAPER_URL, { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${process.env.SOCIAL_SCRAPER_KEY || ""}` }, body: JSON.stringify({ url, network }), signal: AbortSignal.timeout(30000) });
         out[network] = { url, via: "provider", ...(r.ok ? await r.json() : { error: `HTTP ${r.status}` }) };

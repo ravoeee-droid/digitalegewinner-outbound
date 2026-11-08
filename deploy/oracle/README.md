@@ -21,8 +21,12 @@ Tipp für Tempo: Server-Region nahe Frankfurt wählen (Supabase-Pooler ist `eu-c
 
 - **Website:** Startseite plus Impressum/Kontakt/Karriere/Team (robots.txt wird beachtet, 1 Anfrage/s je Host): E-Mails, Telefon, Ansprechpartner, Social-Links, Tech-Stack, Tracking, Mobil/HTTPS, Stellen-Signale.
 - **Meta Ad Library:** offizielle API, braucht `META_ACCESS_TOKEN`.
-- **Google Ads:** über SerpAPI (`SERPAPI_KEY`).
+- **Google Ads:** per TinyFish-Browser-Agent (`TINYFISH_API_KEY`, Vorrang) oder SerpAPI (`SERPAPI_KEY`).
 - **Social:** öffentliche Open-Graph-Daten der auf der Website verlinkten Profile, oder dein Scraping-Anbieter (`SOCIAL_SCRAPER_URL`). Kein Login-Scraping.
 - **Lernen (stündlich):** wertet aus, welche Signale zu Termin, Pain, Entwurf oder Info-Mail führen (`lead_learning_signals`) und schreibt einen begrenzten Bonus nach `sales_companies.metadata.learned_boost`. Das Queue-Ranking bleibt unverändert, bis wir den Bonus bewusst anschließen.
 - Ergebnisse stehen in `lead_enrichment` (je Firma und Quelle); leere Telefon- und Kontaktfelder werden ergänzt, Vorhandenes nie überschrieben.
 - Logs: `docker compose logs -f worker`.
+
+## Schnellstart mit einem Befehl
+
+Auf der frischen VM: `GH_TOKEN=<token> DOMAIN=cockpit.deine-domain.de bash deploy/oracle/bootstrap.sh`. Beim ersten Lauf legt das Skript `app.env` an; Werte eintragen und das Skript erneut starten.
