@@ -158,7 +158,7 @@ export default function CallConsole({ embedded = false }: { embedded?: boolean }
     }, 30000);
     return () => window.clearInterval(timer);
   }, []);
-  useEffect(() => { if (!toast) return; const timer = window.setTimeout(() => setToast(""), toast.startsWith("CloudTalk:") ? 15000 : 2800); return () => window.clearTimeout(timer); }, [toast]);
+  useEffect(() => { if (!toast) return; const timer = window.setTimeout(() => setToast(""), toast.startsWith("CloudTalk:") && !toast.includes("sende …") ? 20000 : toast.includes("sende …") ? 60000 : 2800); return () => window.clearTimeout(timer); }, [toast]);
 
   const dial = useCallback(() => {
     if (!active || !phone) return;
@@ -237,11 +237,18 @@ export default function CallConsole({ embedded = false }: { embedded?: boolean }
   const [syncing, setSyncing] = useState(false);
   const sendToCloudTalk = useCallback(async () => {
     setSyncing(true); setError("");
+    let sent = 0, open = 0, already = 0, noPhone = 0, remaining = 0, failure = "";
     try {
-      const res = await fetch("/api/integrations/cloudtalk/sync", { method: "POST" });
-      const data = await res.json();
-      if (!res.ok && !data?.gesendet) throw new Error(data?.error || "Senden fehlgeschlagen.");
-      setToast(`CloudTalk: ${data.offeneCalls ?? "?"} Calls offen · ${data.gesendet ?? 0} gesendet · ${data.schonVorhanden ?? 0} schon dort · ${data.ohneNummer ?? 0} ohne Nummer${data.fehler?.length ? ` · Fehler: ${data.fehler[0]}` : ""}`);
+      for (let round = 0; round < 15; round++) {
+        const res = await fetch("/api/integrations/cloudtalk/sync", { method: "POST" });
+        const data = await res.json();
+        if (!res.ok && !data?.gesendet) throw new Error(data?.error || "Senden fehlgeschlagen.");
+        sent += data.gesendet ?? 0; open = data.offeneCalls ?? open; already = data.schonVorhanden ?? already; noPhone = data.ohneNummer ?? noPhone; remaining = data.verbleibend ?? 0;
+        if (data.fehler?.length) failure = data.fehler[0];
+        setToast(`CloudTalk: sende … ${sent} gesendet, noch ${remaining}`);
+        if (!remaining || !data.gesendet || data.rateLimited) break;
+      }
+      setToast(`CloudTalk: ${open} Calls offen · ${sent} gesendet · ${already} schon dort · ${noPhone} ohne Nummer${remaining ? ` · ${remaining} noch offen, bitte erneut klicken` : ""}${failure ? ` · Fehler: ${failure}` : ""}`);
     } catch (e) { setError(e instanceof Error ? e.message : "Senden fehlgeschlagen."); }
     finally { setSyncing(false); }
   }, []);
