@@ -1,16 +1,23 @@
 import { query } from "@/lib/db";
 import { addCloudTalkContact, renameCloudTalkContact } from "@/lib/cloudtalk-api";
 import { openCallContacts } from "@/lib/call-queue-export";
+import { enrichContactPersons } from "@/lib/contact-person-enrich";
 
-export type SyncResult = { umbenannt: number; umbenennenOffen: number; offeneCalls: number; ohneNummer: number; gesendet: number; schonVorhanden: number; verbleibend: number; rateLimited: boolean; fehler: string[]; vorschau?: unknown[] };
+export type SyncResult = { namenVersucht: number; namenGefunden: number; namenOffen: number; umbenannt: number; umbenennenOffen: number; offeneCalls: number; ohneNummer: number; gesendet: number; schonVorhanden: number; verbleibend: number; rateLimited: boolean; fehler: string[]; vorschau?: unknown[] };
 
 // Schickt höchstens `limit` noch nicht gesendete Leads der Tages-Queue als Kontakte mit Tag an CloudTalk (jeder Lead nur einmal). dry=true sendet nichts.
 export async function syncCallQueue({ owner, tag, limit = 20, dry = false }: { owner: string; tag: string; limit?: number; dry?: boolean }): Promise<SyncResult> {
-  const { contacts: all, openTasks, withoutPhone } = await openCallContacts(owner, tag);
+  let { contacts: all, openTasks, withoutPhone } = await openCallContacts(owner, tag);
+  // Fehlende Ansprechpartner zuerst aus den Webseiten nachtragen (je Aufruf eine Portion), dann Queue neu lesen.
+  let namen = { tried: 0, found: 0, open: 0 };
+  if (!dry) {
+    namen = await enrichContactPersons(all.filter((c) => !c.person).map((c) => c.leadId));
+    if (namen.found) ({ contacts: all, openTasks, withoutPhone } = await openCallContacts(owner, tag));
+  }
   const done = new Set((await query<{ lead_id: string }>(
     `select distinct lead_id from sales_activities where type='cloudtalk.sync' and meta->>'tag'=$1 and lead_id=any($2::text[])`, [tag, all.map((c) => c.leadId)])).map((r) => r.lead_id));
   const todo = all.filter((c) => !done.has(c.leadId));
-  if (dry) return { umbenannt: 0, umbenennenOffen: 0, offeneCalls: openTasks, ohneNummer: withoutPhone, gesendet: 0, schonVorhanden: done.size, verbleibend: todo.length, rateLimited: false, fehler: [], vorschau: todo.slice(0, 3) };
+  if (dry) return { namenVersucht: 0, namenGefunden: 0, namenOffen: 0, umbenannt: 0, umbenennenOffen: 0, offeneCalls: openTasks, ohneNummer: withoutPhone, gesendet: 0, schonVorhanden: done.size, verbleibend: todo.length, rateLimited: false, fehler: [], vorschau: todo.slice(0, 3) };
   const batch = todo.slice(0, Math.max(1, Math.min(40, limit)));
   let sent = 0, attempted = 0, rateLimited = false;
   const errors: string[] = [];
@@ -54,5 +61,5 @@ export async function syncCallQueue({ owner, tag, limit = 20, dry = false }: { o
       }
     }
   }
-  return { umbenannt: renamed, umbenennenOffen: renamePending, offeneCalls: openTasks, ohneNummer: withoutPhone, gesendet: sent, schonVorhanden: done.size, verbleibend: Math.max(0, todo.length - sent), rateLimited, fehler: errors.slice(0, 5) };
+  return { namenVersucht: namen.tried, namenGefunden: namen.found, namenOffen: namen.open, umbenannt: renamed, umbenennenOffen: renamePending, offeneCalls: openTasks, ohneNummer: withoutPhone, gesendet: sent, schonVorhanden: done.size, verbleibend: Math.max(0, todo.length - sent), rateLimited, fehler: errors.slice(0, 5) };
 }

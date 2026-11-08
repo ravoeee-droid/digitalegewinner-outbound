@@ -17,10 +17,10 @@ export async function GET(request: Request) {
   const startedAt = Date.now();
   let gesendet = 0, last = null as Awaited<ReturnType<typeof syncCallQueue>> | null;
   try {
-    while (Date.now() - startedAt < 230_000) {
+    while (Date.now() - startedAt < 150_000) {
       last = await syncCallQueue({ owner: "Raphael", tag: "pflege-heute", limit: 20 });
       gesendet += last.gesendet;
-      if ((!last.verbleibend && !last.umbenennenOffen) || (!last.gesendet && !last.umbenannt) || last.rateLimited) break;
+      if ((!last.verbleibend && !last.umbenennenOffen && !last.namenOffen) || (!last.gesendet && !last.umbenannt && !last.namenVersucht) || last.rateLimited) break;
     }
     return Response.json({ ok: true, gesendet, offeneCalls: last?.offeneCalls ?? 0, verbleibend: last?.verbleibend ?? 0, fehler: last?.fehler ?? [], sekunden: Math.round((Date.now() - startedAt) / 1000) });
   } catch (error) {

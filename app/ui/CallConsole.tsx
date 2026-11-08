@@ -158,7 +158,7 @@ export default function CallConsole({ embedded = false }: { embedded?: boolean }
     }, 30000);
     return () => window.clearInterval(timer);
   }, []);
-  useEffect(() => { if (!toast) return; const timer = window.setTimeout(() => setToast(""), toast.startsWith("CloudTalk:") && !toast.includes("sende …") ? 20000 : toast.includes("sende …") ? 60000 : 2800); return () => window.clearTimeout(timer); }, [toast]);
+  useEffect(() => { if (!toast) return; const timer = window.setTimeout(() => setToast(""), toast.startsWith("CloudTalk:") && !toast.includes("arbeite …") ? 20000 : toast.includes("arbeite …") ? 60000 : 2800); return () => window.clearTimeout(timer); }, [toast]);
 
   const dial = useCallback(() => {
     if (!active || !phone) return;
@@ -237,7 +237,7 @@ export default function CallConsole({ embedded = false }: { embedded?: boolean }
   const [syncing, setSyncing] = useState(false);
   const sendToCloudTalk = useCallback(async () => {
     setSyncing(true); setError("");
-    let sent = 0, open = 0, already = 0, noPhone = 0, remaining = 0, renamed = 0, renameOpen = 0, failure = "";
+    let sent = 0, open = 0, already = 0, noPhone = 0, remaining = 0, renamed = 0, renameOpen = 0, found = 0, namesOpen = 0, failure = "";
     try {
       for (let round = 0; round < 15; round++) {
         const res = await fetch("/api/integrations/cloudtalk/sync", { method: "POST" });
@@ -245,11 +245,11 @@ export default function CallConsole({ embedded = false }: { embedded?: boolean }
         if (!res.ok && !data?.gesendet) throw new Error(data?.error || "Senden fehlgeschlagen.");
         sent += data.gesendet ?? 0; open = data.offeneCalls ?? open; already = data.schonVorhanden ?? already; noPhone = data.ohneNummer ?? noPhone; remaining = data.verbleibend ?? 0;
         if (data.fehler?.length) failure = data.fehler[0];
-        setToast(`CloudTalk: sende … ${sent} gesendet, ${renamed} umbenannt, noch ${remaining + renameOpen}`);
-        renamed += data.umbenannt ?? 0; renameOpen = data.umbenennenOffen ?? 0;
-        if ((!remaining && !renameOpen) || (!data.gesendet && !data.umbenannt) || data.rateLimited) break;
+        setToast(`CloudTalk: arbeite … ${sent} gesendet, ${found} Namen gefunden, ${renamed} umbenannt, noch ${remaining + renameOpen + namesOpen}`);
+        renamed += data.umbenannt ?? 0; renameOpen = data.umbenennenOffen ?? 0; found += data.namenGefunden ?? 0; namesOpen = data.namenOffen ?? 0;
+        if ((!remaining && !renameOpen && !namesOpen) || (!data.gesendet && !data.umbenannt && !data.namenVersucht) || data.rateLimited) break;
       }
-      setToast(`CloudTalk: ${open} Calls offen · ${sent} gesendet · ${already} schon dort · ${noPhone} ohne Nummer · ${renamed} auf Ansprechpartner umbenannt${remaining || renameOpen ? ` · ${remaining + renameOpen} noch offen, bitte erneut klicken` : ""}${failure ? ` · Fehler: ${failure}` : ""}`);
+      setToast(`CloudTalk: ${open} Calls offen · ${sent} gesendet · ${already} schon dort · ${noPhone} ohne Nummer · ${found} Ansprechpartner auf Webseiten gefunden · ${renamed} in CloudTalk umbenannt${remaining || renameOpen || namesOpen ? ` · ${remaining + renameOpen + namesOpen} noch offen, bitte erneut klicken` : ""}${failure ? ` · Fehler: ${failure}` : ""}`);
     } catch (e) { setError(e instanceof Error ? e.message : "Senden fehlgeschlagen."); }
     finally { setSyncing(false); }
   }, []);
