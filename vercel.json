@@ -60,6 +60,14 @@
     {
       "path": "/api/cron/loom-campaigns",
       "schedule": "7,37 6-16 * * 1-6"
+    },
+    {
+      "path": "/api/cron/cloudtalk-sync",
+      "schedule": "20 5 * * 1-6"
+    },
+    {
+      "path": "/api/cron/cloudtalk-sync",
+      "schedule": "20 10 * * 1-6"
     }
   ],
   "regions": [
