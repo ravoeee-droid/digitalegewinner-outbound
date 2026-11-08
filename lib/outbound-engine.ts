@@ -5,6 +5,10 @@ import { ensureSalesOsSchema } from "./sales-os";
 // Tagesziel: 100 Cold Calls im Cockpit, 300 E-Mails (10 Postfächer x 30).
 // Mindestalter der Stellenanzeige für die Call-Auswahl in Tagen (lange offene Stelle = Personalnot). War 60, jetzt 30 für mehr Volumen.
 export const CALL_MIN_JOB_AGE_DAYS = 30;
+// Veröffentlichungsdatum der Stelle (TT.MM.JJJJ) aus den Firmendaten oder dem Lead-Hinweis; leer, wenn unbekannt.
+const JOB_PUBLISHED_SQL = `coalesce(nullif(c.metadata->>'jobPublishedAt',''),nullif(left(split_part(coalesce(l.notes,''),' · seit ',2),10),''))`;
+const JOB_DATE_RE_SQL = `'^\\d{2}\\.\\d{2}\\.\\d{4}$'`;
+const JOB_DATE_PARSED_SQL = `(case when ${JOB_PUBLISHED_SQL} ~ ${JOB_DATE_RE_SQL} then to_date(${JOB_PUBLISHED_SQL},'DD.MM.YYYY') end)`;
 export const MAILBOX_DAILY_TARGET = 30;
 export const OUTBOUND_TARGETS = {
   call: 100,
@@ -136,7 +140,8 @@ function insertChannelSql(channel: OutboundChannel, extraWhere: string, target: 
 }
 
 // Für Calls zusätzlich Leads im Status 'Kontaktiert' (zweiter Versuch), aber nur ohne Abschluss/Absage und mit mindestens 2 Tagen Abstand.
-const callBaseCandidateSql = baseCandidateSql.replace("    l.owner,", "    coalesce(nullif(l.owner,''),'Raphael') owner,").replace("and l.stage in ('Neu','Research','Bereit')", `and l.stage in ('Neu','Research','Bereit','Kontaktiert')
+const callBaseCandidateSql = baseCandidateSql.replace("    l.owner,", () => `    coalesce(nullif(l.owner,''),'Raphael') owner,
+    coalesce(${JOB_PUBLISHED_SQL} ~ ${JOB_DATE_RE_SQL}, false) job_date_known,`).replace("and l.stage in ('Neu','Research','Bereit')", `and l.stage in ('Neu','Research','Bereit','Kontaktiert')
     and (
       l.stage<>'Kontaktiert'
       or (
@@ -160,31 +165,7 @@ function insertCallChannelSql() {
         or lower(coalesce(l.notes,'')) like '%altenpfleger%'
         or lower(coalesce(l.notes,'')) like '%examiniert%'
       )
-      and length(
-        coalesce(
-          nullif(c.metadata->>'jobPublishedAt',''),
-          nullif(left(split_part(coalesce(l.notes,''),' · seit ',2),10),'')
-        )
-      )=10
-      and substr(
-        coalesce(
-          nullif(c.metadata->>'jobPublishedAt',''),
-          nullif(left(split_part(coalesce(l.notes,''),' · seit ',2),10),'')
-        ),3,1
-      )='.'
-      and substr(
-        coalesce(
-          nullif(c.metadata->>'jobPublishedAt',''),
-          nullif(left(split_part(coalesce(l.notes,''),' · seit ',2),10),'')
-        ),6,1
-      )='.'
-      and to_date(
-        coalesce(
-          nullif(c.metadata->>'jobPublishedAt',''),
-          nullif(left(split_part(coalesce(l.notes,''),' · seit ',2),10),'')
-        ),
-        'DD.MM.YYYY'
-      ) <= ((now() at time zone 'Europe/Berlin')::date - ${CALL_MIN_JOB_AGE_DAYS})
+      and coalesce(${JOB_DATE_PARSED_SQL} <= ((now() at time zone 'Europe/Berlin')::date - ${CALL_MIN_JOB_AGE_DAYS}), true)
       and lower(c.name) not like '%caritas%'
       and lower(c.name) not like '%arbeiterwohlfahrt%'
       and lower(c.name) not like '%johanniter%'
@@ -213,6 +194,7 @@ function insertCallChannelSql() {
       select *, row_number() over (
         partition by owner
         order by
+          case when job_date_known then 0 else 1 end,
           case tier when 'A+' then 0 when 'A' then 1 when 'B' then 2 else 3 end,
           score desc,
           job_count desc,
@@ -434,31 +416,7 @@ export async function buildDailyOutboundPlan(workspace = "default") {
           and lower(coalesce(l.notes,'')) not like '%altenpfleger%'
           and lower(coalesce(l.notes,'')) not like '%examiniert%'
         )
-        or length(
-          coalesce(
-            nullif(c.metadata->>'jobPublishedAt',''),
-            nullif(left(split_part(coalesce(l.notes,''),' · seit ',2),10),'')
-          )
-        )<>10
-        or substr(
-          coalesce(
-            nullif(c.metadata->>'jobPublishedAt',''),
-            nullif(left(split_part(coalesce(l.notes,''),' · seit ',2),10),'')
-          ),3,1
-        )<>'.'
-        or substr(
-          coalesce(
-            nullif(c.metadata->>'jobPublishedAt',''),
-            nullif(left(split_part(coalesce(l.notes,''),' · seit ',2),10),'')
-          ),6,1
-        )<>'.'
-        or to_date(
-          coalesce(
-            nullif(c.metadata->>'jobPublishedAt',''),
-            nullif(left(split_part(coalesce(l.notes,''),' · seit ',2),10),'')
-          ),
-          'DD.MM.YYYY'
-        ) > ((now() at time zone 'Europe/Berlin')::date - ${CALL_MIN_JOB_AGE_DAYS})
+        or coalesce(${JOB_DATE_PARSED_SQL} > ((now() at time zone 'Europe/Berlin')::date - ${CALL_MIN_JOB_AGE_DAYS}), false)
         or lower(c.name) like '%caritas%'
         or lower(c.name) like '%arbeiterwohlfahrt%'
         or lower(c.name) like '%johanniter%'
