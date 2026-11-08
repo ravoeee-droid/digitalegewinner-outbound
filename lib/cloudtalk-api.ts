@@ -15,10 +15,23 @@ export function isValidPhone(e164: string) {
   return /^\+[1-9]\d{7,14}$/.test(e164);
 }
 
-export type CloudTalkContact = { name: string; company: string; phone: string; email: string; city: string; website: string; tag: string };
+export type CloudTalkContact = { name: string; company: string; phone: string; email: string; city: string; website: string; tag: string; person: boolean };
 
 export function cloudtalkConfigured() {
   return Boolean(process.env.CLOUDTALK_API_ID && process.env.CLOUDTALK_API_SECRET);
+}
+
+function authHeader() {
+  return `Basic ${Buffer.from(`${process.env.CLOUDTALK_API_ID}:${process.env.CLOUDTALK_API_SECRET}`).toString("base64")}`;
+}
+
+// Ändert nur den Namen; Nummern, E-Mails und Tags bleiben erhalten (geprüft).
+export async function renameCloudTalkContact(contactId: string, name: string) {
+  const res = await fetch(`https://my.cloudtalk.io/api/contacts/edit/${encodeURIComponent(contactId)}.json`, {
+    method: "POST", headers: { authorization: authHeader(), "content-type": "application/json" }, body: JSON.stringify({ name }), signal: AbortSignal.timeout(20000),
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(`CloudTalk HTTP ${res.status}: ${JSON.stringify(json).slice(0, 200)}`);
 }
 
 export async function addCloudTalkContact(c: CloudTalkContact) {

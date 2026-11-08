@@ -20,7 +20,7 @@ export async function GET(request: Request) {
     while (Date.now() - startedAt < 230_000) {
       last = await syncCallQueue({ owner: "Raphael", tag: "pflege-heute", limit: 20 });
       gesendet += last.gesendet;
-      if (!last.verbleibend || !last.gesendet || last.rateLimited) break;
+      if ((!last.verbleibend && !last.umbenennenOffen) || (!last.gesendet && !last.umbenannt) || last.rateLimited) break;
     }
     return Response.json({ ok: true, gesendet, offeneCalls: last?.offeneCalls ?? 0, verbleibend: last?.verbleibend ?? 0, fehler: last?.fehler ?? [], sekunden: Math.round((Date.now() - startedAt) / 1000) });
   } catch (error) {
