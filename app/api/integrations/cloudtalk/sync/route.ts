@@ -17,11 +17,11 @@ export async function POST(request: Request) {
     if (!dry && !cloudtalkConfigured()) return Response.json({ error: "CLOUDTALK_API_ID / CLOUDTALK_API_SECRET sind in Vercel nicht gesetzt." }, { status: 503 });
     const store = await cookies();
     const owner = sessionRole(store.get(adminCookieName())?.value) === "sales" ? "Mattias" : "Raphael";
-    const all = await openCallContacts(owner, tag);
+    const { contacts: all, openTasks, withoutPhone } = await openCallContacts(owner, tag);
     const done = new Set((await query<{ lead_id: string }>(
       `select distinct lead_id from sales_activities where type='cloudtalk.sync' and meta->>'tag'=$1 and lead_id=any($2::text[])`, [tag, all.map((c) => c.leadId)])).map((r) => r.lead_id));
     const todo = all.filter((c) => !done.has(c.leadId));
-    if (dry) return Response.json({ ok: true, dry: true, offen: all.length, schonGesendet: done.size, wuerdeSenden: todo.length, beispiel: todo.slice(0, 3) });
+    if (dry) return Response.json({ ok: true, dry: true, offeneCalls: openTasks, ohneNummer: withoutPhone, offen: all.length, schonGesendet: done.size, wuerdeSenden: todo.length, beispiel: todo.slice(0, 3) });
     let sent = 0; const errors: string[] = [];
     for (const c of todo) {
       try {
@@ -31,7 +31,7 @@ export async function POST(request: Request) {
         sent++;
       } catch (e) { errors.push(`${c.company}: ${e instanceof Error ? e.message : "Fehler"}`); }
     }
-    return Response.json({ ok: errors.length === 0, gesendet: sent, schonVorhanden: done.size, fehler: errors.slice(0, 5) });
+    return Response.json({ ok: errors.length === 0, offeneCalls: openTasks, ohneNummer: withoutPhone, gesendet: sent, schonVorhanden: done.size, fehler: errors.slice(0, 5) });
   } catch (error) {
     return Response.json({ error: error instanceof Error ? error.message : "Sync fehlgeschlagen." }, { status: 500 });
   }
