@@ -25,7 +25,8 @@
     "dailyCockpitHeute": "dg-implemented-peer-parity-blocked",
     "crmKanbanWorkspace": "DG: Pflege/PV sector-separated pipeline, Info-Mail flow, call-ready contact cards with contact name/role, direct number/mail, company switchboard, preferred contact updates and notes. Peer CRM uses separate energy_leads + workflow model; generic parity pending.",
     "territorySourceImport": "DG supports explicit Pflege sector and public email, preserves legacy PV default; peer parity blocked",
-    "usPvPilotImport": "DG admin-only reviewed JSON import with PV/US metadata and campaign-scoped lead IDs; peer parity blocked"
+    "usPvPilotImport": "DG admin-only reviewed JSON import with PV/US metadata and campaign-scoped lead IDs; peer parity blocked",
+    "leadEnrichmentWorker": "DG: Oracle always-on worker (website/Meta Ad Library/Google Ads via SerpAPI/social OG, learning loop); peer parity blocked, peer source not inspected"
   },
   "blockers": [
     {

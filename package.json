@@ -12,7 +12,8 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "npm run typecheck && npm run lint",
-    "test:d1": "node --experimental-transform-types --test cloudflare/core.test.mjs"
+    "test:d1": "node --experimental-transform-types --test cloudflare/core.test.mjs",
+    "test:worker": "node --test worker/worker.test.mjs"
   },
   "dependencies": {
     "@sparticuz/chromium": "141.0.0",

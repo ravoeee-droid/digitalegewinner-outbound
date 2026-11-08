@@ -14,3 +14,15 @@ Nur für **DG-MAIN**. `app.env` enthält ausschließlich die DG-Variablen (Supab
 Update: `git pull && docker compose up -d --build`.
 
 Tipp für Tempo: Server-Region nahe Frankfurt wählen (Supabase-Pooler ist `eu-central-1`), dann sind die Datenbank-Roundtrips minimal.
+
+## Anreicherungs-Worker (läuft dauerhaft mit)
+
+`docker compose up -d --build` startet neben App und Caddy auch `worker`. Er arbeitet rund um die Uhr:
+
+- **Website:** Startseite plus Impressum/Kontakt/Karriere/Team (robots.txt wird beachtet, 1 Anfrage/s je Host): E-Mails, Telefon, Ansprechpartner, Social-Links, Tech-Stack, Tracking, Mobil/HTTPS, Stellen-Signale.
+- **Meta Ad Library:** offizielle API, braucht `META_ACCESS_TOKEN`.
+- **Google Ads:** über SerpAPI (`SERPAPI_KEY`).
+- **Social:** öffentliche Open-Graph-Daten der auf der Website verlinkten Profile, oder dein Scraping-Anbieter (`SOCIAL_SCRAPER_URL`). Kein Login-Scraping.
+- **Lernen (stündlich):** wertet aus, welche Signale zu Termin, Pain, Entwurf oder Info-Mail führen (`lead_learning_signals`) und schreibt einen begrenzten Bonus nach `sales_companies.metadata.learned_boost`. Das Queue-Ranking bleibt unverändert, bis wir den Bonus bewusst anschließen.
+- Ergebnisse stehen in `lead_enrichment` (je Firma und Quelle); leere Telefon- und Kontaktfelder werden ergänzt, Vorhandenes nie überschrieben.
+- Logs: `docker compose logs -f worker`.

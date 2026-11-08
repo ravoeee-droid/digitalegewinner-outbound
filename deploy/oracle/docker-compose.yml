@@ -4,6 +4,12 @@ services:
     restart: unless-stopped
     env_file: ./app.env
     expose: ["3000"]
+  worker:
+    build: ../../worker
+    restart: unless-stopped
+    env_file: ./app.env
+    environment:
+      WORKER_CONCURRENCY: "3"
   caddy:
     image: caddy:2
     restart: unless-stopped
