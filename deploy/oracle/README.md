@@ -33,4 +33,4 @@ Auf der frischen VM: `GH_TOKEN=<token> DOMAIN=cockpit.deine-domain.de bash deplo
 
 ## Ohne eigenen Server: GitHub Actions
 
-`.github/workflows/enrichment.yml` führt den Worker stündlich (Mo–Sa) für 6 Minuten aus (`node index.mjs --once`). Dafür unter Repo → Settings → Secrets and variables → Actions das Secret `DATABASE_URL` anlegen, optional `META_ACCESS_TOKEN`, `TINYFISH_API_KEY`, `SERPAPI_KEY`. Manuell startbar unter Actions → "Lead-Anreicherung" → Run workflow. Grenze: etwa 6 Minuten Rechenzeit pro Stunde, also deutlich weniger Durchsatz als ein Dauer-Worker.
+`.github/workflows/enrichment.yml` führt den Worker stündlich (Mo–Sa) für 6 Minuten aus (`node index.mjs --once`). Dafür unter Repo → Settings → Secrets and variables → Actions das Secret **`NEW_DATABASE_URL`** anlegen (der Wert ist derselbe wie `NEW_DATABASE_URL` in Vercel; die App läuft dort mit `DB_CUTOVER=1`), optional `META_ACCESS_TOKEN`, `TINYFISH_API_KEY`, `SERPAPI_KEY`. Manuell startbar unter Actions → "Lead-Anreicherung" → Run workflow. Grenze: etwa 6 Minuten Rechenzeit pro Stunde, also deutlich weniger Durchsatz als ein Dauer-Worker.

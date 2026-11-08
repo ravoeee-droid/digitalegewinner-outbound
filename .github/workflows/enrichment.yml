@@ -18,6 +18,9 @@ jobs:
         working-directory: worker
         env:
           WORKER_BUDGET_MIN: "6"
+          # Produktion nutzt NEW_DATABASE_URL (DB_CUTOVER=1), wie lib/db.ts; ohne dieses Secret fällt der Worker auf DATABASE_URL zurück.
+          DB_CUTOVER: "1"
+          NEW_DATABASE_URL: ${{ secrets.NEW_DATABASE_URL }}
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           META_ACCESS_TOKEN: ${{ secrets.META_ACCESS_TOKEN }}
           TINYFISH_API_KEY: ${{ secrets.TINYFISH_API_KEY }}
