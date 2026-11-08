@@ -14,7 +14,7 @@
     "campaignControlPlane": "needs-parity-review",
     "campaignRunTracking": "needs-parity-review",
     "mailboxStatusWorkflow": "DG collision-safe mailbox IDs; missing-only sequential verification and explicit saved-password reuse; peer parity blocked",
-    "callerQueue": "DG: Power-Dialer cockpit (optimistic instant next-lead, auto-dial countdown, daily goal 100 with pace/ETA, skip, objection cheat sheet, call timer); peer parity blocked",
+    "callerQueue": "DG: Power-Dialer cockpit (optimistic instant next-lead, auto-dial countdown, daily goal 100 with pace/ETA, skip, objection cheat sheet, call timer); peer parity blocked; DG call plan: daily cap 100/owner, min job age 30d, second-attempt for Kontaktiert leads (>=2d, no closed outcome); CloudTalk one-click contact sync; peer parity blocked",
     "leadDetailWorkspace": "local-implementation-exists-review-parity",
     "salesBrief": "needs-parity-review",
     "applicationFrame": "dg-single-sidebar-shell-AppFrame-from-jj-growth-os-pattern; walkenhorst-parity-pending",

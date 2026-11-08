@@ -2,10 +2,12 @@ import { query } from "./db";
 import { leadSegmentSql } from "./lead-segment";
 import { ensureSalesOsSchema } from "./sales-os";
 
-// Tagesziel: 50 Cold Calls im Cockpit, 300 E-Mails (10 Postfächer x 30).
+// Tagesziel: 100 Cold Calls im Cockpit, 300 E-Mails (10 Postfächer x 30).
+// Mindestalter der Stellenanzeige für die Call-Auswahl in Tagen (lange offene Stelle = Personalnot). War 60, jetzt 30 für mehr Volumen.
+export const CALL_MIN_JOB_AGE_DAYS = 30;
 export const MAILBOX_DAILY_TARGET = 30;
 export const OUTBOUND_TARGETS = {
-  call: 50,
+  call: 100,
   email: 300,
   video: 30,
   linkedin: 30,
@@ -133,10 +135,20 @@ function insertChannelSql(channel: OutboundChannel, extraWhere: string, target: 
   `;
 }
 
+// Für Calls zusätzlich Leads im Status 'Kontaktiert' (zweiter Versuch), aber nur ohne Abschluss/Absage und mit mindestens 2 Tagen Abstand.
+const callBaseCandidateSql = baseCandidateSql.replace("and l.stage in ('Neu','Research','Bereit')", `and l.stage in ('Neu','Research','Bereit','Kontaktiert')
+    and (
+      l.stage<>'Kontaktiert'
+      or (
+        coalesce(l.last_outcome,'') not in ('no_fit','dnc','appointment','pain','website_requested','info_mail')
+        and (l.last_contact_at is null or l.last_contact_at < now() - interval '2 days')
+      )
+    )`);
+
 function insertCallChannelSql() {
   return `
     with candidates as (
-      ${baseCandidateSql}
+      ${callBaseCandidateSql}
       and coalesce(ct.phone,c.phone,'')<>''
       and l.owner in ('Raphael','Mattias')
       and ${leadSegmentSql("c")}='pflege'
@@ -172,7 +184,7 @@ function insertCallChannelSql() {
           nullif(left(split_part(coalesce(l.notes,''),' · seit ',2),10),'')
         ),
         'DD.MM.YYYY'
-      ) <= ((now() at time zone 'Europe/Berlin')::date - 60)
+      ) <= ((now() at time zone 'Europe/Berlin')::date - ${CALL_MIN_JOB_AGE_DAYS})
       and lower(c.name) not like '%caritas%'
       and lower(c.name) not like '%arbeiterwohlfahrt%'
       and lower(c.name) not like '%johanniter%'
@@ -378,7 +390,7 @@ export async function buildDailyOutboundPlan(workspace = "default") {
            nullif(left(split_part(coalesce(l.notes,''),' · seit ',2),10),'')
          ),
          'DD.MM.YYYY'
-       ) <= ((now() at time zone 'Europe/Berlin')::date - 60)
+       ) <= ((now() at time zone 'Europe/Berlin')::date - ${CALL_MIN_JOB_AGE_DAYS})
        and lower(c.name) not like '%caritas%'
        and lower(c.name) not like '%arbeiterwohlfahrt%'
        and lower(c.name) not like '%johanniter%'
@@ -446,7 +458,7 @@ export async function buildDailyOutboundPlan(workspace = "default") {
             nullif(left(split_part(coalesce(l.notes,''),' · seit ',2),10),'')
           ),
           'DD.MM.YYYY'
-        ) > ((now() at time zone 'Europe/Berlin')::date - 60)
+        ) > ((now() at time zone 'Europe/Berlin')::date - ${CALL_MIN_JOB_AGE_DAYS})
         or lower(c.name) like '%caritas%'
         or lower(c.name) like '%arbeiterwohlfahrt%'
         or lower(c.name) like '%johanniter%'
