@@ -230,7 +230,7 @@ function insertCallChannelSql() {
         'owner',owner
       )
     from ranked
-    where rn <= 50
+    where rn <= ${OUTBOUND_TARGETS.call}
     on conflict(workspace,task_date,lead_id,channel) do update set
       rank=excluded.rank,
       score=excluded.score,
