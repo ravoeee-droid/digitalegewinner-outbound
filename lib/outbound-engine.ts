@@ -136,7 +136,7 @@ function insertChannelSql(channel: OutboundChannel, extraWhere: string, target: 
 }
 
 // Für Calls zusätzlich Leads im Status 'Kontaktiert' (zweiter Versuch), aber nur ohne Abschluss/Absage und mit mindestens 2 Tagen Abstand.
-const callBaseCandidateSql = baseCandidateSql.replace("and l.stage in ('Neu','Research','Bereit')", `and l.stage in ('Neu','Research','Bereit','Kontaktiert')
+const callBaseCandidateSql = baseCandidateSql.replace("    l.owner,", "    coalesce(nullif(l.owner,''),'Raphael') owner,").replace("and l.stage in ('Neu','Research','Bereit')", `and l.stage in ('Neu','Research','Bereit','Kontaktiert')
     and (
       l.stage<>'Kontaktiert'
       or (
@@ -150,7 +150,7 @@ function insertCallChannelSql() {
     with candidates as (
       ${callBaseCandidateSql}
       and coalesce(ct.phone,c.phone,'')<>''
-      and l.owner in ('Raphael','Mattias')
+      and coalesce(nullif(l.owner,''),'Raphael') in ('Raphael','Mattias')
       and ${leadSegmentSql("c")}='pflege'
       and (
         lower(coalesce(c.metadata->>'jobRole',''))='pflegefachkraft'
