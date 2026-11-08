@@ -105,6 +105,9 @@ export default function CallConsole({ embedded = false }: { embedded?: boolean }
   const remainingToGoal = Math.max(0, DAILY_GOAL - completedCalls);
   const etaMinutes = pace > 0 ? Math.round((remainingToGoal / pace) * 60) : null;
   const avgSeconds = sessionCalls > 0 ? Math.round((clock - sessionStart) / 1000 / sessionCalls) : null;
+  const BLOCK_MINUTES = 150;
+  const minutesLeft = Math.max(0, BLOCK_MINUTES - (clock - sessionStart) / 60000);
+  const neededPace = minutesLeft > 1 ? Math.ceil((remainingToGoal / minutesLeft) * 60) : null;
   const goalProgress = Math.min(100, Math.round((completedCalls / DAILY_GOAL) * 100));
   const callSeconds = callStartedAt ? (clock - callStartedAt) / 1000 : 0;
   const p = active?.payload || {};
@@ -117,6 +120,7 @@ export default function CallConsole({ embedded = false }: { embedded?: boolean }
   const contactEmail = value(p, "contactEmail");
   const contactPhone = value(p, "contactPhone");
   const extremeHot = p?.extremeHot === true;
+  const signals = Array.isArray(p?.signals) ? (p.signals as unknown[]).map(String).filter(Boolean) : [];
   const campaign = value(p, "campaign");
   const baJobsUrl = company && company !== "Keine Calls mehr offen"
     ? `https://www.arbeitsagentur.de/jobsuche/suche?angebotsart=1&suchbereich=jobs&was=${encodeURIComponent(company)}`
@@ -322,7 +326,7 @@ export default function CallConsole({ embedded = false }: { embedded?: boolean }
       </header>
       <section className="rapid-progress" aria-label="Tagesziel und Tempo">
         <div><span>Heute / Ziel</span><strong>{completedCalls} / {DAILY_GOAL}</strong></div>
-        <div><span>Tempo</span><strong>{pace ? `${Math.round(pace)}/h` : "–"}</strong></div>
+        <div><span>Tempo / Soll</span><strong className={pace && neededPace && pace < neededPace ? "behind" : ""}>{pace ? `${Math.round(pace)}` : "–"} / {neededPace ?? "–"} pro h</strong></div>
         <div><span>Ø pro Call</span><strong>{avgSeconds ? fmtClock(avgSeconds) : "–"}</strong></div>
         <div><span>Erreicht (Session)</span><strong>{sessionCalls ? `${sessionConnects}/${sessionCalls}` : "–"}</strong></div>
         <div className="rapid-progress-bar"><span><i style={{ width: `${goalProgress}%` }} /></span><strong>{remainingToGoal === 0 ? "Ziel erreicht 🎯" : etaMinutes ? `noch ${remainingToGoal} · ~${etaMinutes >= 60 ? `${Math.floor(etaMinutes / 60)}h ${etaMinutes % 60}min` : `${etaMinutes}min`}` : `noch ${remainingToGoal}`}</strong></div>
@@ -373,7 +377,8 @@ export default function CallConsole({ embedded = false }: { embedded?: boolean }
             </section>
             <section className="rapid-script" id="call-script" aria-labelledby="script-title" tabIndex={-1}>
               <p id="script-title">DU SAGST</p><blockquote>{opener}</blockquote>
-              <div className="rapid-hook"><span>AUFHÄNGER FÜR DIESEN BETRIEB</span><strong>{hook}</strong></div>
+              <div className="rapid-hook"><span>AUFHÄNGER FÜR DIESEN BETRIEB</span><strong>{hook}</strong>
+                {signals.length > 0 && <ul className="rapid-signals" aria-label="Recherche-Funde">{signals.map((sig) => <li key={sig}>{sig}</li>)}</ul>}</div>
               <div className="rapid-question"><span>DANN FRAGEN</span><strong>{question}</strong></div>
               {showObjections && (
                 <div className="rapid-objections">
@@ -416,6 +421,7 @@ export default function CallConsole({ embedded = false }: { embedded?: boolean }
 }
 
 const css = `
+.rapid-signals{margin:.55rem 0 0;padding:0;list-style:none;display:flex;gap:.35rem;flex-wrap:wrap}.rapid-signals li{border:1px solid rgba(94,234,160,.3);background:rgba(52,199,89,.08);color:#c6f9d4;border-radius:999px;padding:.28rem .6rem;font-size:.76rem;font-weight:700}.rapid-progress strong.behind{color:#ff9c75}
 .rapid-notify.power-on{border-color:#34c759;color:#c6f9d4;background:rgba(52,199,89,.12)}.rapid-countdown{position:sticky;top:.5rem;z-index:45;max-width:56rem;margin:.65rem auto;display:flex;justify-content:space-between;align-items:center;gap:1rem;border:1px solid #34c759;background:rgba(18,29,24,.97);color:#c6f9d4;border-radius:.75rem;padding:.7rem .9rem;font-size:.9rem;font-weight:800}.rapid-countdown button{border:1px solid rgba(255,255,255,.2);background:transparent;color:#fff;border-radius:.5rem;padding:.4rem .7rem;font-weight:800;cursor:pointer}.rapid-timer{color:#ff9c75;font-variant-numeric:tabular-nums}.rapid-objections{margin-top:.9rem;display:grid;gap:.45rem}.rapid-objections div{border:1px solid rgba(255,255,255,.08);background:#0d1612;border-radius:.6rem;padding:.5rem .65rem}.rapid-objections span{display:block;color:#d1a34b;font-size:.64rem;font-weight:950;letter-spacing:.1em}.rapid-objections strong{font-size:.86rem;font-weight:650;line-height:1.4}.rapid-upnext{margin-top:.9rem;display:flex;gap:.4rem;flex-wrap:wrap;align-items:center}.rapid-upnext span{font-size:.64rem;font-weight:950;letter-spacing:.11em;color:#7f8993}.rapid-upnext em{font-style:normal;font-size:.76rem;color:#aab3bb;border:1px solid rgba(255,255,255,.08);border-radius:999px;padding:.25rem .55rem}
 .rapid-progress{grid-template-columns:repeat(4,minmax(7rem,.5fr)) minmax(15rem,1.5fr)!important}
 *{box-sizing:border-box}html{font-size:16px;background:#09100d}body{margin:0;background:#09100d;color:#f7f8fa}button,a,textarea,input{font:inherit}button,a{touch-action:manipulation}

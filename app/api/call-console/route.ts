@@ -6,6 +6,7 @@ import { query } from "@/lib/db";
 import { addProductOpportunity, updateRevenueOpportunity } from "@/lib/revenue-opportunities";
 import { createWebsiteProjectFromLead } from "@/lib/website-projects";
 import { leadSegmentSql } from "@/lib/lead-segment";
+import { buildCallSignals } from "@/lib/call-signals";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -51,6 +52,13 @@ async function hydrateContacts<T extends { lead_id: string; payload: Record<stri
     where l.id=any($1::text[])
   `, [leadIds]);
   const byLead = new Map(contacts.map((row) => [row.lead_id, row]));
+  // Anreicherung des Oracle/GitHub-Workers; fehlt die Tabelle noch (Worker nie gelaufen), bleibt die Queue unverändert.
+  const signalsByLead = new Map<string, Record<string, Record<string, unknown>>>();
+  try {
+    const enriched = await query<{ lead_id: string; source: string; data: Record<string, unknown> }>(
+      `select l.id lead_id,e.source,e.data from sales_leads l join lead_enrichment e on e.company_id=l.company_id and e.status='ok' where l.id=any($1::text[])`, [leadIds]);
+    for (const row of enriched) signalsByLead.set(row.lead_id, { ...(signalsByLead.get(row.lead_id) || {}), [row.source]: row.data });
+  } catch { /* lead_enrichment existiert noch nicht */ }
   return tasks.filter((task) => byLead.get(task.lead_id)?.segment === "pflege").map((task) => {
     const contact = byLead.get(task.lead_id);
     if (!contact) return task;
@@ -62,6 +70,7 @@ async function hydrateContacts<T extends { lead_id: string; payload: Record<stri
         contactEmail: String(task.payload?.contactEmail || contact.contact_email || ""),
         contactPhone: String(task.payload?.contactPhone || contact.contact_phone || ""),
         extremeHot: contact.extreme_hot,
+        signals: buildCallSignals(signalsByLead.get(task.lead_id) || {}),
       },
     };
   });
