@@ -1,7 +1,7 @@
 {
   "contractVersion": "1.0.0",
   "instance": "DG-MAIN",
-  "updatedAt": "2026-10-27",
+  "updatedAt": "2026-11-08",
   "policy": "same-task-adapt-both-directions",
   "status": "parity-realignment-in-progress",
   "sharedSurfaces": {
@@ -14,7 +14,7 @@
     "campaignControlPlane": "needs-parity-review",
     "campaignRunTracking": "needs-parity-review",
     "mailboxStatusWorkflow": "DG collision-safe mailbox IDs; missing-only sequential verification and explicit saved-password reuse; peer parity blocked",
-    "callerQueue": "local-implementation-exists-review-parity",
+    "callerQueue": "DG: Power-Dialer cockpit (optimistic instant next-lead, auto-dial countdown, daily goal 100 with pace/ETA, skip, objection cheat sheet, call timer); peer parity blocked",
     "leadDetailWorkspace": "local-implementation-exists-review-parity",
     "salesBrief": "needs-parity-review",
     "applicationFrame": "dg-single-sidebar-shell-AppFrame-from-jj-growth-os-pattern; walkenhorst-parity-pending",
@@ -105,6 +105,12 @@
       "surface": "usPvPilotImport",
       "peer": "CLIENT-WALKENHORST",
       "detail": "Read-only peer inspection found no app/api/territories route and a different energy lead-finder persistence model. DG's reviewed Apify JSON import targets its native sales_companies/sales_contacts/sales_leads tables and DG campaign state; porting it would mix DG campaign copy and customer-specific data contracts into the peer. Peer runtime/data remain unchanged and shared-core parity is not claimed."
+    },
+    {
+      "id": "call-cockpit-power-dialer-2026-11-08",
+      "surface": "callerQueue",
+      "peer": "CLIENT-WALKENHORST",
+      "detail": "DG CallConsole got optimistic outcome saving, power-mode auto-dial, goal/pace tracking, skip and objection helper. Peer source was not inspected in this session (repository not attached, no data access). Equivalent peer adaptation is still to be done; parity is not claimed."
     }
   ],
   "rules": [
@@ -116,4 +122,3 @@
     "Do not mark a shared-core task complete until both instances are adapted or a blocker is recorded here."
   ]
 }
-

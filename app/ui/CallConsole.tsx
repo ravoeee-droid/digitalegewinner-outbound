@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 type Task = {
   id: string;
@@ -12,6 +12,25 @@ type Task = {
 };
 
 type Outcome = "not_reached" | "callback" | "pain" | "appointment" | "no_fit" | "dnc" | "website_requested" | "info_mail";
+
+const DAILY_GOAL = 100;
+const CONNECT_OUTCOMES: Outcome[] = ["callback", "pain", "appointment", "no_fit", "dnc", "website_requested", "info_mail"];
+
+function fmtClock(totalSeconds: number) {
+  const s = Math.max(0, Math.floor(totalSeconds));
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const r = s % 60;
+  return h > 0 ? `${h}:${String(m).padStart(2, "0")}:${String(r).padStart(2, "0")}` : `${m}:${String(r).padStart(2, "0")}`;
+}
+
+const objections = [
+  { k: "Kein Bedarf", a: "„Verstehe ich. Darf ich eine Frage stellen, bevor ich Sie wieder in Ruhe lasse: Woher kommen Ihre Bewerbungen aktuell?“" },
+  { k: "Schicken Sie Infos", a: "„Gern – damit es nicht im Postfach versandet: Wer schaut sich das an, und passt Ihnen Donnerstag für 10 Minuten zum Durchgehen?“" },
+  { k: "Keine Zeit", a: "„Dann fasse ich mich kurz: 30 Sekunden jetzt, oder soll ich in 30 Minuten noch mal anrufen?“" },
+  { k: "Haben schon Agentur", a: "„Super, dann sind Sie schon weiter als viele. Ich schaue nur auf einen Punkt: Wie viele Bewerbungen kommen direkt über Ihre Website?“" },
+  { k: "Dafür bin ich nicht zuständig", a: "„Danke Ihnen – wer ist bei Ihnen für Personal und Recruiting zuständig, und wann erreiche ich die Person am besten?“" },
+];
 
 const outcomes: Array<{ key: string; value: Outcome; label: string }> = [
   { key: "1", value: "not_reached", label: "Nicht erreicht" },
@@ -44,10 +63,26 @@ export default function CallConsole({ embedded = false }: { embedded?: boolean }
   const [callbackOpen, setCallbackOpen] = useState(false);
   const [callbackTime, setCallbackTime] = useState("15:00");
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+  const [powerMode, setPowerMode] = useState(true);
+  const [countdown, setCountdown] = useState<number | null>(null);
+  const [skipped, setSkipped] = useState<string[]>([]);
+  const [sessionStart] = useState(() => Date.now());
+  const [clock, setClock] = useState(() => Date.now());
+  const [callStartedAt, setCallStartedAt] = useState<number | null>(null);
+  const [sessionCalls, setSessionCalls] = useState(0);
+  const [sessionConnects, setSessionConnects] = useState(0);
+  const [showObjections, setShowObjections] = useState(false);
+  const inflight = useRef(0);
+  const noteRef = useRef<HTMLTextAreaElement | null>(null);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setClock(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   const pending = useMemo(() => {
     const now = Date.now();
-    return tasks
+    const list = tasks
       .filter((task) => !["done", "sent", "completed", "skipped"].includes(task.status))
       .filter((task) => {
         const callbackAt = value(task.payload || {}, "callbackAt");
@@ -60,15 +95,18 @@ export default function CallConsole({ embedded = false }: { embedded?: boolean }
         const bDue = bCb && new Date(bCb).getTime() <= now ? 0 : 1;
         return aDue - bDue || a.rank - b.rank;
       });
-  }, [tasks]);
+    return [...list.filter((t) => !skipped.includes(t.id)), ...skipped.map((id) => list.find((t) => t.id === id)).filter((t): t is Task => Boolean(t))];
+  }, [tasks, skipped]);
   const completedCalls = useMemo(() => tasks.filter((task) => ["done", "sent", "completed"].includes(task.status)).length, [tasks]);
-  const scheduledCallbacks = useMemo(() => tasks.filter((task) => {
-    const callbackAt = value(task.payload || {}, "callbackAt");
-    return callbackAt && new Date(callbackAt).getTime() > Date.now();
-  }).length, [tasks]);
-  const totalCalls = completedCalls + pending.length + scheduledCallbacks;
-  const progress = totalCalls ? Math.round((completedCalls / totalCalls) * 100) : 100;
   const active = pending[0] || null;
+  const upNext = pending.slice(1, 4);
+  const sessionHours = Math.max(0, (clock - sessionStart) / 3600000);
+  const pace = sessionHours > 0.03 && sessionCalls > 0 ? sessionCalls / sessionHours : 0;
+  const remainingToGoal = Math.max(0, DAILY_GOAL - completedCalls);
+  const etaMinutes = pace > 0 ? Math.round((remainingToGoal / pace) * 60) : null;
+  const avgSeconds = sessionCalls > 0 ? Math.round((clock - sessionStart) / 1000 / sessionCalls) : null;
+  const goalProgress = Math.min(100, Math.round((completedCalls / DAILY_GOAL) * 100));
+  const callSeconds = callStartedAt ? (clock - callStartedAt) / 1000 : 0;
   const p = active?.payload || {};
   const company = value(p, "company") || "Keine Calls mehr offen";
   const city = value(p, "city");
@@ -120,6 +158,8 @@ export default function CallConsole({ embedded = false }: { embedded?: boolean }
 
   const dial = useCallback(() => {
     if (!active || !phone) return;
+    setCountdown(null);
+    setCallStartedAt(Date.now());
     window.dispatchEvent(new CustomEvent("cloudtalk:dial", { detail: { leadId: active.lead_id, company, phone } }));
     window.location.href = `tel:${phone.replace(/[^+\d]/g, "")}`;
   }, [active, company, phone]);
@@ -190,26 +230,69 @@ export default function CallConsole({ embedded = false }: { embedded?: boolean }
     }
   }, [tasks]);
 
-  const saveOutcome = useCallback(async (outcome: Outcome, callbackPreset?: "30m" | "afternoon" | "time") => {
-    if (!active || busy) return;
-    setBusy(true); setError("");
-    try {
-      const res = await fetch("/api/call-console", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ id: active.id, outcome, note, opener: "A", callbackPreset, callbackTime: callbackPreset === "time" ? callbackTime : undefined }) });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || "Ergebnis konnte nicht gespeichert werden.");
-      setTasks(data.tasks || []); setNote(""); setCallbackOpen(false);
-      if (outcome === "website_requested") {
-        setToast(data.websiteProject ? `✓ ${company}: Website-Projekt im Build Stream angelegt` : `Call gespeichert · Build-Verknüpfung prüfen${data.integrationWarning ? `: ${data.integrationWarning}` : ""}`);
-      }
-    } catch (e) { setError(e instanceof Error ? e.message : "Ergebnis konnte nicht gespeichert werden."); }
-    finally { setBusy(false); }
-  }, [active, busy, callbackTime, company, note]);
+  const skipLead = useCallback(() => {
+    if (!active) return;
+    setCountdown(null);
+    setCallStartedAt(null);
+    setSkipped((prev) => [...prev.filter((id) => id !== active.id), active.id]);
+    setNote("");
+  }, [active]);
+
+  const saveOutcome = useCallback((outcome: Outcome, callbackPreset?: "30m" | "afternoon" | "time") => {
+    if (!active) return;
+    const task = active;
+    const taskNote = note;
+    const taskCompany = company;
+    const nextHasPhone = Boolean(value(pending[1]?.payload || {}, "phone"));
+    // Optimistisch: Lead sofort aus der Queue nehmen, Speichern läuft im Hintergrund.
+    const optimisticCallbackAt = outcome === "callback"
+      ? new Date(Date.now() + (callbackPreset === "30m" ? 30 : 180) * 60000).toISOString()
+      : "";
+    setTasks((prev) => prev.map((t) => t.id === task.id
+      ? { ...t, status: outcome === "callback" ? "callback" : "done", payload: { ...t.payload, callOutcome: outcome, ...(optimisticCallbackAt ? { callbackAt: optimisticCallbackAt } : {}) } }
+      : t));
+    setSkipped((prev) => prev.filter((id) => id !== task.id));
+    setNote(""); setCallbackOpen(false); setError(""); setCallStartedAt(null);
+    setSessionCalls((n) => n + 1);
+    if (CONNECT_OUTCOMES.includes(outcome)) setSessionConnects((n) => n + 1);
+    if (powerMode && nextHasPhone && outcome !== "dnc") setCountdown(2); else setCountdown(null);
+
+    inflight.current += 1;
+    fetch("/api/call-console", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ id: task.id, outcome, note: taskNote, opener: "A", callbackPreset, callbackTime: callbackPreset === "time" ? callbackTime : undefined }) })
+      .then(async (res) => {
+        const data = await res.json();
+        if (!res.ok) throw new Error(data?.error || "Ergebnis konnte nicht gespeichert werden.");
+        if (inflight.current <= 1 && Array.isArray(data.tasks)) setTasks(data.tasks);
+        if (outcome === "website_requested") {
+          setToast(data.websiteProject ? `✓ ${taskCompany}: Website-Projekt im Build Stream angelegt` : `Call gespeichert · Build-Verknüpfung prüfen${data.integrationWarning ? `: ${data.integrationWarning}` : ""}`);
+        }
+      })
+      .catch((e) => {
+        setError(`Speichern für ${taskCompany} fehlgeschlagen: ${e instanceof Error ? e.message : "Unbekannter Fehler"} – Lead kommt zurück in die Queue.`);
+        setSessionCalls((n) => Math.max(0, n - 1));
+        void load();
+      })
+      .finally(() => { inflight.current -= 1; });
+  }, [active, callbackTime, company, load, note, pending, powerMode]);
+
+  useEffect(() => {
+    if (countdown === null) return;
+    if (countdown <= 0) { dial(); return; }
+    const timer = window.setTimeout(() => setCountdown((c) => (c === null ? null : c - 1)), 700);
+    return () => window.clearTimeout(timer);
+  }, [countdown, dial]);
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       const tag = (e.target as HTMLElement)?.tagName;
+      if (e.key === "Escape") { setCountdown(null); setCallbackOpen(false); setShowObjections(false); return; }
       if (tag === "TEXTAREA" || tag === "INPUT" || tag === "BUTTON" || tag === "A") return;
       if (e.key === "Enter") { e.preventDefault(); dial(); return; }
+      const lower = e.key.toLowerCase();
+      if (lower === "n") { e.preventDefault(); noteRef.current?.focus(); return; }
+      if (lower === "s") { e.preventDefault(); skipLead(); return; }
+      if (lower === "p") { e.preventDefault(); setPowerMode((v) => !v); setCountdown(null); return; }
+      if (lower === "e") { e.preventDefault(); setShowObjections((v) => !v); return; }
       const hit = outcomes.find((item) => item.key === e.key);
       if (hit) {
         e.preventDefault();
@@ -219,7 +302,7 @@ export default function CallConsole({ embedded = false }: { embedded?: boolean }
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [dial, saveOutcome]);
+  }, [dial, saveOutcome, skipLead]);
 
   return (
     <main className="rapid-root" aria-busy={busy}>
@@ -233,17 +316,25 @@ export default function CallConsole({ embedded = false }: { embedded?: boolean }
         </div>)}
         <div className="rapid-head-actions">
           <button className="rapid-notify" onClick={() => void enableNotifications()}>{notificationsEnabled ? "🔔 Erinnerungen aktiv" : "🔔 Erinnerungen aktivieren"}</button>
-          <div className="rapid-keys" aria-label="Tastaturkürzel">ENTER = CALL · 1–8 = ERGEBNIS</div>
+          <button className={`rapid-notify ${powerMode ? "power-on" : ""}`} onClick={() => { setPowerMode((v) => !v); setCountdown(null); }} aria-pressed={powerMode}>{powerMode ? "⚡ Power-Modus an" : "⚡ Power-Modus aus"}</button>
+          <div className="rapid-keys" aria-label="Tastaturkürzel">ENTER = CALL · 1–8 = ERGEBNIS · S = SKIP · N = NOTIZ · E = EINWÄNDE · P = POWER · ESC = STOP</div>
         </div>
       </header>
-      <section className="rapid-progress" aria-label="Fortschritt der Call Queue">
-        <div><span>Heute erledigt</span><strong>{completedCalls}</strong></div>
-        <div><span>Noch offen</span><strong>{pending.length}</strong></div>
-        <div><span>Rückrufe geplant</span><strong>{scheduledCallbacks}</strong></div>
-        <div className="rapid-progress-bar"><span><i style={{ width: `${progress}%` }} /></span><strong>{progress}%</strong></div>
+      <section className="rapid-progress" aria-label="Tagesziel und Tempo">
+        <div><span>Heute / Ziel</span><strong>{completedCalls} / {DAILY_GOAL}</strong></div>
+        <div><span>Tempo</span><strong>{pace ? `${Math.round(pace)}/h` : "–"}</strong></div>
+        <div><span>Ø pro Call</span><strong>{avgSeconds ? fmtClock(avgSeconds) : "–"}</strong></div>
+        <div><span>Erreicht (Session)</span><strong>{sessionCalls ? `${sessionConnects}/${sessionCalls}` : "–"}</strong></div>
+        <div className="rapid-progress-bar"><span><i style={{ width: `${goalProgress}%` }} /></span><strong>{remainingToGoal === 0 ? "Ziel erreicht 🎯" : etaMinutes ? `noch ${remainingToGoal} · ~${etaMinutes >= 60 ? `${Math.floor(etaMinutes / 60)}h ${etaMinutes % 60}min` : `${etaMinutes}min`}` : `noch ${remainingToGoal}`}</strong></div>
       </section>
       {error && <div className="rapid-error" role="alert">{error}</div>}
       {toast && <div className="rapid-toast" role="status">{toast}</div>}
+      {countdown !== null && active && (
+        <div className="rapid-countdown" role="status" aria-live="assertive">
+          <span>⚡ Wähle gleich <strong>{company}</strong> …</span>
+          <button onClick={() => setCountdown(null)}>ESC · Stopp</button>
+        </div>
+      )}
 
       {!active ? (
         <section className="rapid-done" aria-live="polite"><div aria-hidden="true">✓</div><h1>Queue leer.</h1><p>Alle vorbereiteten Calls sind durch.</p></section>
@@ -251,7 +342,7 @@ export default function CallConsole({ embedded = false }: { embedded?: boolean }
         <section className="rapid-card" aria-label={`Aktiver Lead: ${company}`}>
           <div className="rapid-topline">
             <span className="rapid-live-dot"><i /> LIVE QUEUE</span>
-            <div><span>Lead #{active.rank}</span><span className="rapid-score">Score {active.score}/100</span></div>
+            <div>{callStartedAt && <span className="rapid-timer">● {fmtClock(callSeconds)}</span>}<span>Lead #{active.rank}</span><span className="rapid-score">Score {active.score}/100</span></div>
           </div>
           <div className="rapid-main">
             <section className="rapid-company" aria-labelledby="company-name">
@@ -273,6 +364,8 @@ export default function CallConsole({ embedded = false }: { embedded?: boolean }
                 </button>
               </div>
               <div className="rapid-links">
+                <button className="rapid-site" onClick={skipLead}>⤼ Überspringen (S)</button>
+                <button className="rapid-site" onClick={() => setShowObjections((v) => !v)}>💬 Einwände (E)</button>
                 {website && <a className="rapid-site" href={website} target="_blank" rel="noreferrer">Homepage öffnen <span aria-hidden="true">↗</span></a>}
                 {jobAdUrl && <a className="rapid-site" href={jobAdUrl} target="_blank" rel="noreferrer">Stellenanzeige öffnen <span aria-hidden="true">↗</span></a>}
                 {baJobsUrl && <a className="rapid-ba" href={baJobsUrl} target="_blank" rel="noreferrer" title={`Offene Stellen von ${company} in der Jobsuche der Bundesagentur prüfen`}>🔎 BA Jobs prüfen <span aria-hidden="true">↗</span></a>}
@@ -282,14 +375,22 @@ export default function CallConsole({ embedded = false }: { embedded?: boolean }
               <p id="script-title">DU SAGST</p><blockquote>{opener}</blockquote>
               <div className="rapid-hook"><span>AUFHÄNGER FÜR DIESEN BETRIEB</span><strong>{hook}</strong></div>
               <div className="rapid-question"><span>DANN FRAGEN</span><strong>{question}</strong></div>
+              {showObjections && (
+                <div className="rapid-objections">
+                  {objections.map((o) => <div key={o.k}><span>{o.k}</span><strong>{o.a}</strong></div>)}
+                </div>
+              )}
+              {upNext.length > 0 && (
+                <div className="rapid-upnext"><span>ALS NÄCHSTES</span>{upNext.map((t) => <em key={t.id}>{value(t.payload || {}, "company")}{value(t.payload || {}, "city") ? ` · ${value(t.payload || {}, "city")}` : ""}</em>)}</div>
+              )}
             </section>
           </div>
           <section className="rapid-bottom" aria-label="Call-Ergebnis erfassen">
-            <div className="rapid-bottom-head"><div><span>CALL ABSCHLIESSEN</span><strong>Was ist passiert?</strong></div><small>Ein Klick speichert und lädt den nächsten Lead.</small></div>
+            <div className="rapid-bottom-head"><div><span>CALL ABSCHLIESSEN</span><strong>Was ist passiert?</strong></div><small>Ein Tastendruck speichert und zeigt sofort den nächsten Lead.</small></div>
             <label className="sr-only" htmlFor="call-note">Kurze Notiz zum Gespräch</label>
-            <textarea id="call-note" value={note} onChange={(e) => setNote(e.target.value)} placeholder="Kurze Notiz: Bedarf, Einwand, Rückrufgrund …" rows={2} />
+            <textarea id="call-note" ref={noteRef} value={note} onChange={(e) => setNote(e.target.value)} placeholder="Kurze Notiz: Bedarf, Einwand, Rückrufgrund …" rows={2} />
             <div className="rapid-outcomes" role="group" aria-label="Call-Ergebnis auswählen">
-              {outcomes.map((item) => <button key={item.value} className={item.value === "appointment" ? "appointment" : item.value === "website_requested" ? "website-request" : item.value === "info_mail" ? "info-mail" : item.value === "callback" ? "callback" : item.value === "pain" ? "pain" : item.value === "dnc" ? "dnc" : ""} onClick={() => item.value === "callback" ? setCallbackOpen(true) : void saveOutcome(item.value)} disabled={busy} aria-label={`${item.key}: ${item.label}. Ergebnis speichern und zum nächsten Lead wechseln.`}><kbd aria-hidden="true">{item.key}</kbd><span>{item.label}</span></button>)}
+              {outcomes.map((item) => <button key={item.value} className={item.value === "appointment" ? "appointment" : item.value === "website_requested" ? "website-request" : item.value === "info_mail" ? "info-mail" : item.value === "callback" ? "callback" : item.value === "pain" ? "pain" : item.value === "dnc" ? "dnc" : ""} onClick={() => item.value === "callback" ? setCallbackOpen(true) : void saveOutcome(item.value)} aria-label={`${item.key}: ${item.label}. Ergebnis speichern und zum nächsten Lead wechseln.`}><kbd aria-hidden="true">{item.key}</kbd><span>{item.label}</span></button>)}
             </div>
           </section>
           {callbackOpen && (
@@ -315,6 +416,8 @@ export default function CallConsole({ embedded = false }: { embedded?: boolean }
 }
 
 const css = `
+.rapid-notify.power-on{border-color:#34c759;color:#c6f9d4;background:rgba(52,199,89,.12)}.rapid-countdown{position:sticky;top:.5rem;z-index:45;max-width:56rem;margin:.65rem auto;display:flex;justify-content:space-between;align-items:center;gap:1rem;border:1px solid #34c759;background:rgba(18,29,24,.97);color:#c6f9d4;border-radius:.75rem;padding:.7rem .9rem;font-size:.9rem;font-weight:800}.rapid-countdown button{border:1px solid rgba(255,255,255,.2);background:transparent;color:#fff;border-radius:.5rem;padding:.4rem .7rem;font-weight:800;cursor:pointer}.rapid-timer{color:#ff9c75;font-variant-numeric:tabular-nums}.rapid-objections{margin-top:.9rem;display:grid;gap:.45rem}.rapid-objections div{border:1px solid rgba(255,255,255,.08);background:#0d1612;border-radius:.6rem;padding:.5rem .65rem}.rapid-objections span{display:block;color:#d1a34b;font-size:.64rem;font-weight:950;letter-spacing:.1em}.rapid-objections strong{font-size:.86rem;font-weight:650;line-height:1.4}.rapid-upnext{margin-top:.9rem;display:flex;gap:.4rem;flex-wrap:wrap;align-items:center}.rapid-upnext span{font-size:.64rem;font-weight:950;letter-spacing:.11em;color:#7f8993}.rapid-upnext em{font-style:normal;font-size:.76rem;color:#aab3bb;border:1px solid rgba(255,255,255,.08);border-radius:999px;padding:.25rem .55rem}
+.rapid-progress{grid-template-columns:repeat(4,minmax(7rem,.5fr)) minmax(15rem,1.5fr)!important}
 *{box-sizing:border-box}html{font-size:16px;background:#09100d}body{margin:0;background:#09100d;color:#f7f8fa}button,a,textarea,input{font:inherit}button,a{touch-action:manipulation}
 .rapid-root{min-height:100vh;background:radial-gradient(circle at 75% -10%,rgba(52,199,89,.09),transparent 28%),linear-gradient(180deg,#09100d 0%,#050a08 100%);color:#f7f8fa;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;padding:.9rem 1rem 1.2rem;overflow-x:hidden}.skip-link{position:absolute;left:.75rem;top:.5rem;z-index:1000;transform:translateY(-180%);background:#fff;color:#050a08;padding:.65rem .8rem;border-radius:.5rem;font-weight:900;text-decoration:none}.skip-link:focus{transform:translateY(0)}.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
 .rapid-head{max-width:1440px;margin:0 auto;min-height:4.1rem;display:flex;align-items:center;justify-content:space-between;gap:1rem;border-bottom:1px solid rgba(255,255,255,.08);padding:.2rem .1rem .8rem}.rapid-brand{display:flex!important;align-items:center!important;gap:.75rem!important}.rapid-brand-mark{display:grid;place-items:center;width:2.35rem;height:2.35rem;border-radius:.7rem;background:linear-gradient(145deg,#34c759,#34c759);color:#09100d;font-size:.76rem;font-weight:1000;letter-spacing:-.03em;box-shadow:0 8px 28px rgba(52,199,89,.18)}.rapid-brand>div:last-child{display:flex;flex-direction:column;gap:.08rem}.rapid-brand span{font-size:.68rem!important;letter-spacing:.12em!important;color:#5eeaa0!important}.rapid-brand strong{font-size:1rem!important;letter-spacing:-.01em;color:#f3f5f7}.rapid-head-actions{display:flex;align-items:center;gap:.7rem}.rapid-notify{border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.045);color:#e9edf1;border-radius:.65rem;padding:.58rem .75rem;font-size:.76rem;font-weight:800;cursor:pointer;transition:.18s ease}.rapid-notify:hover{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.2)}.rapid-keys{font-size:.7rem;color:#7e8791;font-weight:800;letter-spacing:.04em;line-height:1.3}
