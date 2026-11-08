@@ -234,6 +234,18 @@ export default function CallConsole({ embedded = false }: { embedded?: boolean }
     }
   }, [tasks]);
 
+  const [syncing, setSyncing] = useState(false);
+  const sendToCloudTalk = useCallback(async () => {
+    setSyncing(true); setError("");
+    try {
+      const res = await fetch("/api/integrations/cloudtalk/sync", { method: "POST" });
+      const data = await res.json();
+      if (!res.ok && !data?.gesendet) throw new Error(data?.error || "Senden fehlgeschlagen.");
+      setToast(`✓ ${data.gesendet ?? 0} Leads an CloudTalk gesendet${data.schonVorhanden ? ` · ${data.schonVorhanden} waren schon dort` : ""}${data.fehler?.length ? ` · Fehler: ${data.fehler[0]}` : ""}`);
+    } catch (e) { setError(e instanceof Error ? e.message : "Senden fehlgeschlagen."); }
+    finally { setSyncing(false); }
+  }, []);
+
   const skipLead = useCallback(() => {
     if (!active) return;
     setCountdown(null);
@@ -320,6 +332,7 @@ export default function CallConsole({ embedded = false }: { embedded?: boolean }
         </div>)}
         <div className="rapid-head-actions">
           <button className="rapid-notify" onClick={() => void enableNotifications()}>{notificationsEnabled ? "🔔 Erinnerungen aktiv" : "🔔 Erinnerungen aktivieren"}</button>
+          <button className="rapid-notify" onClick={() => void sendToCloudTalk()} disabled={syncing}>{syncing ? "Sende …" : "⬆ An CloudTalk senden"}</button>
           <a className="rapid-notify" href="/api/call-console/export" download>⬇ CSV für CloudTalk</a>
           <button className={`rapid-notify ${powerMode ? "power-on" : ""}`} onClick={() => { setPowerMode((v) => !v); setCountdown(null); }} aria-pressed={powerMode}>{powerMode ? "⚡ Power-Modus an" : "⚡ Power-Modus aus"}</button>
           <div className="rapid-keys" aria-label="Tastaturkürzel">ENTER = CALL · 1–8 = ERGEBNIS · S = SKIP · N = NOTIZ · E = EINWÄNDE · P = POWER · ESC = STOP</div>
