@@ -9,6 +9,8 @@ import { runLearning, applyBoosts } from "./learn.mjs";
 
 const CONCURRENCY = Number(process.env.WORKER_CONCURRENCY || 3);
 const BATCH = Number(process.env.WORKER_BATCH || 12);
+const ONCE = process.argv.includes("--once");
+const DEADLINE = Date.now() + Number(process.env.WORKER_BUDGET_MIN || 6) * 60_000;
 const WORKSPACE = process.env.WORKSPACE_ID || "default";
 
 async function ensureSchema() {
@@ -65,8 +67,10 @@ async function main() {
   log(`Worker gestartet · Workspace ${WORKSPACE} · Meta ${process.env.META_ACCESS_TOKEN ? "an" : "aus"} · Google ${process.env.SERPAPI_KEY ? "an" : "aus"} · Social-Provider ${process.env.SOCIAL_SCRAPER_URL ? "an" : "OG-Modus"}`);
   let lastLearn = 0;
   for (;;) {
+    if (ONCE && Date.now() > DEADLINE) break;
     try {
       const batch = await nextBatch();
+      if (!batch.length && ONCE) break;
       if (!batch.length) { log("Nichts zu tun, warte 5 Minuten."); await sleep(300_000); }
       else {
         const queue = [...batch];
@@ -74,7 +78,8 @@ async function main() {
         log(`Batch fertig (${batch.length})`);
       }
       if (Date.now() - lastLearn > 3600_000) { lastLearn = Date.now(); await runLearning(); if (process.env.LEARN_APPLY !== "0") await applyBoosts(); }
-    } catch (e) { log("Loop-Fehler:", e.message); await sleep(30_000); }
+    } catch (e) { log("Loop-Fehler:", e.message); if (ONCE) break; await sleep(30_000); }
   }
+  if (ONCE) { await runLearning(); if (process.env.LEARN_APPLY !== "0") await applyBoosts(); log("Einmal-Lauf beendet."); await db().end(); process.exit(0); }
 }
 main();

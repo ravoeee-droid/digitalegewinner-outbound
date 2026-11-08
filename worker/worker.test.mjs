@@ -39,3 +39,9 @@ test("parseAgentResult versteht Objekt, JSON-String und Codeblock", () => {
   assert.deepEqual(parseAgentResult('Hier:\n```json\n{"runsAds": true}\n```'), { runsAds: true });
   assert.ok(parseAgentResult("kein json").text);
 });
+import { poolerUrl } from "./lib.mjs";
+test("poolerUrl schreibt direkten Supabase-Host auf den Pooler um", () => {
+  const r = new URL(poolerUrl("postgresql://postgres:pw@db.abcdef.supabase.co:5432/postgres"));
+  assert.equal(r.username, "postgres.abcdef"); assert.match(r.hostname, /pooler\.supabase\.com$/);
+  assert.equal(poolerUrl("postgresql://u:p@example.com/db"), "postgresql://u:p@example.com/db");
+});

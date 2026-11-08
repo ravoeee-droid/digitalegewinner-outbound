@@ -4,9 +4,22 @@ export const log = (...a) => console.log(new Date().toISOString(), ...a);
 export const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // Gleiche Auswahl wie lib/db.ts der App: nach DB_CUTOVER gilt nur NEW_DATABASE_URL.
+// Direkte Supabase-Hosts (db.<ref>.supabase.co) sind nur per IPv6 erreichbar; GitHub-Runner und viele VMs haben nur IPv4 -> Pooler wie in lib/db.ts.
+export function poolerUrl(raw) {
+  try {
+    const url = new URL(raw);
+    const m = url.hostname.match(/^db\.([a-z0-9]+)\.supabase\.co$/i);
+    if (!m) return raw;
+    url.hostname = process.env.SUPABASE_POOLER_HOST || "aws-0-eu-central-1.pooler.supabase.com";
+    url.port = process.env.SUPABASE_POOLER_PORT || "5432";
+    url.username = `postgres.${m[1]}`;
+    return url.toString();
+  } catch { return raw; }
+}
 export function connectionString() {
   if (process.env.DB_CUTOVER === "1" && process.env.NEW_DATABASE_URL) return process.env.NEW_DATABASE_URL;
-  return process.env.POSTGRES_URL || process.env.DATABASE_URL || "";
+  const raw = process.env.POSTGRES_URL || process.env.DATABASE_URL || "";
+  return raw ? poolerUrl(raw) : "";
 }
 
 let pool;

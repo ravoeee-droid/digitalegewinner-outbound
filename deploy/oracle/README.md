@@ -30,3 +30,7 @@ Tipp für Tempo: Server-Region nahe Frankfurt wählen (Supabase-Pooler ist `eu-c
 ## Schnellstart mit einem Befehl
 
 Auf der frischen VM: `GH_TOKEN=<token> DOMAIN=cockpit.deine-domain.de bash deploy/oracle/bootstrap.sh`. Beim ersten Lauf legt das Skript `app.env` an; Werte eintragen und das Skript erneut starten.
+
+## Ohne eigenen Server: GitHub Actions
+
+`.github/workflows/enrichment.yml` führt den Worker stündlich (Mo–Sa) für 6 Minuten aus (`node index.mjs --once`). Dafür unter Repo → Settings → Secrets and variables → Actions das Secret `DATABASE_URL` anlegen, optional `META_ACCESS_TOKEN`, `TINYFISH_API_KEY`, `SERPAPI_KEY`. Manuell startbar unter Actions → "Lead-Anreicherung" → Run workflow. Grenze: etwa 6 Minuten Rechenzeit pro Stunde, also deutlich weniger Durchsatz als ein Dauer-Worker.
