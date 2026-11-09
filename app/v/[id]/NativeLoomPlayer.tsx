@@ -12,6 +12,11 @@ export default function NativeLoomPlayer({src,screenshot,company,posterId,debug=
   const [playing,setPlaying]=useState(false);
   const [error,setError]=useState("");
   const [youtubeFallback,setYoutubeFallback]=useState(false);
+  // Stummer Autoplay: zählt nicht als bewusstes Abspielen (kein play/play_confirmed/progress),
+  // sondern nur als "autoplay_muted". Erst "Ton an" oder Play-Klick ist ein menschliches Signal.
+  const [mutedPlay,setMutedPlay]=useState(false);
+  const humanPlay=useRef(false);
+  const box=useRef<HTMLDivElement>(null);
   const [probe,setProbe]=useState("");
   const validYoutube=/^[A-Za-z0-9_-]{11}$/.test(posterId);
   const milestones=useRef(new Set<number>());
@@ -66,13 +71,48 @@ export default function NativeLoomPlayer({src,screenshot,company,posterId,debug=
     },12000);
   }
   useEffect(()=>()=>clearWatchdog(),[]);
+  // Startet das Video stumm, sobald es zur Hälfte sichtbar ist (mobil oft erst nach dem Scrollen).
+  useEffect(()=>{
+    const el=video.current,wrap=box.current;
+    if(!el||!wrap||typeof IntersectionObserver==="undefined")return;
+    if(window.matchMedia?.("(prefers-reduced-motion: reduce)").matches)return;
+    const observer=new IntersectionObserver(entries=>{
+      if(!entries.some(entry=>entry.isIntersecting&&entry.intersectionRatio>=0.5))return;
+      observer.disconnect();
+      if(humanPlay.current||!el.paused)return;
+      el.muted=true;
+      el.play().then(()=>{setMutedPlay(true);track("autoplay_muted");}).catch(()=>{el.muted=false;});
+    },{threshold:[0.5]});
+    observer.observe(wrap);
+    return ()=>observer.disconnect();
+  },[]);
   function reportPlayerError(code:number) {
     if(!errorTrack.current) { errorTrack.current=true; track("player_error",code,{source:"native",ready:video.current?.readyState??0,network:video.current?.networkState??0,position:Math.round(video.current?.currentTime||0),visibility:document.visibilityState}); }
+  }
+
+  function unmute() {
+    const el=video.current;
+    if(!el)return;
+    humanPlay.current=true;
+    setMutedPlay(false);
+    track("play_intent");
+    // Von vorn beginnen, damit die Nachricht mit Ton von Anfang an gehört wird.
+    el.muted=false;
+    el.currentTime=0;
+    lastPlaybackPosition.current=0;
+    watchedSeconds.current=0;
+    watchedRanges.current=[];
+    if(!startedTrack.current){startedTrack.current=true;track("play");}
+    armWatchdog();
+    el.play().catch(()=>{reportPlayerError(el.error?.code||408);});
   }
 
   async function play() {
     const el=video.current;
     if(!el)return;
+    humanPlay.current=true;
+    setMutedPlay(false);
+    el.muted=false;
     track("play_intent");
     setStarted(true);
     setError("");
@@ -96,6 +136,7 @@ export default function NativeLoomPlayer({src,screenshot,company,posterId,debug=
     if(!el||!el.duration)return;
     if(el.currentTime>=watchdogPosition.current+0.5)clearWatchdog();
     const delta=el.currentTime-lastPlaybackPosition.current;
+    if(!humanPlay.current){lastPlaybackPosition.current=el.currentTime;return;}
     if(delta>0 && delta<=1.5 && !el.paused && !el.seeking) {
       watchedSeconds.current+=delta;
       recordWatchedRange(lastPlaybackPosition.current,el.currentTime);
@@ -160,7 +201,7 @@ export default function NativeLoomPlayer({src,screenshot,company,posterId,debug=
       </p>}
     </div>;
 
-  return <div role="group" aria-label={`Persönliches Video für ${company}`}>
+  return <div role="group" aria-label={`Persönliches Video für ${company}`} ref={box}>
     <div className={styles.player}>
       <div className={styles.screen}
         style={screenshot?{backgroundImage:`url(${screenshot})`}:undefined}
@@ -172,13 +213,13 @@ export default function NativeLoomPlayer({src,screenshot,company,posterId,debug=
           onPlay={()=>{
             setPlaying(true);setStarted(true);setError("");
             lastPlaybackPosition.current=video.current?.currentTime??0;
-            if(!startedTrack.current){startedTrack.current=true;track("play");}
+            if(humanPlay.current&&!startedTrack.current){startedTrack.current=true;track("play");}
           }}
           onPause={()=>{setPlaying(false);clearWatchdog();}}
           onTimeUpdate={onTime}
           onWaiting={()=>{if(startedTrack.current)armWatchdog();}}
           onStalled={()=>{if(started)armWatchdog();}}
-          onEnded={()=>{clearWatchdog();setPlaying(false);const duration=video.current?.duration||0;if(duration>0&&uniqueWatchedSeconds()>=duration*.95){if(!milestones.current.has(100)){milestones.current.add(100);track("progress",100);}track("watch",Math.round(duration));}}}
+          onEnded={()=>{clearWatchdog();setPlaying(false);setMutedPlay(false);const duration=video.current?.duration||0;if(duration>0&&uniqueWatchedSeconds()>=duration*.95){if(!milestones.current.has(100)){milestones.current.add(100);track("progress",100);}track("watch",Math.round(duration));}}}
           onError={()=>{clearWatchdog();const el=video.current;setPlaying(false);reportPlayerError(el?.error?.code||408);setError(`Video-Ladefehler: ${el?.error?.message||"Unbekannt"} (Code ${el?.error?.code||0}, Netzwerk ${el?.networkState||0})`);if(validYoutube)setYoutubeFallback(true);}}
         />
       </div>
@@ -188,7 +229,12 @@ export default function NativeLoomPlayer({src,screenshot,company,posterId,debug=
         <span className={styles.bigIcon} aria-hidden="true">▶</span>
         <span className={styles.bigLabel}>{started?"Video fortsetzen":"Persönliche Videonachricht starten"}</span>
       </button>}
-      {playing&&<button type="button" onClick={play}
+      {playing&&mutedPlay&&<button type="button" onClick={unmute}
+        aria-label="Ton einschalten und Nachricht von vorn ansehen"
+        style={{position:"absolute",left:"50%",bottom:12,transform:"translateX(-50%)",zIndex:4,padding:"12px 18px",border:0,borderRadius:999,background:"#ff641e",color:"#fff",fontWeight:700,fontSize:15,cursor:"pointer",whiteSpace:"nowrap"}}>
+        🔊 Ton an – Nachricht ansehen
+      </button>}
+      {playing&&!mutedPlay&&<button type="button" onClick={play}
         aria-label="Video pausieren" title="Video pausieren"
         style={{position:"absolute",right:12,bottom:12,zIndex:4,padding:"9px 13px",border:"1px solid #eee",borderRadius:8,background:"#202021",color:"#fff",cursor:"pointer"}}>
         ❚❚ Pause
