@@ -1,7 +1,7 @@
 {
   "contractVersion": "1.0.0",
   "instance": "DG-MAIN",
-  "updatedAt": "2026-11-08",
+  "updatedAt": "2026-11-10",
   "policy": "same-task-adapt-both-directions",
   "status": "parity-realignment-in-progress",
   "sharedSurfaces": {
@@ -13,7 +13,7 @@
     "crmWorkflowCockpitV2": "needs-adaptation-from-peer",
     "campaignControlPlane": "needs-parity-review",
     "campaignRunTracking": "needs-parity-review",
-    "mailboxStatusWorkflow": "DG collision-safe mailbox IDs; missing-only sequential verification and explicit saved-password reuse; peer parity blocked",
+    "mailboxStatusWorkflow": "DG collision-safe mailbox IDs; missing-only sequential verification and explicit saved-password reuse; peer parity blocked; DG send worker: account daily target (OUTBOUND_DAILY_EMAIL_TARGET, default 300) distributed over enabled DG mailboxes as per-mailbox floor, per-run pacing over the send window, limit-reason telemetry and Telegram shortfall alerts; peer parity blocked",
     "callerQueue": "DG: Power-Dialer cockpit (optimistic instant next-lead, auto-dial countdown, daily goal 100 with pace/ETA, skip, objection cheat sheet, call timer); peer parity blocked; DG call plan: daily cap 100/owner, min job age 30d, second-attempt for Kontaktiert leads (>=2d, no closed outcome); CloudTalk one-click contact sync; peer parity blocked",
     "leadDetailWorkspace": "local-implementation-exists-review-parity",
     "salesBrief": "needs-parity-review",
@@ -26,7 +26,8 @@
     "crmKanbanWorkspace": "DG: Pflege/PV sector-separated pipeline, Info-Mail flow, call-ready contact cards with contact name/role, direct number/mail, company switchboard, preferred contact updates and notes. Peer CRM uses separate energy_leads + workflow model; generic parity pending.",
     "territorySourceImport": "DG supports explicit Pflege sector and public email, preserves legacy PV default; peer parity blocked",
     "usPvPilotImport": "DG admin-only reviewed JSON import with PV/US metadata and campaign-scoped lead IDs; peer parity blocked",
-    "leadEnrichmentWorker": "DG: Oracle always-on worker (website/Meta Ad Library/Google Ads via SerpAPI/social OG, learning loop); peer parity blocked, peer source not inspected"
+    "leadEnrichmentWorker": "DG: Oracle always-on worker (website/Meta Ad Library/Google Ads via SerpAPI/social OG, learning loop); peer parity blocked, peer source not inspected",
+    "genericAutomationFollowUps": "DG: Loom first-touch copy with reply CTA plus F1/F2 follow-up sequence (3d/+4d) in lib/loom-campaign-launch.ts; DG-specific copy, generic sequence mechanics not yet in peer"
   },
   "blockers": [
     {
@@ -112,6 +113,12 @@
       "surface": "callerQueue",
       "peer": "CLIENT-WALKENHORST",
       "detail": "DG CallConsole got optimistic outcome saving, power-mode auto-dial, goal/pace tracking, skip and objection helper. Peer source was not inspected in this session (repository not attached, no data access). Equivalent peer adaptation is still to be done; parity is not claimed."
+    },
+    {
+      "id": "send-worker-daily-target-2026-11-10",
+      "surface": "mailboxStatusWorkflow",
+      "peer": "CLIENT-WALKENHORST",
+      "detail": "DG-MAIN send worker (app/api/cron/send/route.ts) now derives per-mailbox daily limits from an account-level target, paces sends across the Berlin send window, reports limit reasons and alerts on shortfall; lib/db.ts raises the pg connection timeout to 15 s. The peer repository was not attached to this session (GitHub scope limited to DG-MAIN), so its send worker could not be inspected or adapted. No peer runtime or data was touched; parity is not claimed and must be done in a follow-up task with read-only peer source access."
     }
   ],
   "rules": [

@@ -61,7 +61,9 @@ function getPool() {
     ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : undefined,
     max: 1,
     idleTimeoutMillis: 10_000,
-    connectionTimeoutMillis: 5_000,
+    // Neon/Supavisor brauchen nach Leerlauf (Cold Start) oft >5 s; mit 5 s brach
+    // z. B. jeder zweite ba-leads-Lauf mit "timeout exceeded when trying to connect" ab.
+    connectionTimeoutMillis: 15_000,
     allowExitOnIdle: true,
   });
   return pool;

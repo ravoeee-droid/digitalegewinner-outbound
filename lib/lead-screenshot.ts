@@ -67,6 +67,19 @@ export async function loadScreenshot(leadId: string) {
   return row?.data || null;
 }
 
+// Loom-Videoseite: Ein echter Website-Screenshot ist das Ziel. Ist er nach allen
+// Versuchen endgültig nicht erzeugbar (keine Website, 4x fehlgeschlagen), darf die
+// Videonachricht trotzdem raus; die Seite zeigt dann das Video ohne Website-Bild.
+// LOOM_REQUIRE_SCREENSHOT=strict stellt das alte Verhalten (nur 'ok') wieder her.
+export const SCREENSHOT_FINAL_ATTEMPTS = 4;
+export function loomVisualReadySql(leadIdExpr: string) {
+  const strict = process.env.LOOM_REQUIRE_SCREENSHOT === "strict";
+  const usable = strict
+    ? "s.status='ok'"
+    : `(s.status='ok' or s.status='none' or (s.status='failed' and s.attempts>=${SCREENSHOT_FINAL_ATTEMPTS}))`;
+  return `exists(select 1 from lead_screenshots s where s.lead_id=${leadIdExpr} and ${usable})`;
+}
+
 export async function hasScreenshot(leadId: string) {
   const [row] = await query("select 1 from lead_screenshots where lead_id=$1 and status='ok'", [leadId]).catch(() => []);
   return Boolean(row);

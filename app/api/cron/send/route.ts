@@ -13,6 +13,8 @@ import { recordExperimentExposureForSend } from "@/lib/outbound-experiment-engin
 import { applyBlocklist } from "@/lib/lead-blocklist";
 import { trackedEmailHtml, unsubscribeUrl, videoPageUrl } from "@/lib/email-tracking";
 import { sendAlertOnce } from "@/lib/alerts";
+import { DG_MAILBOX_EMAILS } from "@/lib/dg-mailboxes";
+import { loomVisualReadySql } from "@/lib/lead-screenshot";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -36,6 +38,14 @@ type State = { mailboxes?: Array<{id:string;email?:string;enabled:boolean;dailyL
 const DEFAULT_DAILY_SENDS_PER_MAILBOX=5;
 const PFLEGE_CAMPAIGN_DAILY_TARGET=150;
 const KNOWN_CAMPAIGN_IDS=new Set(["pflege-starter-v2","pv-starter-v1"]);
+// Tagesziel des Kontos (nicht pro Postfach). Das Ziel wird gleichmäßig auf die
+// freigegebenen deutschen DG-Postfächer verteilt und hebt deren Tageslimit mindestens
+// auf diesen Anteil an (bisher blieb der Default von 5/Postfach stehen -> 100 Mails/Tag).
+const DAILY_EMAIL_TARGET=Math.min(1000,Math.max(1,Number(process.env.OUTBOUND_DAILY_EMAIL_TARGET)||300));
+const MAX_DAILY_SENDS_PER_MAILBOX=100;
+const SEND_WINDOW_START_MIN=8*60;
+const SEND_WINDOW_END_MIN=17*60+30;
+const CRON_INTERVAL_MIN=15;
 
 function authorized(request: Request) {
   const expected = process.env.CRON_SECRET;
@@ -58,7 +68,18 @@ function insideBusinessSendWindow(){
   const now=berlinClock();
   if(now.weekday==="Sun")return false;
   const minutes=now.hour*60+now.minute;
-  return minutes>=8*60&&minutes<=17*60+30;
+  return minutes>=SEND_WINDOW_START_MIN&&minutes<=SEND_WINDOW_END_MIN;
+}
+
+// Wie viele Cron-Läufe (alle 15 Minuten) bleiben heute noch im Versandfenster, diesen eingeschlossen.
+function runsRemainingToday(){
+  const now=berlinClock();
+  const minutes=now.hour*60+now.minute;
+  return Math.max(1,Math.floor((SEND_WINDOW_END_MIN-minutes)/CRON_INTERVAL_MIN)+1);
+}
+
+function berlinDateString(){
+  return new Intl.DateTimeFormat("en-CA",{timeZone:"Europe/Berlin",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date());
 }
 
 async function run(request: Request) {
@@ -83,11 +104,22 @@ async function run(request: Request) {
   // (a display label, not a credential) - it must be keyed by the real credential id (credMap's
   // keys, what er_outbox.mailbox_id actually holds), joined by email, not by state.mailboxes' own id.
   const mailboxSettingsByEmail = new Map((state?.mailboxes || []).map((m) => [m.email?.toLowerCase(), m]));
+  const enabledMailboxes = credentials
+    .map((c) => ({ id: c.id, email: c.email?.toLowerCase() || "", known: mailboxSettingsByEmail.get(c.email?.toLowerCase()) }))
+    .filter(({ known }) => known?.enabled ?? true);
+  // Das Tagesziel wird auf die deutschen DG-Postfächer verteilt (nur diese tragen die
+  // Loom-Kampagnen). Gibt es keine, zählen alle freigegebenen Postfächer.
+  const dgEmails = new Set<string>(DG_MAILBOX_EMAILS);
+  const targetMailboxes = enabledMailboxes.filter(({ email }) => dgEmails.has(email));
+  const targetPool = targetMailboxes.length ? targetMailboxes : enabledMailboxes;
+  const targetShare = targetPool.length ? Math.ceil(DAILY_EMAIL_TARGET / targetPool.length) : 0;
+  const targetIds = new Set(targetPool.map(({ id }) => id));
   const mailboxLimits = new Map(
-    credentials
-      .map((c) => ({ id: c.id, known: mailboxSettingsByEmail.get(c.email?.toLowerCase()) }))
-      .filter(({ known }) => known?.enabled ?? true)
-      .map(({ id, known }) => [id, Math.max(1, Math.min(100, Number(known?.dailyLimit ?? DEFAULT_DAILY_SENDS_PER_MAILBOX)))] as const),
+    enabledMailboxes.map(({ id, known }) => {
+      const configured = Number(known?.dailyLimit ?? DEFAULT_DAILY_SENDS_PER_MAILBOX);
+      const floor = targetIds.has(id) ? targetShare : 0;
+      return [id, Math.max(1, Math.min(MAX_DAILY_SENDS_PER_MAILBOX, Math.max(configured, floor)))] as const;
+    }),
   );
   const campaignLimits = new Map((state?.campaigns || []).map((c) => [c.id, Math.max(1, Math.min(500, Number(c.dailyLimit || 150)))]));
   const healthMap = runtimeConfig.deliverabilityMode==="off"
@@ -127,12 +159,27 @@ async function run(request: Request) {
 
   // PV-Mails richten sich an die Geschäftsführung, nicht an Bewerbungs-/Personalpostfächer.
   await query("update er_outbox set status='suppressed',error='Personal-/Bewerbungsadresse (PV)' where workspace='default' and status='queued' and campaign_id in ('pv-starter-v1','pv-loom-150-v1') and recipient ~* '^(bewerbung|bewerbungen|bewerber|karriere|jobs?|hr|personal|recruiting|career|careers|application|applications|stellen|ausbildung)[._-]?[a-z0-9]*@'");
-  // DG Loom requires a real company-specific screenshot; a video placeholder alone is insufficient.
-  // This is campaign-specific and does not alter other customers' sending behavior.
-  await query(`update er_outbox o set status='suppressed',error='Loom-Screenshot fehlt oder ist nicht mehr verfügbar'
-    where o.workspace='default' and o.status='queued'
+  // DG Loom: Ziel ist ein echter Website-Screenshot. Solange er noch erzeugt werden kann,
+  // wird die Mail nur zurückgestellt (nicht mehr dauerhaft unterdrückt). Ist er endgültig
+  // nicht erzeugbar, geht die Videonachricht ohne Website-Bild raus (siehe loomVisualReadySql).
+  // Campaign-specific; does not alter other customers' sending behavior.
+  await query(`update er_outbox o set scheduled_at=now()+interval '2 hours',error='Loom-Screenshot wird noch erzeugt'
+    where o.workspace='default' and o.status='queued' and o.scheduled_at<=now() and o.variant='V'
       and o.campaign_id in ('pflege-loom-150-v1','pv-loom-150-v1')
-      and not exists(select 1 from lead_screenshots sc where sc.lead_id=o.lead_id and sc.status='ok')`);
+      and not ${loomVisualReadySql("o.lead_id")}`);
+  // Früher nur wegen fehlendem Screenshot unterdrückte Loom-Mails wieder freigeben, sobald das
+  // Bild da ist oder endgültig nicht erzeugbar war. Alle übrigen Prüfungen laufen beim Versand erneut.
+  await query(`update er_outbox o set status='queued',scheduled_at=now(),error=null
+    where o.workspace='default' and o.status='suppressed'
+      and o.error in ('Loom-Screenshot fehlt oder ist nicht mehr verfügbar','Loom-Screenshot wird noch erzeugt')
+      and o.campaign_id in ('pflege-loom-150-v1','pv-loom-150-v1')
+      and o.created_at>=now()-interval '45 days'
+      and ${loomVisualReadySql("o.lead_id")}
+      and not exists(select 1 from er_outbox p where p.workspace=o.workspace and p.id<>o.id
+        and (p.lead_id=o.lead_id or lower(p.recipient)=lower(o.recipient)) and p.status in ('sent','queued','sending'))
+      and not exists(select 1 from er_suppressions s where s.workspace=o.workspace and lower(s.email)=lower(o.recipient))
+      and not exists(select 1 from sales_leads l where l.workspace=o.workspace and l.id::text=o.lead_id
+        and (l.status<>'active' or coalesce(l.do_not_contact,false) or l.stage in ('Gewonnen','Verloren')))`);
 
   const due = await query<OutboxRow>(
     `with claim as (
@@ -169,7 +216,9 @@ async function run(request: Request) {
   );
 
   let sent=0, failed=0, limited=0, skipped=0, deliverabilityLimited=0, deliverabilityWouldLimit=0;
+  const limitReasons:Record<string,number>={mailbox_disabled:0,deliverability:0,cycle_pacing:0,mailbox_daily:0,campaign_daily:0};
   const sentThisCycle=new Map<string,number>();
+  const runsLeft=runsRemainingToday();
   // Postfächer laufen parallel (jede Mail dauert mehrere Sekunden), Mails desselben Postfachs nacheinander.
   const handleRow = async (row: OutboxRow) => {
     // Zweite Sicherung gegen parallel bereits beanspruchte Alt-E-Mails.
@@ -186,7 +235,7 @@ async function run(request: Request) {
     }
     if (!mailboxLimits.has(row.mailbox_id)) {
       await query("update er_outbox set status='queued',attempts=greatest(attempts-1,0),scheduled_at=now()+interval '1 hour',error='Postfach deaktiviert oder nicht freigegeben' where id=$1 and status='sending'",[row.id]);
-      limited++; return;
+      limited++; limitReasons.mailbox_disabled++; return;
     }
     const credential = credMap.get(row.mailbox_id);
     if (!credential) {
@@ -253,6 +302,7 @@ async function run(request: Request) {
         );
         limited++;
         deliverabilityLimited++;
+        limitReasons.deliverability++;
         return;
       }
       const healthLimit=health.health_status==="healthy"
@@ -266,17 +316,23 @@ async function run(request: Request) {
 
     const mailboxCurrent = sentToday.get(row.mailbox_id) ?? 0;
     const cycleCurrent=sentThisCycle.get(row.mailbox_id)??0;
-    const cycleLimit=2;
+    // Gleichmäßig über das Versandfenster verteilen statt alles um 08:00 zu bündeln:
+    // pro Lauf so viel, dass das Tageslimit des Postfachs bis 17:30 sicher erreicht wird
+    // (mindestens 2, höchstens 8 Mails je Postfach und Lauf).
+    const cycleLimit=Math.min(8,Math.max(2,Math.ceil(Math.max(0,mailboxLimit-mailboxCurrent)/runsLeft)));
     if(cycleCurrent>=cycleLimit){
       await query("update er_outbox set status='queued',attempts=greatest(attempts-1,0),scheduled_at=now()+interval '10 minutes',error=null where id=$1 and status='sending'", [row.id]);
       limited++;
+      limitReasons.cycle_pacing++;
       return;
     }
     const campaignLimit = row.campaign_id && !row.campaign_id.startsWith("noshow:") ? (KNOWN_CAMPAIGN_IDS.has(row.campaign_id) ? PFLEGE_CAMPAIGN_DAILY_TARGET : (campaignLimits.get(row.campaign_id) ?? 300)) : undefined;
     const campaignCurrent = row.campaign_id ? campaignToday.get(row.campaign_id) ?? 0 : 0;
     if (mailboxCurrent >= mailboxLimit || (campaignLimit !== undefined && campaignCurrent >= campaignLimit)) {
       await query("update er_outbox set status='queued',attempts=greatest(attempts-1,0),scheduled_at=now()+interval '60 minutes',error=null where id=$1 and status='sending'", [row.id]);
-      limited++; return;
+      limited++;
+      if(mailboxCurrent >= mailboxLimit)limitReasons.mailbox_daily++; else limitReasons.campaign_daily++;
+      return;
     }
 
     // Reject malformed or URL-encoded addresses before any SMTP attempt.
@@ -486,7 +542,13 @@ async function run(request: Request) {
   const byMailbox = new Map<string, OutboxRow[]>();
   for (const row of due) byMailbox.set(row.mailbox_id, [...(byMailbox.get(row.mailbox_id) || []), row]);
   await Promise.all([...byMailbox.values()].map(async (rows) => { for (const row of rows) await handleRow(row); }));
-  console.log("[send]",JSON.stringify({claimed:due.length,sent,failed,skipped,limited,seconds:Math.round((Date.now()-startedAt)/1000)}));
+  const sentTodayTotal=[...sentToday.values()].reduce((sum,n)=>sum+n,0);
+  const mailboxCapacity=[...targetIds].reduce((sum,id)=>sum+(mailboxLimits.get(id)??0),0);
+  console.log("[send]",JSON.stringify({claimed:due.length,sent,failed,skipped,limited,limitReasons,sentToday:sentTodayTotal,target:DAILY_EMAIL_TARGET,mailboxes:targetPool.length,perMailbox:targetShare,seconds:Math.round((Date.now()-startedAt)/1000)}));
+
+  // Verlässlichkeit: Wenn das Tagesziel in Gefahr ist, sofort melden statt erst im Tagesbericht.
+  await alertOnShortfall({claimed:due.length,sent,sentTodayTotal,limitReasons,mailboxCapacity,mailboxCount:targetPool.length}).catch(()=>null);
+
   return Response.json({
     ok:true,
     claimed:due.length,
@@ -494,10 +556,37 @@ async function run(request: Request) {
     failed,
     skipped,
     limited,
+    limitReasons,
+    sentToday:sentTodayTotal,
+    dailyTarget:DAILY_EMAIL_TARGET,
     deliverabilityMode:runtimeConfig.deliverabilityMode,
     deliverabilityLimited,
     deliverabilityWouldLimit,
   });
+}
+
+type ShortfallInput={claimed:number;sent:number;sentTodayTotal:number;limitReasons:Record<string,number>;mailboxCapacity:number;mailboxCount:number};
+async function alertOnShortfall(input:ShortfallInput){
+  const now=berlinClock();
+  const minutes=now.hour*60+now.minute;
+  const day=berlinDateString();
+  const target=DAILY_EMAIL_TARGET;
+  const pct=Math.round((input.sentTodayTotal/target)*100);
+  // 1) Warteschlange leer, obwohl das Ziel noch weit entfernt ist (Nachschub-Problem: Leads, Screenshots, Freigaben).
+  if(minutes>=11*60&&input.claimed===0&&input.sentTodayTotal<target*0.6){
+    await sendAlertOnce(`send-queue-empty:${day}`,
+      `⚠️ Outbound: Warteschlange leer – erst ${input.sentTodayTotal} von ${target} Mails heute (${pct} %).\nUrsache liegt im Nachschub (neue Leads, Screenshots, Freigaben, Follow-ups), nicht im Versand. Loom-Readiness im Log [loom-campaigns] prüfen.`,20);
+  }
+  // 2) Alles wird durch Limits gebremst, bevor das Ziel erreicht ist (Postfach-/Kampagnenlimit).
+  if(input.claimed>0&&input.sent===0&&input.sentTodayTotal<target&&(input.limitReasons.mailbox_daily+input.limitReasons.campaign_daily)>=input.claimed*0.8){
+    await sendAlertOnce(`send-limited:${day}`,
+      `⚠️ Outbound: ${input.claimed} Mails warten, aber Limits bremsen – ${input.sentTodayTotal} von ${target} heute. Postfach-Tageslimit ${input.limitReasons.mailbox_daily}×, Kampagnenlimit ${input.limitReasons.campaign_daily}×. Kapazität der ${input.mailboxCount} DG-Postfächer: ${input.mailboxCapacity}/Tag.`,20);
+  }
+  // 3) Letzte Läufe des Tages: Ziel verfehlt.
+  if(minutes>=SEND_WINDOW_END_MIN-CRON_INTERVAL_MIN&&input.sentTodayTotal<target){
+    await sendAlertOnce(`send-shortfall:${day}`,
+      `❗ Outbound Tagesziel verfehlt: ${input.sentTodayTotal} von ${target} Mails (${pct} %).\nOffen in Warteschlange: ${input.claimed}. Bremsen heute: Postfachlimit ${input.limitReasons.mailbox_daily}×, Kampagnenlimit ${input.limitReasons.campaign_daily}×, Deliverability ${input.limitReasons.deliverability}×.`,20);
+  }
 }
 
 export async function GET(request: Request) { return run(request); }
