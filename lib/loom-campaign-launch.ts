@@ -274,6 +274,9 @@ export async function ensureLoomCampaigns() {
   // DE-Outreach geht ausschließlich über die deutschen DG-Postfächer; andere (z. B. US-)Postfächer sind ausgeschlossen.
   const dgEmails=new Set<string>(DG_MAILBOX_EMAILS);
   const mailboxes=creds.filter(c=>c.provider==="smtp"&&dgEmails.has(c.email?.toLowerCase())&&enabledByEmail.get(c.email?.toLowerCase())!==false);
+  // Offene Loom-Mails, die noch an einem Nicht-DG-Postfach (z. B. US, Tageslimit 5) hängen, auf die
+  // deutschen DG-Postfächer verteilen. Sonst bleiben sie bei 5 Mails/Tag stecken, während die DG-Postfächer frei sind.
+  const realigned=mailboxes.length?await realignLoomMailboxes(mailboxes.map(m=>m.id)).catch(()=>0):0;
   const result:Record<Segment,{already:number;prepared:number;queued:number;rejected:number;scanned:number;reason?:string}>={
     pflege:{already:0,prepared:0,queued:0,rejected:0,scanned:0},
     pv:{already:0,prepared:0,queued:0,rejected:0,scanned:0},
@@ -331,7 +334,27 @@ export async function ensureLoomCampaigns() {
     pv:result.pv.queued,
   });
   const readiness=await diagnoseLoomReadiness().catch((err:unknown)=>({error:String(err instanceof Error?err.message:err)}));
-  return {ok:true,oldSuppressed:Number(old?.n||0),maxPerSegment:MAX_PER_SEGMENT,campaigns:result,followUps,refreshedCopy,readiness};
+  return {ok:true,oldSuppressed:Number(old?.n||0),maxPerSegment:MAX_PER_SEGMENT,campaigns:result,followUps,refreshedCopy,realigned,readiness};
+}
+
+async function realignLoomMailboxes(targetIds:string[]){
+  const rows=await query<{id:string}>(
+    `select id::text id from er_outbox
+     where workspace='default' and status in ('draft','queued')
+       and campaign_id in ('pflege-loom-150-v1','pv-loom-150-v1')
+       and not (mailbox_id = any($1::text[]))
+     order by scheduled_at,id limit 1000`,
+    [targetIds],
+  );
+  let moved=0;
+  for(let i=0;i<rows.length;i++){
+    const updated=await query<{id:string}>(
+      "update er_outbox set mailbox_id=$2 where id=$1::uuid and status in ('draft','queued') returning id::text id",
+      [rows[i].id,targetIds[i%targetIds.length]],
+    );
+    moved+=updated.length;
+  }
+  return moved;
 }
 
 // Noch nicht versendete Erstkontakte (queued/draft) bekommen die aktuelle Textfassung.
