@@ -12,6 +12,7 @@ import { sendAlert, sendAlertOnce } from "@/lib/alerts";
 import { dbExpiry } from "@/lib/db-expiry";
 import { analyzeReply, isAutomaticAcknowledgement } from "@/lib/reply-insight";
 import { reflectInterestedReply } from "@/lib/reply-crm-interest";
+import { terminSlots } from "@/lib/outreach-copy";
 import { currentReplyText } from "@/lib/inbox-classifier";
 
 export const runtime="nodejs";export const maxDuration=60;
@@ -155,7 +156,14 @@ async function recordReply(messageId:string,from:string,subject:string,mailboxId
    }
    const snippet=String(bodyText||subject||"").replace(/\s+/g," ").trim().slice(0,260);
    const when=insight.due&&insight.due.getTime()>Date.now()+86400000?`\nWiedervorlage: ${insight.due.toLocaleDateString("de-DE",{timeZone:"Europe/Berlin"})}`:"";
-   await sendAlert(`${insight.suppress?"🚨 ACHTUNG, bitte selbst lesen und NICHT mehr anschreiben (bereits gesperrt)":"💬 Antwort"} von ${from}\n${insight.label}\n„${snippet}"\nNächster Schritt: ${insight.action}${when}`);
+   // Heiße Antworten: fertigen Antworttext mit zwei Terminvorschlägen mitliefern, damit die Antwort in einer Minute raus ist.
+   let draft="";
+   if(highIntent&&!insight.suppress){
+    const [slotA,slotB]=terminSlots();
+    const cal=(process.env.APPOINTMENT_BOOKING_URL||"https://calendar.app.google/jZqwYfHqfjufkFmx5").trim();
+    draft=`\n\n🔥 Heißer Kontakt, bitte innerhalb von 1-2 Stunden antworten.\nVorschlag für die Antwort:\n„Vielen Dank für Ihre Rückmeldung! Ich nehme mir gern 15 Minuten für Sie. Passt ${slotA} oder ${slotB} vormittags? Oder buchen Sie direkt hier: ${cal}"`;
+   }
+   await sendAlert(`${insight.suppress?"🚨 ACHTUNG, bitte selbst lesen und NICHT mehr anschreiben (bereits gesperrt)":"💬 Antwort"} von ${from}\n${insight.label}\n„${snippet}"\nNächster Schritt: ${insight.action}${when}${draft}`);
   }catch(insightError){console.error("[reply-insight] failed",insightError instanceof Error?insightError.message:"unknown")}
   await queryIfTable("update pflege_email_outreach set status='replied',updated_at=now() where lower(email)=lower($1) and status in ('approved','sent')",[from]);
   // A reply is NOT necessarily buying intent: objections and refusals stay in
