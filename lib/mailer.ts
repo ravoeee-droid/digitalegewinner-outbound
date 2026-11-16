@@ -100,6 +100,11 @@ async function sendSmtp(input: SendInput) {
     port: input.smtpPort || 587,
     secure: (input.smtpPort || 587) === 465,
     auth: { user: input.smtpUser, pass: input.smtpPass },
+    // Harte Zeitgrenzen: Ein träger SMTP-Server darf einen Sendelauf nicht bis zum Plattform-Timeout (300 s) blockieren.
+    // Sonst bleiben alle beanspruchten Mails im Status "sending" hängen und werden später als unsicher gestoppt.
+    connectionTimeout: 15_000,
+    greetingTimeout: 15_000,
+    socketTimeout: 40_000,
   });
   const info = await transport.sendMail({ from: { name: input.name || input.email, address: input.email }, to: input.to, subject: input.subject, text: input.text, html: input.html, headers: input.headers, replyTo: input.replyTo });
   return { id: info.messageId };
