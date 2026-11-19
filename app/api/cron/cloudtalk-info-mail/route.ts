@@ -1,4 +1,5 @@
 import { cloudtalkConfigured, cloudTalkContactIdsByTag } from "@/lib/cloudtalk-api";
+import { processDgDialerBatch } from "@/lib/cloudtalk-dialer";
 import { query } from "@/lib/db";
 import { ensureRevenueOpportunitySchema } from "@/lib/revenue-opportunities";
 
@@ -22,6 +23,9 @@ export async function GET(request: Request) {
   let unmatched = 0;
   try {
     await ensureRevenueOpportunitySchema();
+    const dialer = process.env.CLOUDTALK_DIALER_WEBHOOK_SECRET
+      ? await processDgDialerBatch()
+      : null;
     for await (const contactId of cloudTalkContactIdsByTag(infoMailTagId)) {
       contacts++;
       const [result] = await query<{ matched: number; imported: number }>(`
@@ -65,7 +69,7 @@ export async function GET(request: Request) {
       imported += result.imported;
       if (result.matched !== 1) unmatched++;
     }
-    return Response.json({ ok: true, contacts, imported, unmatched });
+    return Response.json({ ok: true, contacts, imported, unmatched, dialer });
   } catch (error) {
     console.error("CloudTalk Info-Mail-Import fehlgeschlagen", error);
     return Response.json({ error: "Info-Mail-Import fehlgeschlagen.", contacts, imported, unmatched }, { status: 500 });
