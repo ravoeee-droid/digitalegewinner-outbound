@@ -21,6 +21,30 @@ export function cloudtalkConfigured() {
   return Boolean(process.env.CLOUDTALK_API_ID && process.env.CLOUDTALK_API_SECRET);
 }
 
+export async function* cloudTalkContactIdsByTag(tagId: string) {
+  for (let page = 1; ; page++) {
+    const filters = new URLSearchParams({ tag_id: tagId, page: String(page), limit: "100" });
+    const response = await fetch(`https://my.cloudtalk.io/api/contacts/index.json?${filters}`, {
+      headers: { authorization: authHeader() },
+      signal: AbortSignal.timeout(20000),
+      cache: "no-store",
+    });
+    if (!response.ok) throw new Error(`CloudTalk HTTP ${response.status}`);
+    const { responseData } = await response.json();
+    if (!Array.isArray(responseData?.data) ||
+        Number(responseData.pageNumber) !== page ||
+        !Number.isSafeInteger(Number(responseData.pageCount))) {
+      throw new Error("CloudTalk hat keine gültige Kontaktseite zurückgegeben.");
+    }
+    for (const row of responseData.data) {
+      const id = String(row?.Contact?.id ?? "");
+      if (!/^\d+$/.test(id)) throw new Error("CloudTalk-Kontakt-ID fehlt.");
+      yield id;
+    }
+    if (page >= Number(responseData.pageCount)) return;
+  }
+}
+
 function authHeader() {
   return `Basic ${Buffer.from(`${process.env.CLOUDTALK_API_ID}:${process.env.CLOUDTALK_API_SECRET}`).toString("base64")}`;
 }
