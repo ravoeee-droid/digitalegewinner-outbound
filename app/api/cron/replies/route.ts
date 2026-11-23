@@ -33,8 +33,15 @@ async function recordReply(messageId:string,from:string,subject:string,mailboxId
  if(!(await claimReply(messageId)))return false;
  // Prefer the relational CRM as source of truth. Only touch the legacy JSON mirror
  // when a reply belongs to an older lead that has not been normalized yet.
+ // Teilen sich mehrere Leads dieselbe Adresse (z. B. info@ bei Firmengruppen), gehört die Antwort zu dem Lead,
+ // dem zuletzt tatsächlich an diese Adresse gesendet wurde, nicht zum zuletzt bearbeiteten Datensatz.
  const dbLead=await query<{id:string}>(
-  "select l.id from sales_leads l join sales_contacts c on c.id=l.contact_id where l.workspace='default' and lower(c.email)=lower($1) order by l.updated_at desc limit 1",
+  `select l.id from sales_leads l
+   join sales_contacts c on c.id=l.contact_id
+   left join lateral (select max(o.sent_at) as last_sent from er_outbox o
+     where o.workspace=l.workspace and o.status='sent' and o.lead_id=l.id::text and lower(o.recipient)=lower($1)) x on true
+   where l.workspace='default' and lower(c.email)=lower($1)
+   order by x.last_sent desc nulls last, l.updated_at desc limit 1`,
   [from],
  );
  let state:State|undefined;
@@ -234,14 +241,30 @@ function isBounceMessage(from:string,subject:string){
 // DSN bodies name the address that failed inline ("Final-Recipient: ...", "couldn't be
 // delivered to ...") - pick the address right after such a marker, falling back to the
 // most-repeated non-self address in the body if no marker matches.
-function extractBouncedEmail(bodyText:string,ownEmail:string){
+function bounceCandidates(bodyText:string,ownEmail:string){
  const own=ownEmail.toLowerCase();
+ const out:string[]=[];
  const marker=/(?:final-recipient|failed recipient|the following address(?:es)? (?:failed|has failed)|rcpt to|couldn't be delivered to|nicht zustellbar an|unzustellbar an)[:\s]*[^\n]*?([A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,})/i.exec(bodyText);
- if(marker?.[1]&&marker[1].toLowerCase()!==own)return marker[1].toLowerCase();
+ if(marker?.[1]&&marker[1].toLowerCase()!==own)out.push(marker[1].toLowerCase());
  const all=(bodyText.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi)||[]).map(v=>v.toLowerCase()).filter(v=>v!==own&&!/^(mailer-daemon|postmaster)@/.test(v));
- if(!all.length)return "";
  const counts=new Map<string,number>();for(const v of all)counts.set(v,(counts.get(v)||0)+1);
- return [...counts.entries()].sort((a,b)=>b[1]-a[1])[0][0];
+ for(const [v] of [...counts.entries()].sort((a,b)=>b[1]-a[1]))if(!out.includes(v))out.push(v);
+ return out;
+}
+// Ein Rückläufer gehört nur zu einer Adresse, an die dieses Postfach in letzter Zeit wirklich gesendet hat.
+// Sonst würde z. B. eine Signatur- oder Weiterleitungsadresse im Text fälschlich gesperrt und die echte fehlerhafte Adresse bliebe aktiv.
+async function resolveBouncedEmail(bodyText:string,ownEmail:string,mailboxId:string){
+ const candidates=bounceCandidates(bodyText,ownEmail);
+ if(!candidates.length)return "";
+ const sent=await query<{r:string}>(
+  "select distinct lower(recipient) as r from er_outbox where workspace='default' and status='sent' and mailbox_id=$1 and sent_at>now()-interval '30 days' and lower(recipient)=any($2::text[])",
+  [mailboxId,candidates],
+ ).catch(()=>[] as {r:string}[]);
+ const known=new Set(sent.map(row=>row.r));
+ const match=candidates.find(v=>known.has(v));
+ if(match)return match;
+ // Kein Treffer in den gesendeten Mails: nur der ausdrücklich markierte Empfänger der Fehlermeldung gilt, nie eine geratene Adresse.
+ return /(?:final-recipient|failed recipient|rcpt to|couldn't be delivered to|nicht zustellbar an|unzustellbar an)/i.test(bodyText)?candidates[0]:"";
 }
 async function recordBounce(messageId:string,bouncedEmail:string,mailboxId:string){
  const existing=await query<{id:number}>("select id from er_events where workspace='default' and type='bounce' and meta->>'providerMessageId'=$1 limit 1",[messageId]);if(existing.length)return false;
@@ -300,7 +323,7 @@ async function syncImap(c:Credential){
   const from=m.from.toLowerCase();if(!from)continue;
   const messageId=m.messageId||`imap:${c.id}:${m.uid}`;
   if(isBounceMessage(from,m.subject)){
-   const bounced=extractBouncedEmail(m.bodyText,c.email.toLowerCase());
+   const bounced=await resolveBouncedEmail(m.bodyText,c.email.toLowerCase(),c.id);
    if(bounced&&await recordBounce(messageId,bounced,c.id))bounces++;
    continue;
   }
