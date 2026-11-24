@@ -15,6 +15,7 @@ import { trackedEmailHtml, unsubscribeUrl, videoPageUrl } from "@/lib/email-trac
 import { sendAlertOnce } from "@/lib/alerts";
 import { DG_MAILBOX_EMAILS } from "@/lib/dg-mailboxes";
 import { loomVisualReadySql } from "@/lib/lead-screenshot";
+import { extraPerMailboxLimit, isExtraMailbox } from "@/lib/extra-send-domains";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -110,12 +111,17 @@ async function run(request: Request) {
   // Das Tagesziel wird auf die deutschen DG-Postfächer verteilt (nur diese tragen die
   // Loom-Kampagnen). Gibt es keine, zählen alle freigegebenen Postfächer.
   const dgEmails = new Set<string>(DG_MAILBOX_EMAILS);
+  const extraMailboxes = enabledMailboxes.filter(({ email }) => isExtraMailbox(email));
+  const extraIds = new Set(extraMailboxes.map(({ id }) => id));
+  const extraShare = extraMailboxes.length ? extraPerMailboxLimit() : 0;
   const targetMailboxes = enabledMailboxes.filter(({ email }) => dgEmails.has(email));
-  const targetPool = targetMailboxes.length ? targetMailboxes : enabledMailboxes;
+  const targetPool = targetMailboxes.length ? targetMailboxes : enabledMailboxes.filter(({ id }) => !extraIds.has(id));
   const targetShare = targetPool.length ? Math.ceil(DAILY_EMAIL_TARGET / targetPool.length) : 0;
   const targetIds = new Set(targetPool.map(({ id }) => id));
   const mailboxLimits = new Map(
     enabledMailboxes.map(({ id, known }) => {
+      // Neue Zusatzdomain: fester, niedriger Anteil am Gesamtlimit, unabhängig von den Oberflächen-Werten.
+      if (extraIds.has(id)) return [id, extraShare] as const;
       const configured = Number(known?.dailyLimit ?? DEFAULT_DAILY_SENDS_PER_MAILBOX);
       const floor = targetIds.has(id) ? targetShare : 0;
       return [id, Math.max(1, Math.min(MAX_DAILY_SENDS_PER_MAILBOX, Math.max(configured, floor)))] as const;

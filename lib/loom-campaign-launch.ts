@@ -6,6 +6,7 @@ import { loadMailboxCredentials } from "@/lib/mailbox-credentials";
 import { DG_MAILBOX_EMAILS } from "@/lib/dg-mailboxes";
 import { VIDEO_IDS } from "@/lib/outreach-copy";
 import { loomVisualReadySql } from "@/lib/lead-screenshot";
+import { extraPerMailboxLimit, extraPerMailboxMax, isExtraMailbox } from "@/lib/extra-send-domains";
 
 type Segment = "pflege" | "pv";
 type Candidate = { id: string; email: string; company: string; contact: string; priority_score: number; has_screenshot: boolean };
@@ -273,7 +274,17 @@ export async function ensureLoomCampaigns() {
   const enabledByEmail=new Map((oldState?.mailboxes||[]).map(m=>[m.email?.toLowerCase(),m.enabled!==false]));
   // DE-Outreach geht ausschließlich über die deutschen DG-Postfächer; andere (z. B. US-)Postfächer sind ausgeschlossen.
   const dgEmails=new Set<string>(DG_MAILBOX_EMAILS);
-  const mailboxes=creds.filter(c=>c.provider==="smtp"&&dgEmails.has(c.email?.toLowerCase())&&enabledByEmail.get(c.email?.toLowerCase())!==false);
+  const mailboxes=creds.filter(c=>c.provider==="smtp"&&(dgEmails.has(c.email?.toLowerCase())||isExtraMailbox(c.email))&&enabledByEmail.get(c.email?.toLowerCase())!==false);
+  // Zusatzdomain bekommt neue Mails im Verhältnis ihrer aktuellen Tageskapazität (Aufwärmplan), damit ihre Warteschlange nicht verstopft.
+  const extraBoxes=mailboxes.filter(c=>isExtraMailbox(c.email));
+  const mainBoxes=mailboxes.filter(c=>!isExtraMailbox(c.email));
+  const extraCapacity=extraBoxes.length*extraPerMailboxLimit(), mainCapacity=mainBoxes.length*30;
+  const extraRatio=extraBoxes.length&&mainBoxes.length?Math.min(extraCapacity/(extraCapacity+mainCapacity),extraBoxes.length*extraPerMailboxMax()/(extraBoxes.length*extraPerMailboxMax()+mainCapacity)):0;
+  const pickMailbox=(index:number)=>{
+   const pool=mainBoxes.length?mainBoxes:mailboxes;
+   if(extraRatio>0&&((index*0.6180339887)%1)<extraRatio)return extraBoxes[index%extraBoxes.length];
+   return pool[index%pool.length];
+  };
   // Offene Loom-Mails, die noch an einem Nicht-DG-Postfach (z. B. US, Tageslimit 5) hängen, auf die
   // deutschen DG-Postfächer verteilen. Sonst bleiben sie bei 5 Mails/Tag stecken, während die DG-Postfächer frei sind.
   const realigned=mailboxes.length?await realignLoomMailboxes(mailboxes.map(m=>m.id)).catch(()=>0):0;
@@ -303,7 +314,7 @@ export async function ensureLoomCampaigns() {
       let allowed=false;
       try { allowed=(await evaluateEmailSendCompliance(lead.id,lead.email)).decision.allowed; }
       catch { allowed=false; }
-      const mailbox=mailboxes[(already+result[segment].prepared)%mailboxes.length];
+      const mailbox=pickMailbox(already+result[segment].prepared);
       const body=emailBody(segment,lead.company,lead.contact,lead.has_screenshot);
       const subject=emailSubject(segment,lead.company);
       await query(
