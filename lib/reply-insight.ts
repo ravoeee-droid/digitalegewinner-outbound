@@ -28,7 +28,7 @@ const ACTION: Record<string, { text: string; days: number | null }> = {
   not_responsible: { text: "Richtige Ansprechperson erfragen", days: 1 },
   referral: { text: "Neue Ansprechperson anschreiben", days: 1 },
   out_of_office: { text: "Nach der Abwesenheit nochmal melden", days: 7 },
-  not_interested: { text: "Abgeschlossen, kein Interesse", days: null },
+  not_interested: { text: "Abgeschlossen, kein Interesse (Adresse gesperrt)", days: null },
   already_filled: { text: "Abgeschlossen, Stelle besetzt", days: null },
   legal_complaint: { text: "Beschwerde prüfen, nicht mehr kontaktieren", days: 0 },
   unsubscribe: { text: "Nie wieder anschreiben (gesperrt)", days: null },
@@ -60,6 +60,8 @@ export function parseFollowUpDate(text: string, now = new Date()): Date | null {
 const COMPLAINT = /\b(anzeige[n]?|anzeigen|polizei|staatsanwalt|verbraucherzentrale|wettbewerbszentrale|abmahn\w*|anwalt|rechtsanwalt|unerlaubte werbung|unerwünschte werbung|unerbetene werbung|spam|belästigung|datenschutzbeauftragt\w*|dsgvo|uwg|löschen sie (meine|alle)|nicht mehr (anschreiben|schreiben|kontaktieren|belästigen)|zeige[n]?\s+(ich\s+)?(sie|euch|dich)\b[^.!?\n]{0,30}\ban\b|melde[n]?\s+(ich\s+)?(sie|euch)\b|rechtliche schritte|\bklage\b)/i;
 // Wunsch, keine Mails mehr zu bekommen (auch höflich formuliert).
 const OPT_OUT = /(aus (ihrem|dem|ihrer) (verteiler|liste|mailingliste)|keine weiteren (angebote|nachrichten|mails|e-mails|werbung|zusendungen)|keine (werbung|angebote|mails|e-mails) (mehr )?(zu|senden|schicken)|bitte (keine|nicht mehr) (\w+ ){0,2}(zusenden|zusenden|senden|schicken|anschreiben|mailen)|nicht mehr (zusenden|senden|schicken|anschreiben|mailen)|austragen|abmelden|abbestellen|streichen sie (uns|mich)|nehmen sie (uns|mich) (bitte )?(aus|von))/i;
+// Eindeutige Absage, auch als blankes "Nein": gilt als Widerspruch gegen weitere Kaltakquise.
+const REFUSAL = /^\s*(?:nein|nö|nope|no)\b[\s.!,]{0,3}(?:danke|thanks?|kein\b[^.]{0,30})?[\s.!]*$|\b(?:nein danke|no,? thanks?|kein interesse|nicht interessiert|kein bedarf|keinen bedarf|brauchen wir nicht|brauche ich nicht)\b/i;
 const NO_AGENCY = /(arbeiten wir nicht|arbeite ich nicht|keine zusammenarbeit)[^.]{0,60}(zusammen|personaldienst|vermittl|agentur)/i;
 const LATER = /(noch\s?mal|erneut|wieder|später)\s+(schreiben|melden|anschreiben|kontaktieren|anrufen|nachfragen)|(schreiben|melden|kontaktieren|nachfragen)\s+sie\s+(\w+\s+){0,4}(noch\s?mal|erneut|wieder)/i;
 
@@ -85,7 +87,7 @@ export function analyzeReply(subject: string, body: string, now = new Date()) {
   else if (inbox.category === "rueckruf") klass = "meeting_intent";
   else if (inbox.category === "information") klass = "needs_information";
   else if (inbox.category === "vermittler") klass = "objection_existing_solution";
-  else if (NO_AGENCY.test(current)) klass = "not_interested";
+  else if (NO_AGENCY.test(current) || REFUSAL.test(current.trim().slice(0, 400))) klass = "not_interested";
   else if (klass === "unknown" && (LATER.test(text) || parseFollowUpDate(current, now))) klass = "objection_timing";
   const action = ACTION[klass] || ACTION.unknown;
   let due: Date | null = null;
@@ -93,5 +95,5 @@ export function analyzeReply(subject: string, body: string, now = new Date()) {
     due = klass === "objection_timing" || klass === "out_of_office" ? parseFollowUpDate(`${subject}\n${current}`, now) : null;
     if (!due) due = new Date(now.getTime() + action.days * 86400000);
   }
-  return { replyClass: klass, label: LABEL[klass] || LABEL.unknown, action: action.text, due, confidence: cls.confidence, suppress: klass === "legal_complaint" || klass === "unsubscribe" };
+  return { replyClass: klass, label: LABEL[klass] || LABEL.unknown, action: action.text, due, confidence: cls.confidence, suppress: klass === "legal_complaint" || klass === "unsubscribe" || klass === "not_interested" };
 }

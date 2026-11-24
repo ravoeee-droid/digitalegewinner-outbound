@@ -170,7 +170,7 @@ async function recordReply(messageId:string,from:string,subject:string,mailboxId
     const cal=(process.env.APPOINTMENT_BOOKING_URL||"https://calendar.app.google/jZqwYfHqfjufkFmx5").trim();
     draft=`\n\n🔥 Heißer Kontakt, bitte innerhalb von 1-2 Stunden antworten.\nVorschlag für die Antwort:\n„Vielen Dank für Ihre Rückmeldung! Ich nehme mir gern 15 Minuten für Sie. Passt ${slotA} oder ${slotB} vormittags? Oder buchen Sie direkt hier: ${cal}"`;
    }
-   await sendAlert(`${insight.suppress?"🚨 ACHTUNG, bitte selbst lesen und NICHT mehr anschreiben (bereits gesperrt)":"💬 Antwort"} von ${from}\n${insight.label}\n„${snippet}"\nNächster Schritt: ${insight.action}${when}${draft}`);
+   await sendAlert(`${insight.replyClass==="not_interested"?"🚫 Absage, Adresse automatisch gesperrt":insight.suppress?"🚨 ACHTUNG, bitte selbst lesen und NICHT mehr anschreiben (bereits gesperrt)":"💬 Antwort"} von ${from}\n${insight.label}\n„${snippet}"\nNächster Schritt: ${insight.action}${when}${draft}`);
   }catch(insightError){console.error("[reply-insight] failed",insightError instanceof Error?insightError.message:"unknown")}
   await queryIfTable("update pflege_email_outreach set status='replied',updated_at=now() where lower(email)=lower($1) and status in ('approved','sent')",[from]);
   // A reply is NOT necessarily buying intent: objections and refusals stay in
