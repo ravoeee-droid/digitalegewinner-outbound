@@ -18,7 +18,7 @@ export async function GET(request: Request) {
   let gesendet = 0, last = null as Awaited<ReturnType<typeof syncCallQueue>> | null;
   try {
     while (Date.now() - startedAt < 150_000) {
-      last = await syncCallQueue({ owner: "Raphael", tag: "pflege-heute", limit: 20 });
+      last = await syncCallQueue({ owner: "Raphael", tag: new Intl.DateTimeFormat("sv-SE", { timeZone: "Europe/Berlin", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date()), limit: 20 });
       gesendet += last.gesendet;
       if ((!last.verbleibend && !last.umbenennenOffen && !last.namenOffen) || (!last.gesendet && !last.umbenannt && !last.namenVersucht) || last.rateLimited) break;
     }
